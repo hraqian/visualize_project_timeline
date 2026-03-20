@@ -270,11 +270,10 @@ function ItemsTabContent({
   }
 
   // Mismatch: e.g. user selected a task but clicked milestone sub-tab
+  const label = activeSubTab === 'milestone' ? 'milestones' : activeSubTab === 'swimlane' ? 'swimlanes' : 'tasks';
   return (
     <div className="text-center text-[var(--color-text-muted)] text-sm py-12">
-      {activeSubTab === 'swimlane'
-        ? 'Select an item in a swimlane to style its swimlane'
-        : `Selected item is a ${item.type}, not a ${activeSubTab}`}
+      Select {label} to style them
     </div>
   );
 }
