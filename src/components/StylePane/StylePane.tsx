@@ -232,9 +232,10 @@ function ItemsTabContent({
   updateSwimlane: ReturnType<typeof useProjectStore.getState>['updateSwimlane'];
 }) {
   if (!item) {
+    const label = activeSubTab === 'milestone' ? 'milestones' : activeSubTab === 'swimlane' ? 'swimlanes' : 'tasks';
     return (
       <div className="text-center text-[var(--color-text-muted)] text-sm py-12">
-        Select tasks to style them
+        Select {label} to style them
       </div>
     );
   }
