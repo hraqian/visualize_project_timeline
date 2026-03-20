@@ -102,6 +102,10 @@ export function StylePane() {
   const activeSubTab = forcedSubTab ?? autoSubTab;
 
   // When selection changes, reset forced sub-tab
+  useEffect(() => {
+    setForcedSubTab(null);
+  }, [selectedItemId]);
+
   const handleSubTabClick = (tab: ItemSubTab) => {
     setForcedSubTab(tab === autoSubTab ? null : tab);
   };
