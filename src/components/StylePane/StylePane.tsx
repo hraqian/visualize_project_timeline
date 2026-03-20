@@ -1127,17 +1127,12 @@ function MilestoneShapeDropdown({
   onChange: (icon: MilestoneIcon) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
-      if (
-        popoverRef.current && !popoverRef.current.contains(e.target as Node) &&
-        triggerRef.current && !triggerRef.current.contains(e.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
@@ -1145,48 +1140,30 @@ function MilestoneShapeDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  useEffect(() => {
-    if (open && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPopoverPos({
-        top: rect.bottom + 4,
-        right: window.innerWidth - rect.right,
-      });
-    }
-  }, [open]);
-
   const selectedIcon = MILESTONE_ICONS.find((i) => i.id === value);
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <button
-        ref={triggerRef}
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-[var(--color-text)] hover:border-[var(--color-text-muted)] transition-colors"
       >
         <MilestoneIconComponent icon={value} size={16} color={color} />
         <span className="flex-1 text-left font-medium">{selectedIcon?.label ?? value}</span>
-        <ChevronRight size={12} className={`text-[var(--color-text-muted)] transition-transform ${open ? 'rotate-90' : ''}`} />
+        <ChevronDown size={12} className={`text-[var(--color-text-muted)]`} />
       </button>
 
-      {open && popoverPos && createPortal(
-        <div
-          ref={popoverRef}
-          className="fixed z-[9999] bg-white border border-[var(--color-border)] rounded-lg shadow-lg p-2"
-          style={{
-            top: popoverPos.top,
-            right: popoverPos.right,
-          }}
-        >
-          <div className="grid grid-cols-6 gap-1">
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 w-[252px] bg-white border border-[var(--color-border)] rounded-lg shadow-xl p-3">
+          <div className="grid grid-cols-6 gap-2">
             {MILESTONE_ICONS.map((ic) => (
               <button
                 key={ic.id}
                 onClick={() => { onChange(ic.id); setOpen(false); }}
-                className={`p-2 rounded-md flex items-center justify-center transition-all ${
+                className={`flex items-center justify-center h-8 rounded-md transition-colors ${
                   value === ic.id
-                    ? 'bg-[var(--color-bg-secondary)] border border-[var(--color-border)]'
-                    : 'hover:bg-[var(--color-bg-secondary)]'
+                    ? 'bg-slate-200'
+                    : 'hover:bg-[var(--color-surface-hover)]'
                 }`}
                 title={ic.label}
               >
@@ -1194,8 +1171,7 @@ function MilestoneShapeDropdown({
               </button>
             ))}
           </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );
