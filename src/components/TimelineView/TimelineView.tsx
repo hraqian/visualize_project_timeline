@@ -4,7 +4,7 @@ import { parseISO, differenceInDays, addDays, subDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, getProjectRange } from '@/utils';
 import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
-import type { ProjectItem, Swimlane, DurationFormat } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness } from '@/types';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -13,6 +13,7 @@ const SWIMLANE_BADGE_WIDTH = 120;
 const SWIMLANE_PADDING_TOP = 10;
 const SWIMLANE_PADDING_BOTTOM = 10;
 const INDEPENDENT_SECTION_PADDING = 12;
+const CONNECTOR_THICKNESS_MAP: Record<ConnectorThickness, number> = { thin: 1, medium: 2, thick: 3 };
 
 // ─── Duration Formatting ─────────────────────────────────────────────────────
 
@@ -176,6 +177,54 @@ export function TimelineView() {
       .filter(Boolean);
   }, [dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath]);
 
+  // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
+  const verticalConnectors = useMemo(() => {
+    const lines: { x: number; y1: number; y2: number; color: string; thickness: number; key: string }[] = [];
+
+    const getItemY = (item: ProjectItem) => {
+      if (!swimlaneIds.has(item.swimlaneId)) {
+        return INDEPENDENT_SECTION_PADDING + item.row * ROW_HEIGHT;
+      }
+      const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
+      if (!sl) return 0;
+      return sl.contentY + item.row * ROW_HEIGHT;
+    };
+
+    for (const item of visibleItems) {
+      if (item.type !== 'task') continue;
+      const style = item.taskStyle;
+      if (!style.showVerticalConnector) continue;
+
+      const startX = itemToX(item.startDate);
+      const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+      const endX = startX + barWidth;
+      const barY = getItemY(item) + (ROW_HEIGHT - style.thickness) / 2;
+      const strokeWidth = CONNECTOR_THICKNESS_MAP[style.connectorThickness] ?? 1;
+
+      // Left edge line: from bar top up to y=0
+      lines.push({
+        x: startX,
+        y1: 0,
+        y2: barY,
+        color: style.connectorColor,
+        thickness: strokeWidth,
+        key: `${item.id}-start`,
+      });
+
+      // Right edge line: from bar top up to y=0
+      lines.push({
+        x: endX,
+        y1: 0,
+        y2: barY,
+        color: style.connectorColor,
+        thickness: strokeWidth,
+        key: `${item.id}-end`,
+      });
+    }
+
+    return lines;
+  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, zoom]);
+
   // ─── Drag handlers ─────────────────────────────────────────────────
 
   const handleMouseDown = useCallback(
@@ -265,7 +314,7 @@ export function TimelineView() {
         isDragging={isDragging}
         onMouseDown={(e) => handleMouseDown(e, item.id)}
         onClickBar={() => { setSelectedItem(item.id); setStylePaneSection('bar'); }}
-        onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('title'); }}
+        onClickSection={(section) => { setSelectedItem(item.id); setStylePaneSection(section); }}
       />
     );
   };
@@ -431,6 +480,19 @@ export function TimelineView() {
                   <polygon points="0 0, 8 3, 0 6" fill="#ef4444" />
                 </marker>
               </defs>
+              {/* Vertical connector lines */}
+              {verticalConnectors.map((c) => (
+                <line
+                  key={c.key}
+                  x1={c.x}
+                  y1={c.y1}
+                  x2={c.x}
+                  y2={c.y2}
+                  stroke={c.color}
+                  strokeWidth={c.thickness}
+                  strokeDasharray="4 3"
+                />
+              ))}
               {depPaths.map(
                 (dep) =>
                   dep && (
@@ -495,10 +557,10 @@ interface TaskBarProps {
   isDragging: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onClickBar: () => void;
-  onClickLabel: () => void;
+  onClickSection: (section: 'title' | 'date' | 'duration' | 'percentComplete') => void;
 }
 
-function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickLabel }: TaskBarProps) {
+function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickSection }: TaskBarProps) {
   const style = item.taskStyle;
   const barHeight = style.thickness;
   const barY = y + (ROW_HEIGHT - barHeight) / 2;
@@ -583,7 +645,9 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
           className="absolute top-0 left-0 h-full transition-all duration-300"
           style={{
             width: `${item.percentComplete}%`,
-            backgroundColor: style.color,
+            backgroundColor: style.showPercentComplete && style.pctLabelPosition === 'center'
+              ? style.pctHighlightColor
+              : style.color,
             ...(clipPath ? {} : { borderRadius }),
             opacity: 0.85,
           }}
@@ -619,7 +683,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               ? { left: 0, top: '100%', marginTop: 2 }
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
           }}
-          onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+          onClick={(e) => { e.stopPropagation(); onClickSection('title'); }}
         >
           <span>{item.name}</span>
           {item.percentComplete > 0 && item.percentComplete < 100 && (
@@ -654,7 +718,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               ? { left: 0, top: '100%', marginTop: style.showTitle && style.labelPosition === 'below' ? 16 : 2 }
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
           }}
-          onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+          onClick={(e) => { e.stopPropagation(); onClickSection('date'); }}
         >
           <span>
             {format(parseISO(item.startDate), style.dateFormat)} - {format(parseISO(item.endDate), style.dateFormat)}
@@ -700,9 +764,55 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
                 }
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }), // 'right' (default)
           }}
-          onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+          onClick={(e) => { e.stopPropagation(); onClickSection('duration'); }}
         >
           <span>{formatDuration(item.startDate, item.endDate, style.durationFormat)}</span>
+        </div>
+      )}
+
+      {/* Percent Complete Label */}
+      {style.showPercentComplete && (
+        <div
+          className="absolute whitespace-nowrap truncate cursor-pointer"
+          style={{
+            fontSize: style.pctFontSize,
+            fontFamily: style.pctFontFamily,
+            fontWeight: style.pctFontWeight,
+            fontStyle: style.pctFontStyle ?? 'normal',
+            textDecoration: style.pctTextDecoration ?? 'none',
+            color: style.pctFontColor,
+            maxWidth: 200,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ...(style.pctLabelPosition === 'left'
+              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
+              : style.pctLabelPosition === 'center'
+              ? { left: `${item.percentComplete}%`, top: '50%', transform: 'translate(-50%, -50%)', maxWidth: 'none' }
+              : style.pctLabelPosition === 'above'
+              ? {
+                  left: 0,
+                  bottom: '100%',
+                  marginBottom:
+                    ((style.showTitle && style.labelPosition === 'above') ? 16 : 0)
+                    + ((style.showDate && style.dateLabelPosition === 'above') ? 16 : 0)
+                    + ((style.showDuration && style.durationLabelPosition === 'above') ? 16 : 0)
+                    + 2,
+                }
+              : style.pctLabelPosition === 'below'
+              ? {
+                  left: 0,
+                  top: '100%',
+                  marginTop:
+                    ((style.showTitle && style.labelPosition === 'below') ? 16 : 0)
+                    + ((style.showDate && style.dateLabelPosition === 'below') ? 16 : 0)
+                    + ((style.showDuration && style.durationLabelPosition === 'below') ? 16 : 0)
+                    + 2,
+                }
+              : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }), // 'right'
+          }}
+          onClick={(e) => { e.stopPropagation(); onClickSection('percentComplete'); }}
+        >
+          <span>{item.percentComplete}%</span>
         </div>
       )}
 

@@ -26,6 +26,7 @@ import {
   type BarShape,
   type LabelPosition,
   type MilestoneIcon,
+  type ConnectorThickness,
 } from '@/types';
 import { useState } from 'react';
 
@@ -348,7 +349,10 @@ function CollapsibleRow({
         )}
       </div>
       {expanded && children && (
-        <div className="px-4 pb-4 pt-1">
+        <div
+          className="px-4 pb-4 pt-1"
+          style={toggle && !toggle.checked ? { opacity: 0.4, pointerEvents: 'none' } : undefined}
+        >
           {children}
         </div>
       )}
@@ -1034,7 +1038,110 @@ function TaskStyleControls({
         onToggleExpand={() => handleToggleExpand('percentComplete')}
         toggle={{ checked: style.showPercentComplete, onChange: (v) => updateTaskStyle(item.id, { showPercentComplete: v }) }}
       >
-        {/* Task % complete controls (TBD) */}
+        <div className="space-y-4">
+          {/* Row 1: Color + Text */}
+          <div className="flex gap-3">
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Color
+              </label>
+              <AdvancedColorPicker
+                value={style.pctFontColor}
+                onChange={(pctFontColor) => updateTaskStyle(item.id, { pctFontColor })}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Text
+              </label>
+              <div className="flex gap-1.5">
+                <FontFamilyDropdown
+                  value={style.pctFontFamily}
+                  onChange={(pctFontFamily) => updateTaskStyle(item.id, { pctFontFamily })}
+                  fonts={FONT_FAMILIES}
+                />
+                <FontSizeDropdown
+                  value={style.pctFontSize}
+                  onChange={(pctFontSize) => updateTaskStyle(item.id, { pctFontSize })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: B / I / U */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => updateTaskStyle(item.id, { pctFontWeight: style.pctFontWeight >= 700 ? 400 : 700 })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm font-bold transition-colors ${
+                style.pctFontWeight >= 700
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Bold"
+            >
+              B
+            </button>
+            <button
+              onClick={() => updateTaskStyle(item.id, { pctFontStyle: style.pctFontStyle === 'italic' ? 'normal' : 'italic' })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm italic transition-colors ${
+                style.pctFontStyle === 'italic'
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Italic"
+            >
+              I
+            </button>
+            <button
+              onClick={() => updateTaskStyle(item.id, { pctTextDecoration: style.pctTextDecoration === 'underline' ? 'none' : 'underline' })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm underline transition-colors ${
+                style.pctTextDecoration === 'underline'
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Underline"
+            >
+              U
+            </button>
+          </div>
+
+          {/* Row 3: Position (5 icons, no Far Left) */}
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Position
+            </label>
+            <div className="flex gap-1">
+              {SECONDARY_LABEL_POSITIONS.map((pos) => (
+                <button
+                  key={pos.id}
+                  onClick={() => updateTaskStyle(item.id, { pctLabelPosition: pos.id })}
+                  className={`flex items-center justify-center w-10 h-9 rounded border transition-colors ${
+                    style.pctLabelPosition === pos.id
+                      ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)] text-[var(--color-text)]'
+                      : 'border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
+                  }`}
+                  title={pos.label}
+                >
+                  <PositionIcon position={pos.id} />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Row 4: Highlight color */}
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Highlight color
+            </label>
+            <AdvancedColorPicker
+              value={style.pctHighlightColor}
+              onChange={(pctHighlightColor) => updateTaskStyle(item.id, { pctHighlightColor })}
+            />
+          </div>
+
+          {/* Row 5: Apply to all tasks */}
+          <TaskPctApplyToAll item={item} />
+        </div>
       </CollapsibleRow>
 
       <CollapsibleRow
@@ -1043,7 +1150,32 @@ function TaskStyleControls({
         onToggleExpand={() => handleToggleExpand('verticalConnector')}
         toggle={{ checked: style.showVerticalConnector, onChange: (v) => updateTaskStyle(item.id, { showVerticalConnector: v }) }}
       >
-        {/* Vertical connector controls (TBD) */}
+        <div className="space-y-4">
+          {/* Row 1: Color + Thickness */}
+          <div className="flex gap-3">
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Color
+              </label>
+              <AdvancedColorPicker
+                value={style.connectorColor}
+                onChange={(connectorColor) => updateTaskStyle(item.id, { connectorColor })}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Thickness
+              </label>
+              <ConnectorThicknessDropdown
+                value={style.connectorThickness}
+                onChange={(connectorThickness) => updateTaskStyle(item.id, { connectorThickness })}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Apply to all tasks */}
+          <ConnectorApplyToAll item={item} />
+        </div>
       </CollapsibleRow>
     </div>
   );
@@ -1829,6 +1961,248 @@ function TaskDurationApplyToAll({ item }: { item: ReturnType<typeof useProjectSt
               onChange={(v) => setApplyProps((p) => ({ ...p, durationLabelPosition: v }))}
             >
               <PositionIcon position={item.taskStyle.durationLabelPosition} />
+            </PropertyCard>
+          </div>
+
+          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={excludeSwimlanes}
+              onChange={(e) => setExcludeSwimlanes(e.target.checked)}
+              className="accent-indigo-500"
+            />
+            <span>Exclude swimlanes</span>
+            <span title="Exclude items placed inside swimlanes">
+              <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
+            </span>
+          </label>
+
+          <button
+            onClick={handleApply}
+            className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              applied
+                ? 'bg-green-500/10 text-green-600 border border-green-500/30'
+                : 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/25 hover:bg-indigo-500/20'
+            }`}
+          >
+            {applied ? <Check size={14} /> : <Copy size={14} />}
+            {applied ? 'Applied!' : 'Apply'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Task % Complete Apply to All ─────────────────────────────────────────────
+
+function TaskPctApplyToAll({ item }: { item: ReturnType<typeof useProjectStore.getState>['items'][number] }) {
+  const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
+  const [expanded, setExpanded] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    pctFontColor: true,
+    pctFontFamily: true,
+    pctFontSize: true,
+    pctFontWeight: true,
+    pctFontStyle: true,
+    pctTextDecoration: true,
+    pctLabelPosition: true,
+    pctHighlightColor: true,
+  });
+
+  const handleApply = () => {
+    const keys = Object.entries(applyProps)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    if (keys.length === 0) return;
+    applyPartialStyleToAll(item.id, keys);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
+
+  return (
+    <div className="border border-[var(--color-border)] rounded-lg p-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
+      >
+        <Paintbrush size={13} className="text-[var(--color-text-muted)]" />
+        <span className="flex-1">Apply to all tasks</span>
+        <ChevronRight
+          size={12}
+          className={`text-[var(--color-text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
+        />
+      </button>
+
+      {expanded && (
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <PropertyCard
+              label="Color"
+              checked={applyProps.pctFontColor}
+              onChange={(v) => setApplyProps((p) => ({ ...p, pctFontColor: v }))}
+            >
+              <div
+                className="w-5 h-5 rounded border border-[var(--color-border)]"
+                style={{ backgroundColor: item.taskStyle.pctFontColor }}
+              />
+            </PropertyCard>
+            <PropertyCard
+              label="Font"
+              checked={applyProps.pctFontFamily}
+              onChange={(v) => setApplyProps((p) => ({ ...p, pctFontFamily: v }))}
+            >
+              <span className="text-[10px] text-[var(--color-text-secondary)] truncate" style={{ fontFamily: item.taskStyle.pctFontFamily }}>
+                {item.taskStyle.pctFontFamily}
+              </span>
+            </PropertyCard>
+            <PropertyCard
+              label="Size"
+              checked={applyProps.pctFontSize}
+              onChange={(v) => setApplyProps((p) => ({ ...p, pctFontSize: v }))}
+            >
+              <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">
+                {item.taskStyle.pctFontSize}
+              </span>
+            </PropertyCard>
+            <PropertyCard
+              label="Position"
+              checked={applyProps.pctLabelPosition}
+              onChange={(v) => setApplyProps((p) => ({ ...p, pctLabelPosition: v }))}
+            >
+              <PositionIcon position={item.taskStyle.pctLabelPosition} />
+            </PropertyCard>
+            <PropertyCard
+              label="Highlight"
+              checked={applyProps.pctHighlightColor}
+              onChange={(v) => setApplyProps((p) => ({ ...p, pctHighlightColor: v }))}
+            >
+              <div
+                className="w-5 h-5 rounded border border-[var(--color-border)]"
+                style={{ backgroundColor: item.taskStyle.pctHighlightColor }}
+              />
+            </PropertyCard>
+          </div>
+
+          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={excludeSwimlanes}
+              onChange={(e) => setExcludeSwimlanes(e.target.checked)}
+              className="accent-indigo-500"
+            />
+            <span>Exclude swimlanes</span>
+            <span title="Exclude items placed inside swimlanes">
+              <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
+            </span>
+          </label>
+
+          <button
+            onClick={handleApply}
+            className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              applied
+                ? 'bg-green-500/10 text-green-600 border border-green-500/30'
+                : 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/25 hover:bg-indigo-500/20'
+            }`}
+          >
+            {applied ? <Check size={14} /> : <Copy size={14} />}
+            {applied ? 'Applied!' : 'Apply'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Connector Thickness Dropdown ─────────────────────────────────────────────
+
+const CONNECTOR_THICKNESSES: { id: ConnectorThickness; label: string }[] = [
+  { id: 'thin', label: 'Thin' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'thick', label: 'Thick' },
+];
+
+function ConnectorThicknessDropdown({
+  value,
+  onChange,
+}: {
+  value: ConnectorThickness;
+  onChange: (v: ConnectorThickness) => void;
+}) {
+  return (
+    <select
+      className="w-full h-9 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+      value={value}
+      onChange={(e) => onChange(e.target.value as ConnectorThickness)}
+    >
+      {CONNECTOR_THICKNESSES.map((t) => (
+        <option key={t.id} value={t.id}>
+          {t.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// ─── Connector Apply to All ──────────────────────────────────────────────────
+
+function ConnectorApplyToAll({ item }: { item: ReturnType<typeof useProjectStore.getState>['items'][number] }) {
+  const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
+  const [expanded, setExpanded] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    connectorColor: true,
+    connectorThickness: true,
+  });
+
+  const handleApply = () => {
+    const keys = Object.entries(applyProps)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    if (keys.length === 0) return;
+    applyPartialStyleToAll(item.id, keys);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
+
+  return (
+    <div className="border border-[var(--color-border)] rounded-lg p-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
+      >
+        <Paintbrush size={13} className="text-[var(--color-text-muted)]" />
+        <span className="flex-1">Apply to all tasks</span>
+        <ChevronRight
+          size={12}
+          className={`text-[var(--color-text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
+        />
+      </button>
+
+      {expanded && (
+        <div className="mt-3 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <PropertyCard
+              label="Color"
+              checked={applyProps.connectorColor}
+              onChange={(v) => setApplyProps((p) => ({ ...p, connectorColor: v }))}
+            >
+              <div
+                className="w-5 h-5 rounded border border-[var(--color-border)]"
+                style={{ backgroundColor: item.taskStyle.connectorColor }}
+              />
+            </PropertyCard>
+            <PropertyCard
+              label="Thickness"
+              checked={applyProps.connectorThickness}
+              onChange={(v) => setApplyProps((p) => ({ ...p, connectorThickness: v }))}
+            >
+              <span className="text-[10px] text-[var(--color-text-secondary)] capitalize">
+                {item.taskStyle.connectorThickness}
+              </span>
             </PropertyCard>
           </div>
 

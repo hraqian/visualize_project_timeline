@@ -69,6 +69,8 @@ export type DurationFormat =
   | 'q' | 'qrts' | 'quarters'         // Quarters
   | 'y' | 'yrs' | 'years';            // Years
 
+export type ConnectorThickness = 'thin' | 'medium' | 'thick';
+
 export interface TaskStyle {
   barShape: BarShape;
   color: string;
@@ -109,6 +111,18 @@ export interface TaskStyle {
   durationFontStyle: 'normal' | 'italic';
   durationTextDecoration: 'none' | 'underline';
   durationTextAlign: TextAlign;
+  // Percent complete label styling
+  pctLabelPosition: LabelPosition;
+  pctFontSize: number;
+  pctFontColor: string;
+  pctFontFamily: string;
+  pctFontWeight: number;
+  pctFontStyle: 'normal' | 'italic';
+  pctTextDecoration: 'none' | 'underline';
+  pctHighlightColor: string;
+  // Vertical connector styling
+  connectorColor: string;
+  connectorThickness: ConnectorThickness;
 }
 
 export interface MilestoneStyle {
@@ -276,6 +290,18 @@ export const DEFAULT_TASK_STYLE: TaskStyle = {
   durationFontStyle: 'normal',
   durationTextDecoration: 'none',
   durationTextAlign: 'left',
+  // Percent complete label defaults
+  pctLabelPosition: 'center',
+  pctFontSize: 9,
+  pctFontColor: '#3b82f6',
+  pctFontFamily: 'Arial',
+  pctFontWeight: 400,
+  pctFontStyle: 'normal',
+  pctTextDecoration: 'none',
+  pctHighlightColor: '#fde047',
+  // Vertical connector defaults
+  connectorColor: '#9ca3af',
+  connectorThickness: 'thin',
 };
 
 export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {
