@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 20, 2026 (session 6)
+> **Last updated**: March 20, 2026 (session 7)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -78,14 +78,17 @@ src/
 ```typescript
 type ItemType = 'task' | 'milestone';
 type ActiveView = 'data' | 'timeline';
-type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector';
+type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector'
+  | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector';
 
 type BarShape = 'rounded' | 'square' | 'flat' | 'capsule' | 'chevron' | 'double-chevron'
   | 'arrow-right' | 'pointed' | 'notched' | 'tab' | 'arrow-both' | 'trapezoid'; // 12 variants
 
 type MilestoneIcon = 'diamond' | 'diamond-filled' | 'triangle' | 'triangle-filled'
   | 'flag' | 'flag-filled' | 'star' | 'star-filled' | 'circle' | 'circle-filled'
-  | 'square-ms' | 'square-ms-filled' | 'check' | 'arrow-up' | 'arrow-right' | 'hexagon'; // 16 variants
+  | 'square-ms' | 'square-ms-filled' | 'check' | 'arrow-up' | 'arrow-right' | 'hexagon'
+  | 'arrow-down' | 'star-6pt' | 'plus' | 'circle-half' | 'pentagon' | 'heart'
+  | 'chevron-right' | 'triangle-down'; // 24 variants
 
 type LabelPosition = 'far-left' | 'left' | 'center' | 'right' | 'above' | 'below';
 type TextAlign = 'left' | 'center' | 'right';
@@ -134,9 +137,20 @@ interface TaskStyle {
 
 interface MilestoneStyle {
   icon: MilestoneIcon; size: number; color: string;
+  position: 'above' | 'below';  // milestone shape position (only for independent items)
   fontSize: number; fontColor: string; labelPosition: LabelPosition;
   fontFamily: string; fontWeight: number;
   fontStyle: 'normal' | 'italic'; textDecoration: 'none' | 'underline';
+  // Date label styling
+  showDate: boolean; dateFormat: DateFormat; dateLabelPosition: LabelPosition;
+  dateFontSize: number; dateFontColor: string; dateFontFamily: string;
+  dateFontWeight: number; dateFontStyle: 'normal' | 'italic';
+  dateTextDecoration: 'none' | 'underline';
+  // Title
+  showTitle: boolean;
+  // Connector
+  showConnector: boolean; connectorColor: string;
+  connectorThickness: ConnectorThickness;
 }
 
 interface ProjectItem {
@@ -169,7 +183,7 @@ interface ProjectState {
 
 ### Store Actions (`src/store/useProjectStore.ts`)
 - **Global**: `setActiveView`, `setSelectedItem`, `setStylePaneSection`, `setZoom`, `setProjectName`, `setTimelineTitle`
-- **Items**: `addItem`, `addItemRelative`, `duplicateItem`, `updateItem`, `deleteItem`, `toggleVisibility`, `toggleItemType`, `moveItem`, `resizeItem`, `setItemRow`, `reorderItem`, `moveItemToSwimlane`
+- **Items**: `addItem`, `addItemRelative`, `duplicateItem`, `updateItem`, `deleteItem`, `toggleVisibility`, `toggleItemType`, `moveItem`, `resizeItem`, `setItemRow`, `reorderItem`, `moveItemToSwimlane`, `moveItemToGroup`
 - **Swimlanes**: `addSwimlane`, `addSwimlaneRelative`, `duplicateSwimlane`, `hideSwimlaneItems`, `updateSwimlane`, `deleteSwimlane`, `reorderSwimlane`
 - **Dependencies**: `addDependency`, `removeDependency`
 - **Styles**: `updateTaskStyle`, `updateMilestoneStyle`, `applyStyleToAll`, `applyPartialStyleToAll`, `applyTaskBarStyleToAll`
@@ -432,6 +446,32 @@ Contains:
 - Clicking labels on timeline opens correct StylePane section via `onClickSection` callback
 - CollapsibleRow disabled state: toggled-off sections show content at opacity 0.4 with pointer-events none
 
+### Phase 9 — Milestone Sections + Independent Items + Cross-Group Drag (session 7)
+- **Apply to All popover**: Portal-based `ApplyToAllBox` wrapper (escapes sidebar overflow clipping via `createPortal`)
+- **PropertyCard**: Vertical card layout (label top, icon center, checkbox bottom, `flex-1` sizing)
+- **Context-dependent empty state**: "Select {tasks|milestones|swimlanes} to style them"
+- **Sub-tab auto-switch**: `useEffect` resets `forcedSubTab` to `null` on `selectedItemId` change
+- **Milestone collapsible sections**: 4 sections with hooks (milestoneShape, milestoneTitle, milestoneDate, milestoneConnector)
+- **Milestone Shape section** (fully implemented):
+  - Color (AdvancedColorPicker), Shape (MilestoneShapeDropdown — absolute positioning, w-[252px], 24 icons in 6-col grid)
+  - Size (S=14, M=20, L=28 presets via MILESTONE_SIZE_PRESETS)
+  - Position (above/below — only available when milestone is independent, i.e. swimlaneId === null)
+  - Apply to all milestones (ApplyToAllBox with label="Apply to all milestones", cards: Color, Shape, Size, Position)
+- **MilestoneIcon expanded**: 8 new icons (arrow-down, star-6pt, plus, circle-half, pentagon, heart, chevron-right, triangle-down)
+- **Custom SVG components**: Star6pt, CircleHalf, TriangleDown added to MilestoneIconComponent.tsx
+- **MilestoneStyle expanded**: position ('above'|'below'), showTitle, showDate, showConnector, date/connector styling fields
+- **Milestone click auto-expand**: clicking milestone icon on timeline opens milestoneShape section, label click opens milestoneTitle
+- **Independent items**: Tasks/milestones can exist without swimlane (swimlaneId === null)
+  - `addItem` accepts optional `swimlaneId` (defaults to null)
+  - IndependentItemsGroup renders above swimlane groups in DataView
+  - Toolbar "Add Task"/"Add Milestone" creates independent items
+  - Swimlane deletion shows `window.confirm` with item count warning
+- **Cross-group item drag-and-drop**: Global drag state lifted from per-group to DataView level
+  - `moveItemToGroup` store action: changes swimlaneId + reorders atomically
+  - Items can be dragged between swimlanes and the independent section
+  - Swimlane headers act as drop zones (drop onto header = insert at position 0)
+  - Empty independent section shows "Drop here to remove from swimlane" zone during drag
+
 ---
 
 ## Known Pre-existing Build Errors
@@ -441,6 +481,14 @@ Contains:
 ---
 
 ## What's Next (TODO)
+
+### Milestone Sections (remaining)
+1. Milestone title section content (placeholder exists)
+2. Milestone date section content (placeholder exists)
+3. Milestone connector section content (placeholder exists)
+
+### TimelineView Milestone Rendering
+1. Render milestones using new style properties (position above/below, new icons, date labels, connectors)
 
 ### Cleanup
 1. Replace old `ColorPicker` used in milestone/swimlane sections with `AdvancedColorPicker`
