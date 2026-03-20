@@ -133,10 +133,7 @@ function App() {
               if (type === 'swimlane') {
                 handleAddSwimlane();
               } else {
-                const targetSwimlane = [...swimlanes].sort((a, b) => a.order - b.order)[0];
-                if (targetSwimlane) {
-                  addItem({ name: type === 'task' ? 'New Task' : 'New Milestone', type, swimlaneId: targetSwimlane.id });
-                }
+                addItem({ name: type === 'task' ? 'New Task' : 'New Milestone', type });
               }
             }} />
           )}

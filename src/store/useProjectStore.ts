@@ -148,7 +148,7 @@ interface ProjectActions {
   setTimelineTitle: (title: string) => void;
 
   // Items
-  addItem: (item: Partial<ProjectItem> & { name: string; type: ItemType; swimlaneId: string }) => void;
+  addItem: (item: Partial<ProjectItem> & { name: string; type: ItemType; swimlaneId?: string | null }) => void;
   addItemRelative: (referenceId: string, position: 'above' | 'below') => void;
   duplicateItem: (id: string) => void;
   updateItem: (id: string, updates: Partial<ProjectItem>) => void;
@@ -159,7 +159,7 @@ interface ProjectActions {
   resizeItem: (id: string, newEndDate: string) => void;
   setItemRow: (id: string, row: number) => void;
   reorderItem: (id: string, newIndex: number) => void;
-  moveItemToSwimlane: (id: string, swimlaneId: string) => void;
+  moveItemToSwimlane: (id: string, swimlaneId: string | null) => void;
 
   // Swimlanes
   addSwimlane: (name: string) => void;
@@ -261,7 +261,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       statusId: partial.statusId ?? null,
       assignedTo: partial.assignedTo ?? '',
       visible: partial.visible ?? true,
-      swimlaneId: partial.swimlaneId,
+      swimlaneId: partial.swimlaneId ?? null,
       row: partial.row ?? 0,
       taskStyle: partial.taskStyle ? { ...DEFAULT_TASK_STYLE, ...partial.taskStyle } : { ...DEFAULT_TASK_STYLE },
       milestoneStyle: partial.milestoneStyle ? { ...DEFAULT_MILESTONE_STYLE, ...partial.milestoneStyle } : { ...DEFAULT_MILESTONE_STYLE },

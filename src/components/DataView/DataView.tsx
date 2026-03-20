@@ -21,7 +21,7 @@ import {
   ListPlus,
 } from 'lucide-react';
 import { TypePickerCell } from './TypePicker';
-import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn } from '@/types';
+import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn, ProjectItem } from '@/types';
 import { PRESET_COLORS } from '@/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -140,6 +140,10 @@ export function DataView() {
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
 
   const sortedSwimlanes = [...swimlanes].sort((a, b) => a.order - b.order);
+  const swimlaneIds = new Set(swimlanes.map((s) => s.id));
+  const independentItems = items
+    .filter((i) => i.swimlaneId === null || !swimlaneIds.has(i.swimlaneId))
+    .sort((a, b) => a.row - b.row);
 
   const hasChecked = checkedItemIds.length > 0;
   const allChecked = items.length > 0 && checkedItemIds.length === items.length;
@@ -226,6 +230,15 @@ export function DataView() {
     });
   };
 
+  const handleAddIndependentItem = (type: ItemType) => {
+    const today = new Date().toISOString().split('T')[0];
+    addItem({
+      name: type === 'task' ? 'New Task' : 'New Milestone',
+      type,
+      startDate: today,
+    });
+  };
+
   const handleAddSwimlane = () => {
     addSwimlane('New Swimlane');
   };
@@ -288,6 +301,30 @@ export function DataView() {
             </tr>
           </thead>
           <tbody>
+            {/* Independent items (no swimlane) */}
+            <IndependentItemsGroup
+              items={independentItems}
+              statusLabels={statusLabels}
+              columnVisibility={columnVisibility}
+              totalColumns={totalColumns}
+              checkedItemIds={checkedItemIds}
+              onToggleChecked={toggleCheckedItem}
+              onUpdateItem={updateItem}
+              onDeleteItem={deleteItem}
+              onSelectItem={setSelectedItem}
+              selectedItemId={selectedItemId}
+              onDateChange={handleDateChange}
+              onDurationChange={handleDurationChange}
+              onUpdateTaskStyle={updateTaskStyle}
+              onUpdateMilestoneStyle={updateMilestoneStyle}
+              onAddItem={handleAddIndependentItem}
+              onAddStatusLabel={addStatusLabel}
+              onAddItemRelative={addItemRelative}
+              onDuplicateItem={duplicateItem}
+              onToggleVisibility={toggleVisibility}
+              onReorderItem={reorderItem}
+            />
+
             {sortedSwimlanes.map((swimlane, idx) => {
               const swimItems = items
                 .filter((i) => i.swimlaneId === swimlane.id)
@@ -323,7 +360,13 @@ export function DataView() {
                   onToggleVisibility={toggleVisibility}
                   onAddSwimlaneRelative={(pos) => addSwimlaneRelative(swimlane.id, pos)}
                   onDuplicateSwimlane={() => duplicateSwimlane(swimlane.id)}
-                  onDeleteSwimlane={() => deleteSwimlane(swimlane.id)}
+                  onDeleteSwimlane={() => {
+                    const swimItemCount = items.filter((i) => i.swimlaneId === swimlane.id).length;
+                    if (swimItemCount > 0) {
+                      if (!window.confirm(`Delete "${swimlane.name}" and its ${swimItemCount} item${swimItemCount === 1 ? '' : 's'}? This cannot be undone.`)) return;
+                    }
+                    deleteSwimlane(swimlane.id);
+                  }}
                    onHideSwimlaneItems={() => hideSwimlaneItems(swimlane.id)}
                    onReorderItem={reorderItem}
                    isDragging={dragSwimId === swimlane.id}
@@ -604,6 +647,113 @@ export function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlan
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Independent Items Group ─────────────────────────────────────────────────
+
+interface IndependentItemsGroupProps {
+  items: ReturnType<typeof useProjectStore.getState>['items'];
+  statusLabels: StatusLabel[];
+  columnVisibility: { percentComplete: boolean; assignedTo: boolean; status: boolean };
+  totalColumns: number;
+  checkedItemIds: string[];
+  onToggleChecked: (id: string) => void;
+  onUpdateItem: (id: string, updates: Partial<ProjectItem>) => void;
+  onDeleteItem: (id: string) => void;
+  onSelectItem: (id: string) => void;
+  selectedItemId: string | null;
+  onDateChange: (id: string, field: 'startDate' | 'endDate', value: string) => void;
+  onDurationChange: (id: string, days: number) => void;
+  onUpdateTaskStyle: (id: string, style: Partial<TaskStyle>) => void;
+  onUpdateMilestoneStyle: (id: string, style: Partial<MilestoneStyle>) => void;
+  onAddItem: (type: ItemType) => void;
+  onAddStatusLabel: (name: string) => void;
+  onAddItemRelative: (referenceId: string, position: 'above' | 'below') => void;
+  onDuplicateItem: (id: string) => void;
+  onToggleVisibility: (id: string) => void;
+  onReorderItem: (id: string, newIndex: number) => void;
+}
+
+function IndependentItemsGroup({
+  items: indItems,
+  statusLabels,
+  columnVisibility,
+  totalColumns,
+  checkedItemIds,
+  onToggleChecked,
+  onUpdateItem,
+  onDeleteItem,
+  onSelectItem,
+  selectedItemId,
+  onDateChange,
+  onDurationChange,
+  onUpdateTaskStyle,
+  onUpdateMilestoneStyle,
+  onAddItem,
+  onAddStatusLabel,
+  onAddItemRelative,
+  onDuplicateItem,
+  onToggleVisibility,
+  onReorderItem,
+}: IndependentItemsGroupProps) {
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
+  const [dropItemIdx, setDropItemIdx] = useState<number | null>(null);
+
+  return (
+    <>
+      {indItems.map((item, idx) => (
+        <ItemRow
+          key={item.id}
+          item={item}
+          statusLabels={statusLabels}
+          columnVisibility={columnVisibility}
+          isSelected={selectedItemId === item.id}
+          isChecked={checkedItemIds.includes(item.id)}
+          hasAnyChecked={checkedItemIds.length > 0}
+          onToggleChecked={() => onToggleChecked(item.id)}
+          onUpdateItem={onUpdateItem}
+          onDeleteItem={onDeleteItem}
+          onSelectItem={onSelectItem}
+          onDateChange={onDateChange}
+          onDurationChange={onDurationChange}
+          onUpdateTaskStyle={onUpdateTaskStyle}
+          onUpdateMilestoneStyle={onUpdateMilestoneStyle}
+          onAddStatusLabel={onAddStatusLabel}
+          onAddItemRelative={onAddItemRelative}
+          onDuplicateItem={onDuplicateItem}
+          onToggleVisibility={onToggleVisibility}
+          isItemDragging={dragItemId === item.id}
+          isItemDropTarget={dropItemIdx === idx}
+          onItemDragStart={() => setDragItemId(item.id)}
+          onItemDragEnd={() => { setDragItemId(null); setDropItemIdx(null); }}
+          onItemDragOver={(e) => { e.preventDefault(); if (dragItemId && dragItemId !== item.id) setDropItemIdx(idx); }}
+          onItemDrop={() => {
+            if (dragItemId && dragItemId !== item.id) {
+              onReorderItem(dragItemId, idx);
+            }
+            setDragItemId(null);
+            setDropItemIdx(null);
+          }}
+        />
+      ))}
+
+      {/* Add row for independent items */}
+      <tr>
+        <td colSpan={totalColumns} className="pl-6 pr-4 py-1.5">
+          <InlineAddRow onAdd={(type) => onAddItem(type)} />
+        </td>
+      </tr>
+
+      {/* Separator before swimlanes */}
+      {indItems.length > 0 && (
+        <tr>
+          <td colSpan={totalColumns} className="py-1">
+            <div className="h-px bg-slate-200" />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
