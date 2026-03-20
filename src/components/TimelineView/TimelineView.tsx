@@ -903,6 +903,11 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
   // When iconTopOverride is provided, use it directly; otherwise center in the row
   const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_HEIGHT / 2 - style.size / 2;
 
+  // Date label position: for independent milestones, date goes on the timescale-bar side
+  // "above" position → date above shape; "below" position → date below shape
+  // Swimlaned milestones default to below
+  const datePlacement = item.swimlaneId === null && style.position === 'above' ? 'above' : 'below';
+
   return (
     <div
       className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30 opacity-80' : 'z-10'}`}
@@ -929,34 +934,59 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         )}
       </div>
 
-      <div
-        className="absolute whitespace-nowrap truncate cursor-pointer"
-        style={{
-          fontSize: style.fontSize,
-          fontFamily: style.fontFamily,
-          fontWeight: style.fontWeight,
-          fontStyle: style.fontStyle ?? 'normal',
-          textDecoration: style.textDecoration ?? 'none',
-          color: style.fontColor,
-          maxWidth: 200,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          ...(style.labelPosition === 'far-left'
-            ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 24 }
-            : style.labelPosition === 'left'
-            ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
-            : style.labelPosition === 'center'
-            ? { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }
-            : style.labelPosition === 'above'
-            ? { left: '50%', bottom: '100%', transform: 'translateX(-50%)', marginBottom: 4 }
-            : style.labelPosition === 'below'
-            ? { left: '50%', top: '100%', transform: 'translateX(-50%)', marginTop: 4 }
-            : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
-        }}
-        onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
-      >
-        <span>{item.name}</span>
-      </div>
+      {/* Title label */}
+      {style.showTitle && (
+        <div
+          className="absolute whitespace-nowrap truncate cursor-pointer"
+          style={{
+            fontSize: style.fontSize,
+            fontFamily: style.fontFamily,
+            fontWeight: style.fontWeight,
+            fontStyle: style.fontStyle ?? 'normal',
+            textDecoration: style.textDecoration ?? 'none',
+            color: style.fontColor,
+            maxWidth: 200,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ...(style.labelPosition === 'far-left'
+              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 24 }
+              : style.labelPosition === 'left'
+              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
+              : style.labelPosition === 'center'
+              ? { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }
+              : style.labelPosition === 'above'
+              ? { left: '50%', bottom: '100%', transform: 'translateX(-50%)', marginBottom: 4 }
+              : style.labelPosition === 'below'
+              ? { left: '50%', top: '100%', transform: 'translateX(-50%)', marginTop: 4 }
+              : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
+          }}
+          onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+        >
+          <span>{item.name}</span>
+        </div>
+      )}
+
+      {/* Date label */}
+      {style.showDate && (
+        <div
+          className="absolute whitespace-nowrap pointer-events-none"
+          style={{
+            fontSize: style.dateFontSize,
+            fontFamily: style.dateFontFamily,
+            fontWeight: style.dateFontWeight,
+            fontStyle: style.dateFontStyle ?? 'normal',
+            textDecoration: style.dateTextDecoration ?? 'none',
+            color: style.dateFontColor,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            ...(datePlacement === 'above'
+              ? { bottom: '100%', marginBottom: 2 }
+              : { top: '100%', marginTop: 2 }),
+          }}
+        >
+          {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
+        </div>
+      )}
     </div>
   );
 }
