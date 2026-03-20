@@ -1080,10 +1080,13 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
             fontStyle: style.dateFontStyle ?? 'normal',
             textDecoration: style.dateTextDecoration ?? 'none',
             color: style.dateFontColor,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            top: '100%',
-            marginTop: 2,
+            ...(style.dateLabelPosition === 'above'
+              ? { left: '50%', transform: 'translateX(-50%)', bottom: '100%', marginBottom: 2 }
+              : style.dateLabelPosition === 'left'
+              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 6 }
+              : style.dateLabelPosition === 'right'
+              ? { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 6 }
+              : { left: '50%', transform: 'translateX(-50%)', top: '100%', marginTop: 2 }),
           }}
         >
           {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}

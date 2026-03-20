@@ -84,6 +84,14 @@ const SECONDARY_LABEL_POSITIONS: { id: LabelPosition; label: string }[] = [
   { id: 'below', label: 'Below' },
 ];
 
+// Milestone date positions: above/below/left/right relative to shape
+const MILESTONE_DATE_POSITIONS: { id: LabelPosition; label: string }[] = [
+  { id: 'above', label: 'Above' },
+  { id: 'below', label: 'Below' },
+  { id: 'left', label: 'Left' },
+  { id: 'right', label: 'Right' },
+];
+
 type MainTab = 'items' | 'timescale';
 type ItemSubTab = 'task' | 'milestone' | 'swimlane';
 
@@ -1490,6 +1498,29 @@ function MilestoneStyleControls({
             />
           </div>
 
+          {/* Row 4: Position */}
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Position
+            </label>
+            <div className="flex gap-1">
+              {MILESTONE_DATE_POSITIONS.map((pos) => (
+                <button
+                  key={pos.id}
+                  onClick={() => updateMilestoneStyle(item.id, { dateLabelPosition: pos.id })}
+                  className={`flex items-center justify-center w-10 h-9 rounded border transition-colors ${
+                    style.dateLabelPosition === pos.id
+                      ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)] text-[var(--color-text)]'
+                      : 'border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
+                  }`}
+                  title={pos.label}
+                >
+                  <MilestoneDatePositionIcon position={pos.id} />
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Apply to all milestones */}
           <MilestoneDateApplyToAll item={item} />
         </div>
@@ -1716,6 +1747,56 @@ function PositionIcon({ position }: { position: LabelPosition }) {
           <text x={14} y={18.5} fontSize={9} fontFamily="serif" fontWeight={600} fill={tk} textAnchor="middle" shapeRendering="geometricPrecision">T</text>
         </svg>
       );
+  }
+}
+
+// Milestone date position icons: "T" + diamond shape in 4 arrangements
+function MilestoneDatePositionIcon({ position }: { position: LabelPosition }) {
+  const dia = '#9ca3af';  // gray-400 (diamond shape)
+  const tk = '#334155';   // slate-800 (text "T")
+  // Diamond path centered at (cx, cy) with radius r
+  const diamond = (cx: number, cy: number, r: number) =>
+    `M${cx} ${cy - r} L${cx + r} ${cy} L${cx} ${cy + r} L${cx - r} ${cy} Z`;
+
+  switch (position) {
+    case 'above':
+      // "T" on top, line, diamond below
+      return (
+        <svg width={28} height={20} viewBox="0 0 28 20" fill="none" shapeRendering="crispEdges">
+          <text x={14} y={7} fontSize={9} fontFamily="serif" fontWeight={600} fill={tk} textAnchor="middle" shapeRendering="geometricPrecision">T</text>
+          <line x1={7} y1={9} x2={21} y2={9} stroke={tk} strokeWidth={1} />
+          <path d={diamond(14, 14.5, 4)} fill={dia} shapeRendering="geometricPrecision" />
+        </svg>
+      );
+    case 'below':
+      // Diamond on top, line, "T" below
+      return (
+        <svg width={28} height={20} viewBox="0 0 28 20" fill="none" shapeRendering="crispEdges">
+          <path d={diamond(14, 5.5, 4)} fill={dia} shapeRendering="geometricPrecision" />
+          <line x1={7} y1={11} x2={21} y2={11} stroke={tk} strokeWidth={1} />
+          <text x={14} y={18.5} fontSize={9} fontFamily="serif" fontWeight={600} fill={tk} textAnchor="middle" shapeRendering="geometricPrecision">T</text>
+        </svg>
+      );
+    case 'left':
+      // "T" left, separator, diamond right
+      return (
+        <svg width={28} height={20} viewBox="0 0 28 20" fill="none" shapeRendering="crispEdges">
+          <text x={7} y={14.5} fontSize={11} fontFamily="serif" fontWeight={600} fill={tk} textAnchor="middle" shapeRendering="geometricPrecision">T</text>
+          <line x1={14} y1={4} x2={14} y2={16} stroke={tk} strokeWidth={1} />
+          <path d={diamond(21, 10, 4.5)} fill={dia} shapeRendering="geometricPrecision" />
+        </svg>
+      );
+    case 'right':
+      // Diamond left, separator, "T" right
+      return (
+        <svg width={28} height={20} viewBox="0 0 28 20" fill="none" shapeRendering="crispEdges">
+          <path d={diamond(7, 10, 4.5)} fill={dia} shapeRendering="geometricPrecision" />
+          <line x1={14} y1={4} x2={14} y2={16} stroke={tk} strokeWidth={1} />
+          <text x={21} y={14.5} fontSize={11} fontFamily="serif" fontWeight={600} fill={tk} textAnchor="middle" shapeRendering="geometricPrecision">T</text>
+        </svg>
+      );
+    default:
+      return null;
   }
 }
 
