@@ -1412,7 +1412,87 @@ function MilestoneStyleControls({
           onChange: (v) => updateMilestoneStyle(item.id, { showDate: v }),
         }}
       >
-        <div className="text-xs text-[var(--color-text-muted)]">Date controls coming soon</div>
+        <div className="space-y-4">
+          {/* Row 1: Color + Text */}
+          <div className="flex gap-3">
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Color
+              </label>
+              <AdvancedColorPicker
+                value={style.dateFontColor}
+                onChange={(dateFontColor) => updateMilestoneStyle(item.id, { dateFontColor })}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Text
+              </label>
+              <div className="flex gap-1.5">
+                <FontFamilyDropdown
+                  value={style.dateFontFamily}
+                  onChange={(dateFontFamily) => updateMilestoneStyle(item.id, { dateFontFamily })}
+                  fonts={FONT_FAMILIES}
+                />
+                <FontSizeDropdown
+                  value={style.dateFontSize}
+                  onChange={(dateFontSize) => updateMilestoneStyle(item.id, { dateFontSize })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: B / I / U toggles */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => updateMilestoneStyle(item.id, { dateFontWeight: style.dateFontWeight >= 700 ? 400 : 700 })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm font-bold transition-colors ${
+                style.dateFontWeight >= 700
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Bold"
+            >
+              B
+            </button>
+            <button
+              onClick={() => updateMilestoneStyle(item.id, { dateFontStyle: style.dateFontStyle === 'italic' ? 'normal' : 'italic' })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm italic transition-colors ${
+                style.dateFontStyle === 'italic'
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Italic"
+            >
+              I
+            </button>
+            <button
+              onClick={() => updateMilestoneStyle(item.id, { dateTextDecoration: style.dateTextDecoration === 'underline' ? 'none' : 'underline' })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm underline transition-colors ${
+                style.dateTextDecoration === 'underline'
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Underline"
+            >
+              U
+            </button>
+          </div>
+
+          {/* Row 3: Format */}
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Format
+            </label>
+            <DateFormatDropdown
+              value={style.dateFormat}
+              onChange={(dateFormat) => updateMilestoneStyle(item.id, { dateFormat })}
+            />
+          </div>
+
+          {/* Apply to all milestones */}
+          <MilestoneDateApplyToAll item={item} />
+        </div>
       </CollapsibleRow>
 
       <CollapsibleRow
@@ -2201,6 +2281,51 @@ function MilestoneTitleApplyToAll({ item }: { item: ItemType }) {
       </PropertyCard>
       <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
         <TextIcon />
+      </PropertyCard>
+    </ApplyToAllBox>
+  );
+}
+
+// ─── Milestone Date Apply to All ──────────────────────────────────────────────
+
+function MilestoneDateApplyToAll({ item }: { item: ItemType }) {
+  const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
+  const [applied, setApplied] = useState(false);
+  const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    showDate: true,
+    dateFontColor: true,
+    text: true,
+    dateFormat: true,
+  });
+
+  const handleApply = () => {
+    const keys: string[] = [];
+    if (applyProps.showDate) keys.push('showDate');
+    if (applyProps.dateFontColor) keys.push('dateFontColor');
+    if (applyProps.text) keys.push('dateFontFamily', 'dateFontSize', 'dateFontWeight', 'dateFontStyle', 'dateTextDecoration');
+    if (applyProps.dateFormat) keys.push('dateFormat');
+    if (keys.length === 0) return;
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
+
+  const style = item.milestoneStyle;
+
+  return (
+    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied} label="Apply to all milestones">
+      <PropertyCard label="Show" checked={applyProps.showDate} onChange={(v) => setApplyProps((p) => ({ ...p, showDate: v }))}>
+        <ShowIcon />
+      </PropertyCard>
+      <PropertyCard label="Color" checked={applyProps.dateFontColor} onChange={(v) => setApplyProps((p) => ({ ...p, dateFontColor: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.dateFontColor }} />
+      </PropertyCard>
+      <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
+        <TextIcon />
+      </PropertyCard>
+      <PropertyCard label="Format" checked={applyProps.dateFormat} onChange={(v) => setApplyProps((p) => ({ ...p, dateFormat: v }))}>
+        <FormatIcon />
       </PropertyCard>
     </ApplyToAllBox>
   );
