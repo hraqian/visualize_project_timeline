@@ -1129,7 +1129,7 @@ function MilestoneShapeDropdown({
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -1150,8 +1150,7 @@ function MilestoneShapeDropdown({
       const rect = triggerRef.current.getBoundingClientRect();
       setPopoverPos({
         top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
+        right: window.innerWidth - rect.right,
       });
     }
   }, [open]);
@@ -1176,8 +1175,7 @@ function MilestoneShapeDropdown({
           className="fixed z-[9999] bg-white border border-[var(--color-border)] rounded-lg shadow-lg p-2"
           style={{
             top: popoverPos.top,
-            left: popoverPos.left,
-            width: popoverPos.width,
+            right: popoverPos.right,
           }}
         >
           <div className="grid grid-cols-6 gap-1">
