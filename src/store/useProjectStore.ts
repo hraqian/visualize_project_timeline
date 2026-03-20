@@ -244,7 +244,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   // ─── View ────────────────────────────────────────────────────────────
   setActiveView: (view) => set({ activeView: view }),
   setSelectedItem: (id) => set({ selectedItemId: id, selectedSwimlaneId: null }),
-  setSelectedSwimlane: (id) => set({ selectedSwimlaneId: id, selectedItemId: null }),
+  setSelectedSwimlane: (id) => set({ selectedSwimlaneId: id, selectedItemId: null, stylePaneSection: 'swimlaneTitle' }),
   setStylePaneSection: (section) => set({ stylePaneSection: section }),
   setZoom: (zoom) => set({ zoom: Math.max(2, Math.min(30, zoom)) }),
 
