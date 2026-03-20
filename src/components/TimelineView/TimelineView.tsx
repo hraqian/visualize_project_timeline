@@ -80,6 +80,20 @@ export function TimelineView() {
     [visibleItems, swimlaneIds]
   );
 
+  // Split independent items: "above" milestones go above timescale bar, everything else stays below
+  const aboveMilestones = useMemo(
+    () => independentItems.filter(
+      (i) => i.type === 'milestone' && i.swimlaneId === null && i.milestoneStyle.position === 'above'
+    ),
+    [independentItems]
+  );
+  const belowIndependentItems = useMemo(
+    () => independentItems.filter(
+      (i) => !(i.type === 'milestone' && i.swimlaneId === null && i.milestoneStyle.position === 'above')
+    ),
+    [independentItems]
+  );
+
   // Compute project range with padding
   const { origin, totalDays } = useMemo(() => {
     const range = getProjectRange(items);
@@ -105,12 +119,19 @@ export function TimelineView() {
 
   // ─── Layout computation ────────────────────────────────────────────
 
-  // Independent items section height
+  // Height for "above" milestones row (rendered before timescale header)
+  const aboveHeight = useMemo(() => {
+    if (aboveMilestones.length === 0) return 0;
+    // Single row of milestones above the timescale bar
+    return ROW_HEIGHT + INDEPENDENT_SECTION_PADDING;
+  }, [aboveMilestones]);
+
+  // Independent items section height (only "below" items — those in the canvas)
   const independentHeight = useMemo(() => {
-    if (independentItems.length === 0) return 0;
-    const maxRow = Math.max(...independentItems.map((i) => i.row), 0);
+    if (belowIndependentItems.length === 0) return 0;
+    const maxRow = Math.max(...belowIndependentItems.map((i) => i.row), 0);
     return (maxRow + 1) * ROW_HEIGHT + INDEPENDENT_SECTION_PADDING * 2;
-  }, [independentItems]);
+  }, [belowIndependentItems]);
 
   // Swimlane layout: compute y offset for each swimlane
   const swimlaneLayout = useMemo(() => {
@@ -154,6 +175,10 @@ export function TimelineView() {
         if (!from || !to) return null;
 
         const getItemY = (item: ProjectItem) => {
+          // "Above" milestones are rendered above the timescale bar — use top of canvas as endpoint
+          if (item.type === 'milestone' && item.swimlaneId === null && item.milestoneStyle.position === 'above') {
+            return 0;
+          }
           if (!swimlaneIds.has(item.swimlaneId)) {
             return INDEPENDENT_SECTION_PADDING + item.row * ROW_HEIGHT + ROW_HEIGHT / 2;
           }
@@ -364,6 +389,33 @@ export function TimelineView() {
         onMouseLeave={handleMouseUp}
       >
         <div style={{ minWidth: totalWidth, position: 'relative' }}>
+          {/* ─── "Above" milestones row (before sticky timescale header) ─── */}
+          {aboveHeight > 0 && (
+            <div className="relative" style={{ height: aboveHeight }}>
+              {aboveMilestones.map((item) => {
+                const ax = itemToX(item.startDate);
+                const ay = INDEPENDENT_SECTION_PADDING / 2;
+                const isDraggingItem = draggingId === item.id;
+                const txl = isDraggingItem ? dragOffset : 0;
+                const isSel = selectedItemId === item.id;
+                return (
+                  <MilestoneItem
+                    key={item.id}
+                    item={item}
+                    x={ax}
+                    y={ay}
+                    translateX={txl}
+                    isSelected={isSel}
+                    isDragging={isDraggingItem}
+                    onMouseDown={(e) => handleMouseDown(e, item.id)}
+                    onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
+                    onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
+                  />
+                );
+              })}
+            </div>
+          )}
+
           {/* Timescale Headers */}
           <div className="sticky top-0 z-10 border-b border-[var(--color-border)]">
             {tierLabels.map(({ tier, labels }, tierIdx) => (
@@ -510,8 +562,8 @@ export function TimelineView() {
               )}
             </svg>
 
-            {/* ─── Render independent items ─── */}
-            {independentItems.map((item) =>
+            {/* ─── Render independent items (below timescale only) ─── */}
+            {belowIndependentItems.map((item) =>
               renderItem(item, INDEPENDENT_SECTION_PADDING)
             )}
 
@@ -838,14 +890,8 @@ interface MilestoneItemProps {
 function MilestoneItem({ item, x, y, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel }: MilestoneItemProps) {
   const style = item.milestoneStyle;
   const centerY = y + ROW_HEIGHT / 2;
-  // Position: 'above' places the icon so its bottom edge aligns with center line;
-  //           'below' places it so its top edge aligns with center line.
-  //           Swimlaned milestones (or default) stay vertically centered.
-  const iconTop = item.swimlaneId === null && style.position === 'above'
-    ? centerY - style.size
-    : item.swimlaneId === null && style.position === 'below'
-    ? centerY
-    : centerY - style.size / 2;
+  // Always vertically center in the allocated row — above/below timescale bar is handled at layout level
+  const iconTop = centerY - style.size / 2;
 
   return (
     <div
