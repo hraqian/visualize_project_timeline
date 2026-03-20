@@ -1623,7 +1623,7 @@ function SwimlaneStyleControls({
       </div>
 
       <Section title="Swimlane Color">
-        <ColorPicker
+        <AdvancedColorPicker
           value={swimlane.color}
           onChange={(color) => updateSwimlane(swimlane.id, { color })}
         />
