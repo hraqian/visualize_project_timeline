@@ -371,30 +371,12 @@ function TaskStyleControls({
 }) {
   const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
-  const applyTaskBarStyleToAll = useProjectStore((s) => s.applyTaskBarStyleToAll);
-
-  // Apply to all tasks state
-  const [applyExpanded, setApplyExpanded] = useState(false);
-  const [applyProps, setApplyProps] = useState({
-    color: true,
-    barShape: true,
-    thickness: true,
-    spacing: true,
-  });
-  const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
-  const [applied, setApplied] = useState(false);
 
   const handleToggleExpand = (key: string) => {
     setStylePaneSection(stylePaneSection === key ? null : key as any);
   };
 
   const style = item.taskStyle;
-
-  const handleApply = () => {
-    applyTaskBarStyleToAll(item.id, applyProps, excludeSwimlanes);
-    setApplied(true);
-    setTimeout(() => setApplied(false), 1200);
-  };
 
   return (
     <div className="-mx-4 -mt-1">
@@ -450,92 +432,7 @@ function TaskStyleControls({
           </div>
 
           {/* Row 4: Apply to all tasks */}
-          <div className="border border-[var(--color-border)] rounded-lg p-3">
-            <button
-              onClick={() => setApplyExpanded(!applyExpanded)}
-              className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
-            >
-              <Paintbrush size={13} className="text-[var(--color-text-muted)]" />
-              <span className="flex-1">Apply to all tasks</span>
-              <ChevronRight
-                size={12}
-                className={`text-[var(--color-text-muted)] transition-transform ${applyExpanded ? 'rotate-90' : ''}`}
-              />
-            </button>
-
-            {applyExpanded && (
-              <div className="mt-3 space-y-3">
-                {/* Property cards */}
-                <div className="grid grid-cols-2 gap-2">
-                  <PropertyCard
-                    label="Color"
-                    checked={applyProps.color}
-                    onChange={(v) => setApplyProps((p) => ({ ...p, color: v }))}
-                  >
-                    <div
-                      className="w-5 h-5 rounded border border-[var(--color-border)]"
-                      style={{ backgroundColor: style.color }}
-                    />
-                  </PropertyCard>
-                  <PropertyCard
-                    label="Shape"
-                    checked={applyProps.barShape}
-                    onChange={(v) => setApplyProps((p) => ({ ...p, barShape: v }))}
-                  >
-                    <ShapePreview shape={style.barShape} color={style.color} width={28} height={10} />
-                  </PropertyCard>
-                  <PropertyCard
-                    label="Size"
-                    checked={applyProps.thickness}
-                    onChange={(v) => setApplyProps((p) => ({ ...p, thickness: v }))}
-                  >
-                    <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">
-                      {style.thickness}px
-                    </span>
-                  </PropertyCard>
-                  <PropertyCard
-                    label="Spacing"
-                    checked={applyProps.spacing}
-                    onChange={(v) => setApplyProps((p) => ({ ...p, spacing: v }))}
-                  >
-                    <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">
-                      {style.spacing}px
-                    </span>
-                  </PropertyCard>
-                </div>
-
-                {/* Exclude swimlanes */}
-                <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={excludeSwimlanes}
-                    onChange={(e) => setExcludeSwimlanes(e.target.checked)}
-                    className="accent-indigo-500"
-                  />
-                  <span>Exclude swimlanes</span>
-                  <span
-                    className="relative"
-                    title="Exclude items placed inside swimlanes"
-                  >
-                    <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
-                  </span>
-                </label>
-
-                {/* Apply button */}
-                <button
-                  onClick={handleApply}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    applied
-                      ? 'bg-green-500/10 text-green-600 border border-green-500/30'
-                      : 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/25 hover:bg-indigo-500/20'
-                  }`}
-                >
-                  {applied ? <Check size={14} /> : <Copy size={14} />}
-                  {applied ? 'Applied!' : 'Apply'}
-                </button>
-              </div>
-            )}
-          </div>
+          <TaskBarApplyToAll item={item} />
         </div>
       </CollapsibleRow>
 
@@ -1195,22 +1092,23 @@ function PropertyCard({
   children: React.ReactNode;
 }) {
   return (
-    <label
-      className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-all ${
+    <div
+      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border cursor-pointer transition-all min-w-[70px] ${
         checked
-          ? 'border-indigo-500/30 bg-indigo-500/5'
+          ? 'border-[var(--color-border)] bg-[var(--color-bg-secondary)]'
           : 'border-[var(--color-border)] bg-[var(--color-bg-secondary)]'
       }`}
+      onClick={() => onChange(!checked)}
     >
+      <span className="text-[11px] font-medium text-[var(--color-text)]">{label}</span>
+      <div className="flex items-center justify-center h-6">{children}</div>
       <input
         type="checkbox"
         checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="accent-indigo-500 shrink-0"
+        onChange={(e) => { e.stopPropagation(); onChange(e.target.checked); }}
+        className="accent-[var(--color-text)] w-4 h-4 cursor-pointer"
       />
-      {children}
-      <span className="text-[10px] text-[var(--color-text-secondary)] flex-1 text-right">{label}</span>
-    </label>
+    </div>
   );
 }
 
@@ -1629,34 +1527,92 @@ function PositionIcon({ position }: { position: LabelPosition }) {
   }
 }
 
-// ─── Task Title Apply to All ─────────────────────────────────────────────────
+// ─── Apply to All — Shared icon previews ─────────────────────────────────────
 
-function TaskTitleApplyToAll({ item }: { item: ReturnType<typeof useProjectStore.getState>['items'][number] }) {
-  const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
+function ShowIcon() {
+  return (
+    <svg width={22} height={16} viewBox="0 0 22 16" fill="none">
+      <ellipse cx={11} cy={8} rx={9} ry={6} stroke="currentColor" strokeWidth={1.5} fill="none" />
+      <circle cx={11} cy={8} r={3} stroke="currentColor" strokeWidth={1.5} fill="none" />
+      <circle cx={11} cy={8} r={1} fill="currentColor" />
+    </svg>
+  );
+}
+
+function TextIcon() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+      <path d="M4 4h10M9 4v10M6.5 14h5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PositionIcon5Dot() {
+  // 5-dot position icon (like the mockup shows)
+  return (
+    <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+      <circle cx={5} cy={5} r={1.5} fill="currentColor" />
+      <circle cx={13} cy={5} r={1.5} fill="currentColor" />
+      <circle cx={5} cy={13} r={1.5} fill="currentColor" />
+      <circle cx={13} cy={13} r={1.5} fill="currentColor" />
+      <circle cx={9} cy={9} r={1.5} fill="currentColor" />
+    </svg>
+  );
+}
+
+function FormatIcon() {
+  return (
+    <span className="text-[13px] font-semibold text-[var(--color-text-secondary)]">-/-</span>
+  );
+}
+
+function SizeIcon() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+      <path d="M4 4L1 7M4 4L7 7M4 4V14M14 14L11 11M14 14L17 11M14 14V4" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SpacingIcon() {
+  return (
+    <svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+      <path d="M4 2v14M14 2v14" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
+      <line x1={6} y1={6} x2={12} y2={6} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={6} y1={9} x2={12} y2={9} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={6} y1={12} x2={12} y2={12} stroke="currentColor" strokeWidth={1.5} />
+    </svg>
+  );
+}
+
+function ThicknessIcon() {
+  return (
+    <svg width={18} height={14} viewBox="0 0 18 14" fill="none">
+      <line x1={2} y1={3} x2={16} y2={3} stroke="currentColor" strokeWidth={1.5} />
+      <line x1={2} y1={7} x2={16} y2={7} stroke="currentColor" strokeWidth={2.5} />
+      <line x1={2} y1={11} x2={16} y2={11} stroke="currentColor" strokeWidth={3.5} />
+    </svg>
+  );
+}
+
+// ─── Apply to All — Shared wrapper ───────────────────────────────────────────
+
+type ItemType = ReturnType<typeof useProjectStore.getState>['items'][number];
+
+function ApplyToAllBox({
+  children,
+  onApply,
+  excludeSwimlanes,
+  setExcludeSwimlanes,
+  applied,
+}: {
+  children: React.ReactNode;
+  onApply: () => void;
+  excludeSwimlanes: boolean;
+  setExcludeSwimlanes: (v: boolean) => void;
+  applied: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
-  const [applied, setApplied] = useState(false);
-  const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
-  const [applyProps, setApplyProps] = useState({
-    fontColor: true,
-    fontFamily: true,
-    fontSize: true,
-    fontWeight: true,
-    fontStyle: true,
-    textDecoration: true,
-    textAlign: true,
-    labelPosition: true,
-  });
-
-  const handleApply = () => {
-    const keys = Object.entries(applyProps)
-      .filter(([, v]) => v)
-      .map(([k]) => k);
-    if (keys.length === 0) return;
-    // Use applyPartialStyleToAll which handles per-type
-    applyPartialStyleToAll(item.id, keys);
-    setApplied(true);
-    setTimeout(() => setApplied(false), 1200);
-  };
 
   return (
     <div className="border border-[var(--color-border)] rounded-lg p-3">
@@ -1674,445 +1630,276 @@ function TaskTitleApplyToAll({ item }: { item: ReturnType<typeof useProjectStore
 
       {expanded && (
         <div className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <PropertyCard
-              label="Color"
-              checked={applyProps.fontColor}
-              onChange={(v) => setApplyProps((p) => ({ ...p, fontColor: v }))}
-            >
-              <div
-                className="w-5 h-5 rounded border border-[var(--color-border)]"
-                style={{ backgroundColor: item.taskStyle.fontColor }}
-              />
-            </PropertyCard>
-            <PropertyCard
-              label="Font"
-              checked={applyProps.fontFamily}
-              onChange={(v) => setApplyProps((p) => ({ ...p, fontFamily: v }))}
-            >
-              <span className="text-[10px] text-[var(--color-text-secondary)] truncate" style={{ fontFamily: item.taskStyle.fontFamily }}>
-                {item.taskStyle.fontFamily}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Size"
-              checked={applyProps.fontSize}
-              onChange={(v) => setApplyProps((p) => ({ ...p, fontSize: v }))}
-            >
-              <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">
-                {item.taskStyle.fontSize}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Position"
-              checked={applyProps.labelPosition}
-              onChange={(v) => setApplyProps((p) => ({ ...p, labelPosition: v }))}
-            >
-              <PositionIcon position={item.taskStyle.labelPosition} />
-            </PropertyCard>
-            <PropertyCard
-              label="Alignment"
-              checked={applyProps.textAlign}
-              onChange={(v) => setApplyProps((p) => ({ ...p, textAlign: v }))}
-            >
-              <span className="text-[10px] text-[var(--color-text-secondary)] capitalize">
-                {item.taskStyle.textAlign}
-              </span>
-            </PropertyCard>
+          <div className="flex gap-2 flex-wrap">
+            {children}
           </div>
 
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={excludeSwimlanes}
-              onChange={(e) => setExcludeSwimlanes(e.target.checked)}
-              className="accent-indigo-500"
-            />
-            <span>Exclude swimlanes</span>
-            <span title="Exclude items placed inside swimlanes">
-              <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
-            </span>
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={excludeSwimlanes}
+                onChange={(e) => setExcludeSwimlanes(e.target.checked)}
+                className="accent-indigo-500"
+              />
+              <span>Exclude swimlanes</span>
+              <span title="Exclude items placed inside swimlanes">
+                <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
+              </span>
+            </label>
 
-          <button
-            onClick={handleApply}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              applied
-                ? 'bg-green-500/10 text-green-600 border border-green-500/30'
-                : 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/25 hover:bg-indigo-500/20'
-            }`}
-          >
-            {applied ? <Check size={14} /> : <Copy size={14} />}
-            {applied ? 'Applied!' : 'Apply'}
-          </button>
+            <button
+              onClick={onApply}
+              className={`px-6 py-1.5 rounded-lg text-sm font-medium transition-all border ${
+                applied
+                  ? 'bg-green-500/10 text-green-600 border-green-500/30'
+                  : 'bg-white text-[var(--color-text)] border-[var(--color-border)] hover:border-[var(--color-text-muted)]'
+              }`}
+            >
+              {applied ? 'Applied!' : 'Apply'}
+            </button>
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Task Bar Apply to All ───────────────────────────────────────────────────
+
+function TaskBarApplyToAll({ item }: { item: ItemType }) {
+  const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
+  const [applied, setApplied] = useState(false);
+  const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    color: true,
+    barShape: true,
+    thickness: true,
+    spacing: true,
+  });
+
+  const handleApply = () => {
+    const keys = Object.entries(applyProps)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    if (keys.length === 0) return;
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
+
+  const style = item.taskStyle;
+
+  return (
+    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+      <PropertyCard label="Color" checked={applyProps.color} onChange={(v) => setApplyProps((p) => ({ ...p, color: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.color }} />
+      </PropertyCard>
+      <PropertyCard label="Shape" checked={applyProps.barShape} onChange={(v) => setApplyProps((p) => ({ ...p, barShape: v }))}>
+        <ShapePreview shape={style.barShape} color={style.color} width={28} height={10} />
+      </PropertyCard>
+      <PropertyCard label="Size" checked={applyProps.thickness} onChange={(v) => setApplyProps((p) => ({ ...p, thickness: v }))}>
+        <SizeIcon />
+      </PropertyCard>
+      <PropertyCard label="Spacing" checked={applyProps.spacing} onChange={(v) => setApplyProps((p) => ({ ...p, spacing: v }))}>
+        <SpacingIcon />
+      </PropertyCard>
+    </ApplyToAllBox>
+  );
+}
+
+// ─── Task Title Apply to All ─────────────────────────────────────────────────
+
+function TaskTitleApplyToAll({ item }: { item: ItemType }) {
+  const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
+  const [applied, setApplied] = useState(false);
+  const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    showTitle: true,
+    fontColor: true,
+    text: true,
+    labelPosition: true,
+  });
+
+  const handleApply = () => {
+    const keys: string[] = [];
+    if (applyProps.showTitle) keys.push('showTitle');
+    if (applyProps.fontColor) keys.push('fontColor');
+    if (applyProps.text) keys.push('fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'textDecoration');
+    if (applyProps.labelPosition) keys.push('labelPosition', 'textAlign');
+    if (keys.length === 0) return;
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
+
+  const style = item.taskStyle;
+
+  return (
+    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+      <PropertyCard label="Show" checked={applyProps.showTitle} onChange={(v) => setApplyProps((p) => ({ ...p, showTitle: v }))}>
+        <ShowIcon />
+      </PropertyCard>
+      <PropertyCard label="Color" checked={applyProps.fontColor} onChange={(v) => setApplyProps((p) => ({ ...p, fontColor: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.fontColor }} />
+      </PropertyCard>
+      <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
+        <TextIcon />
+      </PropertyCard>
+      <PropertyCard label="Position" checked={applyProps.labelPosition} onChange={(v) => setApplyProps((p) => ({ ...p, labelPosition: v }))}>
+        <PositionIcon5Dot />
+      </PropertyCard>
+    </ApplyToAllBox>
   );
 }
 
 // ─── Task Date Apply to All ──────────────────────────────────────────────────
 
-function TaskDateApplyToAll({ item }: { item: ReturnType<typeof useProjectStore.getState>['items'][number] }) {
+function TaskDateApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
-  const [expanded, setExpanded] = useState(false);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
   const [applyProps, setApplyProps] = useState({
+    showDate: true,
     dateFontColor: true,
-    dateFontFamily: true,
-    dateFontSize: true,
-    dateFontWeight: true,
-    dateFontStyle: true,
-    dateTextDecoration: true,
+    text: true,
     dateFormat: true,
     dateLabelPosition: true,
   });
 
   const handleApply = () => {
-    const keys = Object.entries(applyProps)
-      .filter(([, v]) => v)
-      .map(([k]) => k);
+    const keys: string[] = [];
+    if (applyProps.showDate) keys.push('showDate');
+    if (applyProps.dateFontColor) keys.push('dateFontColor');
+    if (applyProps.text) keys.push('dateFontFamily', 'dateFontSize', 'dateFontWeight', 'dateFontStyle', 'dateTextDecoration');
+    if (applyProps.dateFormat) keys.push('dateFormat');
+    if (applyProps.dateLabelPosition) keys.push('dateLabelPosition', 'dateTextAlign');
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
 
+  const style = item.taskStyle;
+
   return (
-    <div className="border border-[var(--color-border)] rounded-lg p-3">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
-      >
-        <Paintbrush size={13} className="text-[var(--color-text-muted)]" />
-        <span className="flex-1">Apply to all tasks</span>
-        <ChevronRight
-          size={12}
-          className={`text-[var(--color-text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
-        />
-      </button>
-
-      {expanded && (
-        <div className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <PropertyCard
-              label="Color"
-              checked={applyProps.dateFontColor}
-              onChange={(v) => setApplyProps((p) => ({ ...p, dateFontColor: v }))}
-            >
-              <div
-                className="w-5 h-5 rounded border border-[var(--color-border)]"
-                style={{ backgroundColor: item.taskStyle.dateFontColor }}
-              />
-            </PropertyCard>
-            <PropertyCard
-              label="Font"
-              checked={applyProps.dateFontFamily}
-              onChange={(v) => setApplyProps((p) => ({ ...p, dateFontFamily: v }))}
-            >
-              <span className="text-[10px] text-[var(--color-text-secondary)] truncate" style={{ fontFamily: item.taskStyle.dateFontFamily }}>
-                {item.taskStyle.dateFontFamily}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Size"
-              checked={applyProps.dateFontSize}
-              onChange={(v) => setApplyProps((p) => ({ ...p, dateFontSize: v }))}
-            >
-              <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">
-                {item.taskStyle.dateFontSize}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Format"
-              checked={applyProps.dateFormat}
-              onChange={(v) => setApplyProps((p) => ({ ...p, dateFormat: v }))}
-            >
-              <span className="text-[10px] text-[var(--color-text-secondary)] truncate">
-                {item.taskStyle.dateFormat}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Position"
-              checked={applyProps.dateLabelPosition}
-              onChange={(v) => setApplyProps((p) => ({ ...p, dateLabelPosition: v }))}
-            >
-              <PositionIcon position={item.taskStyle.dateLabelPosition} />
-            </PropertyCard>
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={excludeSwimlanes}
-              onChange={(e) => setExcludeSwimlanes(e.target.checked)}
-              className="accent-indigo-500"
-            />
-            <span>Exclude swimlanes</span>
-            <span title="Exclude items placed inside swimlanes">
-              <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
-            </span>
-          </label>
-
-          <button
-            onClick={handleApply}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              applied
-                ? 'bg-green-500/10 text-green-600 border border-green-500/30'
-                : 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/25 hover:bg-indigo-500/20'
-            }`}
-          >
-            {applied ? <Check size={14} /> : <Copy size={14} />}
-            {applied ? 'Applied!' : 'Apply'}
-          </button>
-        </div>
-      )}
-    </div>
+    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+      <PropertyCard label="Show" checked={applyProps.showDate} onChange={(v) => setApplyProps((p) => ({ ...p, showDate: v }))}>
+        <ShowIcon />
+      </PropertyCard>
+      <PropertyCard label="Color" checked={applyProps.dateFontColor} onChange={(v) => setApplyProps((p) => ({ ...p, dateFontColor: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.dateFontColor }} />
+      </PropertyCard>
+      <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
+        <TextIcon />
+      </PropertyCard>
+      <PropertyCard label="Format" checked={applyProps.dateFormat} onChange={(v) => setApplyProps((p) => ({ ...p, dateFormat: v }))}>
+        <FormatIcon />
+      </PropertyCard>
+      <PropertyCard label="Position" checked={applyProps.dateLabelPosition} onChange={(v) => setApplyProps((p) => ({ ...p, dateLabelPosition: v }))}>
+        <PositionIcon5Dot />
+      </PropertyCard>
+    </ApplyToAllBox>
   );
 }
 
 // ─── Task Duration Apply to All ──────────────────────────────────────────────
 
-function TaskDurationApplyToAll({ item }: { item: ReturnType<typeof useProjectStore.getState>['items'][number] }) {
+function TaskDurationApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
-  const [expanded, setExpanded] = useState(false);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
   const [applyProps, setApplyProps] = useState({
+    showDuration: true,
     durationFontColor: true,
-    durationFontFamily: true,
-    durationFontSize: true,
-    durationFontWeight: true,
-    durationFontStyle: true,
-    durationTextDecoration: true,
-    durationTextAlign: true,
+    text: true,
     durationFormat: true,
     durationLabelPosition: true,
   });
 
   const handleApply = () => {
-    const keys = Object.entries(applyProps)
-      .filter(([, v]) => v)
-      .map(([k]) => k);
+    const keys: string[] = [];
+    if (applyProps.showDuration) keys.push('showDuration');
+    if (applyProps.durationFontColor) keys.push('durationFontColor');
+    if (applyProps.text) keys.push('durationFontFamily', 'durationFontSize', 'durationFontWeight', 'durationFontStyle', 'durationTextDecoration');
+    if (applyProps.durationFormat) keys.push('durationFormat');
+    if (applyProps.durationLabelPosition) keys.push('durationLabelPosition', 'durationTextAlign');
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
 
+  const style = item.taskStyle;
+
   return (
-    <div className="border border-[var(--color-border)] rounded-lg p-3">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
-      >
-        <Paintbrush size={13} className="text-[var(--color-text-muted)]" />
-        <span className="flex-1">Apply to all tasks</span>
-        <ChevronRight
-          size={12}
-          className={`text-[var(--color-text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
-        />
-      </button>
-
-      {expanded && (
-        <div className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <PropertyCard
-              label="Color"
-              checked={applyProps.durationFontColor}
-              onChange={(v) => setApplyProps((p) => ({ ...p, durationFontColor: v }))}
-            >
-              <div
-                className="w-5 h-5 rounded border border-[var(--color-border)]"
-                style={{ backgroundColor: item.taskStyle.durationFontColor }}
-              />
-            </PropertyCard>
-            <PropertyCard
-              label="Font"
-              checked={applyProps.durationFontFamily}
-              onChange={(v) => setApplyProps((p) => ({ ...p, durationFontFamily: v }))}
-            >
-              <span className="text-[10px] text-[var(--color-text-secondary)] truncate" style={{ fontFamily: item.taskStyle.durationFontFamily }}>
-                {item.taskStyle.durationFontFamily}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Size"
-              checked={applyProps.durationFontSize}
-              onChange={(v) => setApplyProps((p) => ({ ...p, durationFontSize: v }))}
-            >
-              <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">
-                {item.taskStyle.durationFontSize}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Format"
-              checked={applyProps.durationFormat}
-              onChange={(v) => setApplyProps((p) => ({ ...p, durationFormat: v }))}
-            >
-              <span className="text-[10px] text-[var(--color-text-secondary)] truncate">
-                {item.taskStyle.durationFormat}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Position"
-              checked={applyProps.durationLabelPosition}
-              onChange={(v) => setApplyProps((p) => ({ ...p, durationLabelPosition: v }))}
-            >
-              <PositionIcon position={item.taskStyle.durationLabelPosition} />
-            </PropertyCard>
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={excludeSwimlanes}
-              onChange={(e) => setExcludeSwimlanes(e.target.checked)}
-              className="accent-indigo-500"
-            />
-            <span>Exclude swimlanes</span>
-            <span title="Exclude items placed inside swimlanes">
-              <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
-            </span>
-          </label>
-
-          <button
-            onClick={handleApply}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              applied
-                ? 'bg-green-500/10 text-green-600 border border-green-500/30'
-                : 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/25 hover:bg-indigo-500/20'
-            }`}
-          >
-            {applied ? <Check size={14} /> : <Copy size={14} />}
-            {applied ? 'Applied!' : 'Apply'}
-          </button>
-        </div>
-      )}
-    </div>
+    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+      <PropertyCard label="Show" checked={applyProps.showDuration} onChange={(v) => setApplyProps((p) => ({ ...p, showDuration: v }))}>
+        <ShowIcon />
+      </PropertyCard>
+      <PropertyCard label="Color" checked={applyProps.durationFontColor} onChange={(v) => setApplyProps((p) => ({ ...p, durationFontColor: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.durationFontColor }} />
+      </PropertyCard>
+      <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
+        <TextIcon />
+      </PropertyCard>
+      <PropertyCard label="Format" checked={applyProps.durationFormat} onChange={(v) => setApplyProps((p) => ({ ...p, durationFormat: v }))}>
+        <FormatIcon />
+      </PropertyCard>
+      <PropertyCard label="Position" checked={applyProps.durationLabelPosition} onChange={(v) => setApplyProps((p) => ({ ...p, durationLabelPosition: v }))}>
+        <PositionIcon5Dot />
+      </PropertyCard>
+    </ApplyToAllBox>
   );
 }
 
 // ─── Task % Complete Apply to All ─────────────────────────────────────────────
 
-function TaskPctApplyToAll({ item }: { item: ReturnType<typeof useProjectStore.getState>['items'][number] }) {
+function TaskPctApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
-  const [expanded, setExpanded] = useState(false);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
   const [applyProps, setApplyProps] = useState({
+    showPercentComplete: true,
     pctFontColor: true,
-    pctFontFamily: true,
-    pctFontSize: true,
-    pctFontWeight: true,
-    pctFontStyle: true,
-    pctTextDecoration: true,
+    text: true,
     pctLabelPosition: true,
     pctHighlightColor: true,
   });
 
   const handleApply = () => {
-    const keys = Object.entries(applyProps)
-      .filter(([, v]) => v)
-      .map(([k]) => k);
+    const keys: string[] = [];
+    if (applyProps.showPercentComplete) keys.push('showPercentComplete');
+    if (applyProps.pctFontColor) keys.push('pctFontColor');
+    if (applyProps.text) keys.push('pctFontFamily', 'pctFontSize', 'pctFontWeight', 'pctFontStyle', 'pctTextDecoration');
+    if (applyProps.pctLabelPosition) keys.push('pctLabelPosition');
+    if (applyProps.pctHighlightColor) keys.push('pctHighlightColor');
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
 
+  const style = item.taskStyle;
+
   return (
-    <div className="border border-[var(--color-border)] rounded-lg p-3">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
-      >
-        <Paintbrush size={13} className="text-[var(--color-text-muted)]" />
-        <span className="flex-1">Apply to all tasks</span>
-        <ChevronRight
-          size={12}
-          className={`text-[var(--color-text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
-        />
-      </button>
-
-      {expanded && (
-        <div className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <PropertyCard
-              label="Color"
-              checked={applyProps.pctFontColor}
-              onChange={(v) => setApplyProps((p) => ({ ...p, pctFontColor: v }))}
-            >
-              <div
-                className="w-5 h-5 rounded border border-[var(--color-border)]"
-                style={{ backgroundColor: item.taskStyle.pctFontColor }}
-              />
-            </PropertyCard>
-            <PropertyCard
-              label="Font"
-              checked={applyProps.pctFontFamily}
-              onChange={(v) => setApplyProps((p) => ({ ...p, pctFontFamily: v }))}
-            >
-              <span className="text-[10px] text-[var(--color-text-secondary)] truncate" style={{ fontFamily: item.taskStyle.pctFontFamily }}>
-                {item.taskStyle.pctFontFamily}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Size"
-              checked={applyProps.pctFontSize}
-              onChange={(v) => setApplyProps((p) => ({ ...p, pctFontSize: v }))}
-            >
-              <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">
-                {item.taskStyle.pctFontSize}
-              </span>
-            </PropertyCard>
-            <PropertyCard
-              label="Position"
-              checked={applyProps.pctLabelPosition}
-              onChange={(v) => setApplyProps((p) => ({ ...p, pctLabelPosition: v }))}
-            >
-              <PositionIcon position={item.taskStyle.pctLabelPosition} />
-            </PropertyCard>
-            <PropertyCard
-              label="Highlight"
-              checked={applyProps.pctHighlightColor}
-              onChange={(v) => setApplyProps((p) => ({ ...p, pctHighlightColor: v }))}
-            >
-              <div
-                className="w-5 h-5 rounded border border-[var(--color-border)]"
-                style={{ backgroundColor: item.taskStyle.pctHighlightColor }}
-              />
-            </PropertyCard>
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={excludeSwimlanes}
-              onChange={(e) => setExcludeSwimlanes(e.target.checked)}
-              className="accent-indigo-500"
-            />
-            <span>Exclude swimlanes</span>
-            <span title="Exclude items placed inside swimlanes">
-              <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
-            </span>
-          </label>
-
-          <button
-            onClick={handleApply}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              applied
-                ? 'bg-green-500/10 text-green-600 border border-green-500/30'
-                : 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/25 hover:bg-indigo-500/20'
-            }`}
-          >
-            {applied ? <Check size={14} /> : <Copy size={14} />}
-            {applied ? 'Applied!' : 'Apply'}
-          </button>
-        </div>
-      )}
-    </div>
+    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+      <PropertyCard label="Show" checked={applyProps.showPercentComplete} onChange={(v) => setApplyProps((p) => ({ ...p, showPercentComplete: v }))}>
+        <ShowIcon />
+      </PropertyCard>
+      <PropertyCard label="Color" checked={applyProps.pctFontColor} onChange={(v) => setApplyProps((p) => ({ ...p, pctFontColor: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.pctFontColor }} />
+      </PropertyCard>
+      <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
+        <TextIcon />
+      </PropertyCard>
+      <PropertyCard label="Position" checked={applyProps.pctLabelPosition} onChange={(v) => setApplyProps((p) => ({ ...p, pctLabelPosition: v }))}>
+        <PositionIcon5Dot />
+      </PropertyCard>
+      <PropertyCard label="Highlight" checked={applyProps.pctHighlightColor} onChange={(v) => setApplyProps((p) => ({ ...p, pctHighlightColor: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.pctHighlightColor }} />
+      </PropertyCard>
+    </ApplyToAllBox>
   );
 }
 
@@ -2148,12 +1935,12 @@ function ConnectorThicknessDropdown({
 
 // ─── Connector Apply to All ──────────────────────────────────────────────────
 
-function ConnectorApplyToAll({ item }: { item: ReturnType<typeof useProjectStore.getState>['items'][number] }) {
+function ConnectorApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
-  const [expanded, setExpanded] = useState(false);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
   const [applyProps, setApplyProps] = useState({
+    showVerticalConnector: true,
     connectorColor: true,
     connectorThickness: true,
   });
@@ -2163,76 +1950,25 @@ function ConnectorApplyToAll({ item }: { item: ReturnType<typeof useProjectStore
       .filter(([, v]) => v)
       .map(([k]) => k);
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
 
+  const style = item.taskStyle;
+
   return (
-    <div className="border border-[var(--color-border)] rounded-lg p-3">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
-      >
-        <Paintbrush size={13} className="text-[var(--color-text-muted)]" />
-        <span className="flex-1">Apply to all tasks</span>
-        <ChevronRight
-          size={12}
-          className={`text-[var(--color-text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
-        />
-      </button>
-
-      {expanded && (
-        <div className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <PropertyCard
-              label="Color"
-              checked={applyProps.connectorColor}
-              onChange={(v) => setApplyProps((p) => ({ ...p, connectorColor: v }))}
-            >
-              <div
-                className="w-5 h-5 rounded border border-[var(--color-border)]"
-                style={{ backgroundColor: item.taskStyle.connectorColor }}
-              />
-            </PropertyCard>
-            <PropertyCard
-              label="Thickness"
-              checked={applyProps.connectorThickness}
-              onChange={(v) => setApplyProps((p) => ({ ...p, connectorThickness: v }))}
-            >
-              <span className="text-[10px] text-[var(--color-text-secondary)] capitalize">
-                {item.taskStyle.connectorThickness}
-              </span>
-            </PropertyCard>
-          </div>
-
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={excludeSwimlanes}
-              onChange={(e) => setExcludeSwimlanes(e.target.checked)}
-              className="accent-indigo-500"
-            />
-            <span>Exclude swimlanes</span>
-            <span title="Exclude items placed inside swimlanes">
-              <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
-            </span>
-          </label>
-
-          <button
-            onClick={handleApply}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              applied
-                ? 'bg-green-500/10 text-green-600 border border-green-500/30'
-                : 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/25 hover:bg-indigo-500/20'
-            }`}
-          >
-            {applied ? <Check size={14} /> : <Copy size={14} />}
-            {applied ? 'Applied!' : 'Apply'}
-          </button>
-        </div>
-      )}
-    </div>
+    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+      <PropertyCard label="Show" checked={applyProps.showVerticalConnector} onChange={(v) => setApplyProps((p) => ({ ...p, showVerticalConnector: v }))}>
+        <ShowIcon />
+      </PropertyCard>
+      <PropertyCard label="Color" checked={applyProps.connectorColor} onChange={(v) => setApplyProps((p) => ({ ...p, connectorColor: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.connectorColor }} />
+      </PropertyCard>
+      <PropertyCard label="Thickness" checked={applyProps.connectorThickness} onChange={(v) => setApplyProps((p) => ({ ...p, connectorThickness: v }))}>
+        <ThicknessIcon />
+      </PropertyCard>
+    </ApplyToAllBox>
   );
 }
 

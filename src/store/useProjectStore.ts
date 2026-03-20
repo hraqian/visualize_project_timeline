@@ -178,7 +178,7 @@ interface ProjectActions {
   updateTaskStyle: (id: string, style: Partial<TaskStyle>) => void;
   updateMilestoneStyle: (id: string, style: Partial<MilestoneStyle>) => void;
   applyStyleToAll: (id: string) => void;
-  applyPartialStyleToAll: (id: string, keys: string[]) => void;
+  applyPartialStyleToAll: (id: string, keys: string[], excludeSwimlanes?: boolean) => void;
 
   applyTaskBarStyleToAll: (
     id: string,
@@ -549,7 +549,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }));
   },
 
-  applyPartialStyleToAll: (id, keys) => {
+  applyPartialStyleToAll: (id, keys, excludeSwimlanes) => {
     const state = get();
     const source = state.items.find((i) => i.id === id);
     if (!source) return;
@@ -558,6 +558,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       items: st.items.map((i) => {
         if (i.id === id) return i;
         if (i.type === source.type) {
+          if (excludeSwimlanes && i.swimlaneId !== null) return i;
           if (source.type === 'task') {
             const partial: Record<string, unknown> = {};
             for (const k of keys) {
