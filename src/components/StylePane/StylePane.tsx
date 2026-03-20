@@ -1613,22 +1613,39 @@ function SwimlaneStyleControls({
   swimlane: ReturnType<typeof useProjectStore.getState>['swimlanes'][number];
   updateSwimlane: ReturnType<typeof useProjectStore.getState>['updateSwimlane'];
 }) {
-  return (
-    <>
-      <div className="mb-4">
-        <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-0.5">
-          Swimlane Style
-        </div>
-        <div className="font-medium text-sm text-[var(--color-text)]">{swimlane.name}</div>
-      </div>
+  const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
+  const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
 
-      <Section title="Swimlane Color">
-        <AdvancedColorPicker
-          value={swimlane.color}
-          onChange={(color) => updateSwimlane(swimlane.id, { color })}
-        />
-      </Section>
-    </>
+  const handleToggleExpand = (key: string) => {
+    setStylePaneSection(stylePaneSection === key ? null : key as any);
+  };
+
+  return (
+    <div className="-mx-4 -mt-1">
+      <CollapsibleRow
+        label="Swimlane title"
+        expanded={stylePaneSection === 'swimlaneTitle'}
+        onToggleExpand={() => handleToggleExpand('swimlaneTitle')}
+      >
+        <div className="text-xs text-[var(--color-text-muted)]">Coming soon</div>
+      </CollapsibleRow>
+
+      <CollapsibleRow
+        label="Swimlane background"
+        expanded={stylePaneSection === 'swimlaneBackground'}
+        onToggleExpand={() => handleToggleExpand('swimlaneBackground')}
+      >
+        <div className="text-xs text-[var(--color-text-muted)]">Coming soon</div>
+      </CollapsibleRow>
+
+      <CollapsibleRow
+        label="Swimlane spacing"
+        expanded={stylePaneSection === 'swimlaneSpacing'}
+        onToggleExpand={() => handleToggleExpand('swimlaneSpacing')}
+      >
+        <div className="text-xs text-[var(--color-text-muted)]">Coming soon</div>
+      </CollapsibleRow>
+    </div>
   );
 }
 

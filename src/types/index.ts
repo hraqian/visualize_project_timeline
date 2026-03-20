@@ -222,7 +222,7 @@ export interface TimescaleConfig {
 
 export type ActiveView = 'data' | 'timeline';
 
-export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector' | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector';
+export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector' | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector' | 'swimlaneTitle' | 'swimlaneBackground' | 'swimlaneSpacing';
 
 export type OptionalColumn = 'percentComplete' | 'assignedTo' | 'status';
 
