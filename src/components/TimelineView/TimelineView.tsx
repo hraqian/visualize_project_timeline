@@ -838,13 +838,21 @@ interface MilestoneItemProps {
 function MilestoneItem({ item, x, y, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel }: MilestoneItemProps) {
   const style = item.milestoneStyle;
   const centerY = y + ROW_HEIGHT / 2;
+  // Position: 'above' places the icon so its bottom edge aligns with center line;
+  //           'below' places it so its top edge aligns with center line.
+  //           Swimlaned milestones (or default) stay vertically centered.
+  const iconTop = item.swimlaneId === null && style.position === 'above'
+    ? centerY - style.size
+    : item.swimlaneId === null && style.position === 'below'
+    ? centerY
+    : centerY - style.size / 2;
 
   return (
     <div
       className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30 opacity-80' : 'z-10'}`}
       style={{
         left: x - style.size / 2,
-        top: centerY - style.size / 2,
+        top: iconTop,
         transform: `translateX(${translateX}px)`,
         transition: isDragging ? 'none' : 'transform 0.15s ease',
       }}
