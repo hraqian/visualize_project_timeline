@@ -294,8 +294,8 @@ export function TimelineView() {
           isSelected={isSelected}
           isDragging={isDragging}
           onMouseDown={(e) => handleMouseDown(e, item.id)}
-          onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('bar'); }}
-          onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('title'); }}
+          onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
+          onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
         />
       );
     }
