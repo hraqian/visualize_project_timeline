@@ -120,12 +120,18 @@ export function TimelineView() {
   // ─── Layout computation ────────────────────────────────────────────
 
   // Height for "above" milestones row (rendered before timescale header)
-  // Use the largest milestone size + small gap so the icon sits tight against the timescale bar
-  const aboveRowGap = 4; // px between milestone bottom edge and timescale bar top
+  // Stack layout: title → date → shape (top to bottom). Account for full stack height.
+  const aboveRowGap = 4; // px between stack bottom edge and timescale bar top
   const aboveHeight = useMemo(() => {
     if (aboveMilestones.length === 0) return 0;
-    const maxSize = Math.max(...aboveMilestones.map((i) => i.milestoneStyle.size), 20);
-    return maxSize + aboveRowGap * 2;
+    const maxStack = Math.max(...aboveMilestones.map((i) => {
+      const s = i.milestoneStyle;
+      let h = s.size; // shape
+      if (s.showTitle) h += Math.ceil(s.fontSize * 1.25) + 1; // title + gap-px
+      if (s.showDate) h += Math.ceil(s.dateFontSize * 1.25) + 1; // date + gap-px
+      return h;
+    }), 20);
+    return maxStack + aboveRowGap * 2;
   }, [aboveMilestones]);
 
   // Independent items section height (only "below" items — those in the canvas)
@@ -402,8 +408,12 @@ export function TimelineView() {
             <div className="relative" style={{ height: aboveHeight }}>
               {aboveMilestones.map((item) => {
                 const ax = itemToX(item.startDate);
-                // Position icon so its bottom edge is aboveRowGap from the row bottom (timescale bar top)
-                const ay = aboveHeight - item.milestoneStyle.size - aboveRowGap;
+                // Position whole stack so its bottom edge is aboveRowGap from the row bottom (timescale bar top)
+                const s = item.milestoneStyle;
+                let stackH = s.size;
+                if (s.showTitle) stackH += Math.ceil(s.fontSize * 1.25) + 1;
+                if (s.showDate) stackH += Math.ceil(s.dateFontSize * 1.25) + 1;
+                const ay = aboveHeight - stackH - aboveRowGap;
                 const isDraggingItem = draggingId === item.id;
                 const txl = isDraggingItem ? dragOffset : 0;
                 const isSel = selectedItemId === item.id;
@@ -900,13 +910,106 @@ interface MilestoneItemProps {
 
 function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel }: MilestoneItemProps) {
   const style = item.milestoneStyle;
-  // When iconTopOverride is provided, use it directly; otherwise center in the row
-  const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_HEIGHT / 2 - style.size / 2;
+  const isIndependent = item.swimlaneId === null;
 
-  // Date label position: for independent milestones, date goes on the timescale-bar side
-  // "above" position → date above shape; "below" position → date below shape
-  // Swimlaned milestones default to below
-  const datePlacement = item.swimlaneId === null && style.position === 'above' ? 'above' : 'below';
+  // ─── Independent milestones: vertical stack layout ───
+  // "above" position: title → date → shape (top to bottom)
+  // "below" position: shape → date → title (top to bottom)
+  if (isIndependent) {
+    const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_HEIGHT / 2 - style.size / 2;
+
+    // Build the title element
+    const titleEl = style.showTitle ? (
+      <div
+        className="whitespace-nowrap truncate cursor-pointer text-center"
+        style={{
+          fontSize: style.fontSize,
+          fontFamily: style.fontFamily,
+          fontWeight: style.fontWeight,
+          fontStyle: style.fontStyle ?? 'normal',
+          textDecoration: style.textDecoration ?? 'none',
+          color: style.fontColor,
+          maxWidth: 200,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+        onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+      >
+        {item.name}
+      </div>
+    ) : null;
+
+    // Build the date element
+    const dateEl = style.showDate ? (
+      <div
+        className="whitespace-nowrap pointer-events-none text-center"
+        style={{
+          fontSize: style.dateFontSize,
+          fontFamily: style.dateFontFamily,
+          fontWeight: style.dateFontWeight,
+          fontStyle: style.dateFontStyle ?? 'normal',
+          textDecoration: style.dateTextDecoration ?? 'none',
+          color: style.dateFontColor,
+        }}
+      >
+        {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
+      </div>
+    ) : null;
+
+    // Build the icon element
+    const iconEl = (
+      <div
+        className={`relative cursor-pointer ${isSelected ? 'drop-shadow-lg' : ''}`}
+        style={{
+          filter: isSelected ? `drop-shadow(0 0 6px ${style.color}80)` : 'none',
+        }}
+        onClick={(e) => { e.stopPropagation(); onClickIcon(); }}
+      >
+        <MilestoneIconComponent icon={style.icon} size={style.size} color={style.color} />
+        {item.isCriticalPath && (
+          <div className="absolute inset-0 rounded-full border-2 border-red-500" />
+        )}
+      </div>
+    );
+
+    // "above": title, date, shape — shape at bottom (nearest timescale bar)
+    // "below": shape, date, title — shape at top (nearest timescale bar)
+    const isAbove = style.position === 'above';
+
+    return (
+      <div
+        className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30 opacity-80' : 'z-10'}`}
+        style={{
+          left: x - style.size / 2,
+          top: iconTop,
+          transform: `translateX(${translateX}px)`,
+          transition: isDragging ? 'none' : 'transform 0.15s ease',
+        }}
+        onMouseDown={onMouseDown}
+        draggable
+        onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
+      >
+        <div className="flex flex-col items-center gap-px">
+          {isAbove ? (
+            <>
+              {titleEl}
+              {dateEl}
+              {iconEl}
+            </>
+          ) : (
+            <>
+              {iconEl}
+              {dateEl}
+              {titleEl}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Swimlaned milestones: current absolute-positioning behavior ───
+  const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_HEIGHT / 2 - style.size / 2;
 
   return (
     <div
@@ -979,9 +1082,8 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
             color: style.dateFontColor,
             left: '50%',
             transform: 'translateX(-50%)',
-            ...(datePlacement === 'above'
-              ? { bottom: '100%', marginBottom: 2 }
-              : { top: '100%', marginTop: 2 }),
+            top: '100%',
+            marginTop: 2,
           }}
         >
           {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}

@@ -349,7 +349,7 @@ export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {
   // Date
   showDate: true,
   dateFontSize: 11,
-  dateFontColor: '#64748b',
+  dateFontColor: '#334155',
   dateFontFamily: 'Inter',
   dateFontWeight: 400,
   dateFontStyle: 'normal',
