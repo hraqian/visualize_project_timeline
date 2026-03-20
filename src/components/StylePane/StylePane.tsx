@@ -1331,7 +1331,76 @@ function MilestoneStyleControls({
           onChange: (v) => updateMilestoneStyle(item.id, { showTitle: v }),
         }}
       >
-        <div className="text-xs text-[var(--color-text-muted)]">Title controls coming soon</div>
+        <div className="space-y-4">
+          {/* Row 1: Color + Text */}
+          <div className="flex gap-3">
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Color
+              </label>
+              <AdvancedColorPicker
+                value={style.fontColor}
+                onChange={(fontColor) => updateMilestoneStyle(item.id, { fontColor })}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Text
+              </label>
+              <div className="flex gap-1.5">
+                <FontFamilyDropdown
+                  value={style.fontFamily}
+                  onChange={(fontFamily) => updateMilestoneStyle(item.id, { fontFamily })}
+                  fonts={FONT_FAMILIES}
+                />
+                <FontSizeDropdown
+                  value={style.fontSize}
+                  onChange={(fontSize) => updateMilestoneStyle(item.id, { fontSize })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: B / I / U toggles */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => updateMilestoneStyle(item.id, { fontWeight: style.fontWeight >= 700 ? 400 : 700 })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm font-bold transition-colors ${
+                style.fontWeight >= 700
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Bold"
+            >
+              B
+            </button>
+            <button
+              onClick={() => updateMilestoneStyle(item.id, { fontStyle: style.fontStyle === 'italic' ? 'normal' : 'italic' })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm italic transition-colors ${
+                style.fontStyle === 'italic'
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Italic"
+            >
+              I
+            </button>
+            <button
+              onClick={() => updateMilestoneStyle(item.id, { textDecoration: style.textDecoration === 'underline' ? 'none' : 'underline' })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm underline transition-colors ${
+                style.textDecoration === 'underline'
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Underline"
+            >
+              U
+            </button>
+          </div>
+
+          {/* Apply to all milestones */}
+          <MilestoneTitleApplyToAll item={item} />
+        </div>
       </CollapsibleRow>
 
       <CollapsibleRow
@@ -2092,6 +2161,46 @@ function MilestoneShapeApplyToAll({ item }: { item: ItemType }) {
       </PropertyCard>
       <PropertyCard label="Position" checked={applyProps.position} onChange={(v) => setApplyProps((p) => ({ ...p, position: v }))}>
         <PositionIcon5Dot />
+      </PropertyCard>
+    </ApplyToAllBox>
+  );
+}
+
+// ─── Milestone Title Apply to All ─────────────────────────────────────────────
+
+function MilestoneTitleApplyToAll({ item }: { item: ItemType }) {
+  const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
+  const [applied, setApplied] = useState(false);
+  const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    showTitle: true,
+    fontColor: true,
+    text: true,
+  });
+
+  const handleApply = () => {
+    const keys: string[] = [];
+    if (applyProps.showTitle) keys.push('showTitle');
+    if (applyProps.fontColor) keys.push('fontColor');
+    if (applyProps.text) keys.push('fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'textDecoration');
+    if (keys.length === 0) return;
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
+
+  const style = item.milestoneStyle;
+
+  return (
+    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied} label="Apply to all milestones">
+      <PropertyCard label="Show" checked={applyProps.showTitle} onChange={(v) => setApplyProps((p) => ({ ...p, showTitle: v }))}>
+        <ShowIcon />
+      </PropertyCard>
+      <PropertyCard label="Color" checked={applyProps.fontColor} onChange={(v) => setApplyProps((p) => ({ ...p, fontColor: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.fontColor }} />
+      </PropertyCard>
+      <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
+        <TextIcon />
       </PropertyCard>
     </ApplyToAllBox>
   );
