@@ -335,6 +335,7 @@ export function TimelineView() {
           onMouseDown={(e) => handleMouseDown(e, item.id)}
           onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
           onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
+          onClickDate={() => { setSelectedItem(item.id); setStylePaneSection('milestoneDate'); }}
         />
       );
     }
@@ -430,6 +431,7 @@ export function TimelineView() {
                     onMouseDown={(e) => handleMouseDown(e, item.id)}
                     onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
                     onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
+                    onClickDate={() => { setSelectedItem(item.id); setStylePaneSection('milestoneDate'); }}
                   />
                 );
               })}
@@ -906,9 +908,10 @@ interface MilestoneItemProps {
   onMouseDown: (e: React.MouseEvent) => void;
   onClickIcon: () => void;
   onClickLabel: () => void;
+  onClickDate: () => void;
 }
 
-function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel }: MilestoneItemProps) {
+function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel, onClickDate }: MilestoneItemProps) {
   const style = item.milestoneStyle;
   const isIndependent = item.swimlaneId === null;
 
@@ -942,7 +945,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
     // Build the date element
     const dateEl = style.showDate ? (
       <div
-        className="whitespace-nowrap pointer-events-none text-center"
+        className="whitespace-nowrap cursor-pointer text-center"
         style={{
           fontSize: style.dateFontSize,
           fontFamily: style.dateFontFamily,
@@ -951,6 +954,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           textDecoration: style.dateTextDecoration ?? 'none',
           color: style.dateFontColor,
         }}
+        onClick={(e) => { e.stopPropagation(); onClickDate(); }}
       >
         {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
       </div>
@@ -1072,7 +1076,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
       {/* Date label */}
       {style.showDate && (
         <div
-          className="absolute whitespace-nowrap pointer-events-none"
+          className="absolute whitespace-nowrap cursor-pointer"
           style={{
             fontSize: style.dateFontSize,
             fontFamily: style.dateFontFamily,
@@ -1088,6 +1092,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
               ? { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 6 }
               : { left: '50%', transform: 'translateX(-50%)', top: '100%', marginTop: 2 }),
           }}
+          onClick={(e) => { e.stopPropagation(); onClickDate(); }}
         >
           {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
         </div>
