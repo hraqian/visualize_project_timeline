@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 20, 2026 (session 5)
+> **Last updated**: March 20, 2026 (session 6)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -49,7 +49,7 @@ src/
 ├── index.css                            # CSS variables (light-only), Tailwind directives
 ├── main.tsx                             # Entry point
 ├── types/
-│   └── index.ts                         # All TypeScript types, interfaces, constants (311 lines)
+│   └── index.ts                         # All TypeScript types, interfaces, constants (~335 lines)
 ├── store/
 │   └── useProjectStore.ts               # Zustand store — all state + actions (757 lines)
 ├── utils/
@@ -59,9 +59,9 @@ src/
 │   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups (1509 lines)
 │   │   └── TypePicker.tsx               # Type column cell + popover (shape/color picker)
 │   ├── TimelineView/
-│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines (788 lines)
+│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, vertical connectors (~898 lines)
 │   ├── StylePane/
-│   │   └── StylePane.tsx                # Per-item style editor — heavily extended (1911 lines)
+│   │   └── StylePane.tsx                # Per-item style editor — heavily extended (~2200+ lines)
 │   └── common/
 │       ├── MilestoneIconComponent.tsx   # Renders milestone icons using Lucide
 │       ├── AdvancedColorPicker.tsx      # Full Office-style color picker with theme/standard/recent colors
@@ -96,6 +96,8 @@ type DateFormat = 'MMM d' | "MMM d ''yy" | 'MMM d, yyyy' | 'MMM yyyy' | 'MMMM d,
 type DurationFormat = 'd' | 'days' | 'w' | 'wks' | 'weeks' | 'mons' | 'months'
   | 'q' | 'qrts' | 'quarters' | 'y' | 'yrs' | 'years'; // 13 formats in 5 categories
 
+type ConnectorThickness = 'thin' | 'medium' | 'thick'; // maps to 1px, 2px, 3px
+
 interface TaskStyle {
   // Bar properties
   barShape: BarShape; color: string; thickness: number; spacing: number;
@@ -120,6 +122,14 @@ interface TaskStyle {
   durationFontSize: number; durationFontColor: string; durationFontFamily: string;
   durationFontWeight: number; durationFontStyle: 'normal' | 'italic';
   durationTextDecoration: 'none' | 'underline'; durationTextAlign: TextAlign;
+  // Percent complete label styling
+  pctLabelPosition: LabelPosition; pctFontSize: number; pctFontColor: string;
+  pctFontFamily: string; pctFontWeight: number;
+  pctFontStyle: 'normal' | 'italic'; pctTextDecoration: 'none' | 'underline';
+  pctHighlightColor: string;    // highlight fill color when position=center
+  // Vertical connector styling
+  connectorColor: string;       // default '#9ca3af'
+  connectorThickness: ConnectorThickness; // 'thin' | 'medium' | 'thick'
 }
 
 interface MilestoneStyle {
@@ -205,8 +215,8 @@ interface ProjectState {
 | 2 | Task title | Yes | Yes (green) | ON | COMPLETED |
 | 3 | Task date | Yes | Yes | OFF | COMPLETED |
 | 4 | Task duration | Yes | Yes | OFF | COMPLETED |
-| 5 | Task % complete | Yes | Yes | OFF | TODO |
-| 6 | Vertical connector | Yes | Yes | OFF | TODO |
+| 5 | Task % complete | Yes | Yes | OFF | COMPLETED |
+| 6 | Vertical connector | Yes | Yes | OFF | COMPLETED |
 
 ---
 
@@ -248,6 +258,25 @@ interface ProjectState {
 | Quarters | `q`, `qrts`, `quarters` |
 | Years | `y`, `yrs`, `years` |
 
+### Task % Complete (COMPLETED)
+- Row 1: Color (pctFontColor AdvancedColorPicker) + Text (pct-specific FontFamily + FontSize)
+- Row 2: B / I / U toggles (no alignment buttons — % complete has no alignment)
+- Row 3: Position — **5 icons only (no Far Left)**, uses `SECONDARY_LABEL_POSITIONS`
+- Row 4: Highlight color (pctHighlightColor AdvancedColorPicker) — highlight fill when position=center
+- Row 5: Apply to all tasks (boxed, PctCompleteApplyToAll component)
+- **Center position**: label placed at `left: {pct}%` with `transform: translate(-50%, -50%)` (at the actual percent point along bar)
+- **Highlight fill**: when showPercentComplete is ON and position is center, progress fill uses pctHighlightColor instead of bar's main color
+
+### Vertical Connector (COMPLETED)
+- Row 1: Color (connectorColor AdvancedColorPicker) + Thickness (ConnectorThicknessDropdown: Thin/Medium/Thick select)
+- Row 2: Apply to all tasks (boxed, ConnectorApplyToAll component)
+- **TimelineView rendering**: Two dashed vertical lines per task — one at left edge (start date), one at right edge (end date)
+- Lines extend from top of canvas (y=0, bottom of sticky timescale header) down to the top of the task bar
+- No circles at endpoints — plain dashed lines (`strokeDasharray="4 3"`)
+- Thickness mapping: thin=1px, medium=2px, thick=3px
+- Only rendered when `showVerticalConnector` is true
+- Rendered as SVG `<line>` elements in the dependency SVG layer, behind dependency paths
+
 ---
 
 ## Position vs Alignment (Justification)
@@ -266,11 +295,12 @@ interface ProjectState {
 
 ## TimelineView Label Rendering
 
-Three label types rendered for tasks, each conditional on its show toggle:
+Four label types rendered for tasks, each conditional on its show toggle:
 
 1. **Title label** (`style.showTitle`) — displays `item.name` + optional % badge
 2. **Date label** (`style.showDate`) — displays `"start - end"` formatted per `dateFormat`
 3. **Duration label** (`style.showDuration`) — displays computed duration via `formatDuration()` helper
+4. **% Complete label** (`style.showPercentComplete`) — displays `"X%"` at the configured position
 
 ### Duration Computation
 - Duration is **inclusive** (same day = 1 day): `differenceInDays(end, start) + 1`
@@ -287,6 +317,7 @@ For side positions: positioned outside the bar with appropriate margins
 When multiple labels share the same vertical position (above or below), they stack with 16px offsets:
 - Date checks if title is also above/below
 - Duration checks if both title and date are above/below
+- % Complete checks if title, date, and duration are above/below
 
 ---
 
@@ -389,36 +420,31 @@ Contains:
 - **Alignment buttons conditionally shown**: only for center/above/below positions (not side positions)
 - textAlign added to TaskStyle type + defaults + TaskTitleApplyToAll property cards
 
+### Phase 8 — % Complete + Vertical Connector (session 6)
+- Percent complete fields added to TaskStyle: pctLabelPosition, pctFontSize, pctFontColor, pctFontFamily, pctFontWeight, pctFontStyle, pctTextDecoration, pctHighlightColor
+- Task % Complete StylePane section: Color+Text, B/I/U (no alignment), Position (5 icons), Highlight color, Apply to all
+- % Complete label rendering in TimelineView with center position at actual percent point
+- % Complete highlight fill: progress bar uses pctHighlightColor when position=center
+- Vertical connector fields added to TaskStyle: connectorColor, connectorThickness (ConnectorThickness type)
+- Vertical Connector StylePane section: Color+Thickness, Apply to all
+- ConnectorThicknessDropdown component (simple select: Thin/Medium/Thick)
+- Vertical connector rendering in TimelineView: two dashed SVG lines per task (start edge + end edge), extending from canvas top to bar top
+- Clicking labels on timeline opens correct StylePane section via `onClickSection` callback
+- CollapsibleRow disabled state: toggled-off sections show content at opacity 0.4 with pointer-events none
+
 ---
 
 ## Known Pre-existing Build Errors
 
-These errors exist in the codebase but don't affect runtime (Vite dev server works fine):
-- `AdvancedColorPicker.tsx(169)`: unused `onClose` variable
-- `ShapeDropdown.tsx(91)`: unused `color` variable
-- `DataView.tsx(679)`: unused `swimlaneIndex`
-- `DataView.tsx(1188)`: unused `itemId`
-- `StylePane.tsx(41)`: unused `BAR_SHAPES`
-- `StylePane.tsx(189)`: `Swimlane | null | undefined` not assignable to `Swimlane | undefined`
-- `TimelineView.tsx(74,78,156)`: `string | null` not assignable to `string` (swimlaneId)
-- `TimelineView.tsx(145)`: unused `timescaleHeight`
-- `useProjectStore.ts(565,573,598)`: TaskStyle/MilestoneStyle to Record<string, unknown> conversion
+`npx tsc --noEmit` passes clean as of session 6. No known type errors.
 
 ---
 
 ## What's Next (TODO)
 
-### Immediate
-1. **Task % Complete section** — StylePane controls + TimelineView rendering
-   - Needs: percent complete display fields in TaskStyle (if adding font/position controls)
-   - Rendering: show "X%" label on bar, styled per properties
-2. **Vertical Connector section** — StylePane controls + TimelineView rendering
-   - Needs: vertical connector style fields in TaskStyle (color, thickness, etc.)
-   - Rendering: draw vertical lines between dependent tasks
-
 ### Cleanup
-3. Replace old `ColorPicker` used in milestone/swimlane sections with `AdvancedColorPicker`
-4. Replace old `ApplyToAllSection` used in milestone section with new boxed pattern
+1. Replace old `ColorPicker` used in milestone/swimlane sections with `AdvancedColorPicker`
+2. Replace old `ApplyToAllSection` used in milestone section with new boxed pattern
 
 ---
 
