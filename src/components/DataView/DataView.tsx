@@ -133,11 +133,15 @@ export function DataView() {
   const deleteCheckedItems = useProjectStore((s) => s.deleteCheckedItems);
   const setColorForCheckedItems = useProjectStore((s) => s.setColorForCheckedItems);
   const reorderSwimlane = useProjectStore((s) => s.reorderSwimlane);
-  const reorderItem = useProjectStore((s) => s.reorderItem);
+  const moveItemToGroup = useProjectStore((s) => s.moveItemToGroup);
 
   const [collapsedSwimlanes, setCollapsedSwimlanes] = useState<Set<string>>(new Set());
   const [dragSwimId, setDragSwimId] = useState<string | null>(null);
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
+
+  // Global item drag state (lifted from per-group to support cross-group dragging)
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ swimlaneId: string | null; index: number } | null>(null);
 
   const sortedSwimlanes = [...swimlanes].sort((a, b) => a.order - b.order);
   const swimlaneIds = new Set(swimlanes.map((s) => s.id));
@@ -322,7 +326,16 @@ export function DataView() {
               onAddItemRelative={addItemRelative}
               onDuplicateItem={duplicateItem}
               onToggleVisibility={toggleVisibility}
-              onReorderItem={reorderItem}
+              dragItemId={dragItemId}
+              dropTarget={dropTarget}
+              onItemDragStart={(id) => setDragItemId(id)}
+              onItemDragEnd={() => { setDragItemId(null); setDropTarget(null); }}
+              onItemDragOver={(swimlaneId, index) => { if (dragItemId) setDropTarget({ swimlaneId, index }); }}
+              onItemDrop={(swimlaneId, index) => {
+                if (dragItemId) moveItemToGroup(dragItemId, swimlaneId, index);
+                setDragItemId(null);
+                setDropTarget(null);
+              }}
             />
 
             {sortedSwimlanes.map((swimlane, idx) => {
@@ -368,7 +381,16 @@ export function DataView() {
                     deleteSwimlane(swimlane.id);
                   }}
                    onHideSwimlaneItems={() => hideSwimlaneItems(swimlane.id)}
-                   onReorderItem={reorderItem}
+                   dragItemId={dragItemId}
+                   dropTarget={dropTarget}
+                   onItemDragStart={(id) => setDragItemId(id)}
+                   onItemDragEnd={() => { setDragItemId(null); setDropTarget(null); }}
+                   onItemDragOver={(swimlaneId, index) => { if (dragItemId) setDropTarget({ swimlaneId, index }); }}
+                   onItemDrop={(swimlaneId, index) => {
+                     if (dragItemId) moveItemToGroup(dragItemId, swimlaneId, index);
+                     setDragItemId(null);
+                     setDropTarget(null);
+                   }}
                    isDragging={dragSwimId === swimlane.id}
                   isDropTarget={dropTargetIdx === idx}
                   onDragStart={() => setDragSwimId(swimlane.id)}
@@ -672,7 +694,13 @@ interface IndependentItemsGroupProps {
   onAddItemRelative: (referenceId: string, position: 'above' | 'below') => void;
   onDuplicateItem: (id: string) => void;
   onToggleVisibility: (id: string) => void;
-  onReorderItem: (id: string, newIndex: number) => void;
+  // Global drag state
+  dragItemId: string | null;
+  dropTarget: { swimlaneId: string | null; index: number } | null;
+  onItemDragStart: (id: string) => void;
+  onItemDragEnd: () => void;
+  onItemDragOver: (swimlaneId: string | null, index: number, e: React.DragEvent) => void;
+  onItemDrop: (swimlaneId: string | null, index: number) => void;
 }
 
 function IndependentItemsGroup({
@@ -695,13 +723,31 @@ function IndependentItemsGroup({
   onAddItemRelative,
   onDuplicateItem,
   onToggleVisibility,
-  onReorderItem,
+  dragItemId,
+  dropTarget,
+  onItemDragStart,
+  onItemDragEnd,
+  onItemDragOver,
+  onItemDrop,
 }: IndependentItemsGroupProps) {
-  const [dragItemId, setDragItemId] = useState<string | null>(null);
-  const [dropItemIdx, setDropItemIdx] = useState<number | null>(null);
-
   return (
     <>
+      {/* Drop zone when section is empty but an item is being dragged */}
+      {indItems.length === 0 && dragItemId && (
+        <tr
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); onItemDragOver(null, 0, e); }}
+          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onItemDrop(null, 0); }}
+        >
+          <td colSpan={totalColumns} className="py-2">
+            <div className={`mx-4 rounded-lg border-2 border-dashed py-3 text-center text-xs transition-colors ${
+              dropTarget?.swimlaneId === null ? 'border-indigo-400 bg-indigo-50 text-indigo-500' : 'border-slate-300 text-slate-400'
+            }`}>
+              Drop here to remove from swimlane
+            </div>
+          </td>
+        </tr>
+      )}
+
       {indItems.map((item, idx) => (
         <ItemRow
           key={item.id}
@@ -724,16 +770,14 @@ function IndependentItemsGroup({
           onDuplicateItem={onDuplicateItem}
           onToggleVisibility={onToggleVisibility}
           isItemDragging={dragItemId === item.id}
-          isItemDropTarget={dropItemIdx === idx}
-          onItemDragStart={() => setDragItemId(item.id)}
-          onItemDragEnd={() => { setDragItemId(null); setDropItemIdx(null); }}
-          onItemDragOver={(e) => { e.preventDefault(); if (dragItemId && dragItemId !== item.id) setDropItemIdx(idx); }}
+          isItemDropTarget={dropTarget?.swimlaneId === null && dropTarget?.index === idx}
+          onItemDragStart={() => onItemDragStart(item.id)}
+          onItemDragEnd={onItemDragEnd}
+          onItemDragOver={(e) => { e.preventDefault(); if (dragItemId && dragItemId !== item.id) onItemDragOver(null, idx, e); }}
           onItemDrop={() => {
             if (dragItemId && dragItemId !== item.id) {
-              onReorderItem(dragItemId, idx);
+              onItemDrop(null, idx);
             }
-            setDragItemId(null);
-            setDropItemIdx(null);
           }}
         />
       ))}
@@ -746,7 +790,7 @@ function IndependentItemsGroup({
       </tr>
 
       {/* Separator before swimlanes */}
-      {indItems.length > 0 && (
+      {(indItems.length > 0 || dragItemId) && (
         <tr>
           <td colSpan={totalColumns} className="py-1">
             <div className="h-px bg-slate-200" />
@@ -787,7 +831,13 @@ interface SwimlaneGroupProps {
   onDuplicateSwimlane: () => void;
   onDeleteSwimlane: () => void;
   onHideSwimlaneItems: () => void;
-  onReorderItem: (id: string, newIndex: number) => void;
+  // Global item drag state
+  dragItemId: string | null;
+  dropTarget: { swimlaneId: string | null; index: number } | null;
+  onItemDragStart: (id: string) => void;
+  onItemDragEnd: () => void;
+  onItemDragOver: (swimlaneId: string | null, index: number, e: React.DragEvent) => void;
+  onItemDrop: (swimlaneId: string | null, index: number) => void;
   swimlaneIndex: number;
   isDragging: boolean;
   isDropTarget: boolean;
@@ -825,7 +875,12 @@ function SwimlaneGroup({
   onDuplicateSwimlane,
   onDeleteSwimlane,
   onHideSwimlaneItems,
-  onReorderItem,
+  dragItemId,
+  dropTarget,
+  onItemDragStart,
+  onItemDragEnd,
+  onItemDragOver,
+  onItemDrop,
   swimlaneIndex,
   isDragging,
   isDropTarget,
@@ -836,8 +891,6 @@ function SwimlaneGroup({
 }: SwimlaneGroupProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(swimlane.name);
-  const [dragItemId, setDragItemId] = useState<string | null>(null);
-  const [dropItemIdx, setDropItemIdx] = useState<number | null>(null);
 
   return (
     <>
@@ -852,7 +905,7 @@ function SwimlaneGroup({
 
       {/* Swimlane Header Row */}
       <tr
-        className={`group/swimlane cursor-pointer hover:bg-slate-50 transition-colors ${isDragging ? 'opacity-50' : ''}`}
+        className={`group/swimlane cursor-pointer hover:bg-slate-50 transition-colors ${isDragging ? 'opacity-50' : ''} ${dragItemId && !isDragging ? 'ring-1 ring-inset ring-indigo-200' : ''}`}
         onClick={onToggleCollapse}
         draggable
         onDragStart={(e) => {
@@ -860,8 +913,23 @@ function SwimlaneGroup({
           onDragStart();
         }}
         onDragEnd={onDragEnd}
-        onDragOver={onDragOver}
-        onDrop={(e) => { e.preventDefault(); onDrop(); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          // Item drag takes priority over swimlane drag
+          if (dragItemId) {
+            onItemDragOver(swimlane.id, 0, e);
+          } else {
+            onDragOver(e);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (dragItemId) {
+            onItemDrop(swimlane.id, 0);
+          } else {
+            onDrop();
+          }
+        }}
       >
         <td className="py-2.5" colSpan={totalColumns}>
           <div className="flex items-center gap-2 px-4" style={{ borderLeft: `3px solid ${swimlane.color}` }}>
@@ -942,16 +1010,14 @@ function SwimlaneGroup({
             onDuplicateItem={onDuplicateItem}
             onToggleVisibility={onToggleVisibility}
             isItemDragging={dragItemId === item.id}
-            isItemDropTarget={dropItemIdx === idx}
-            onItemDragStart={() => setDragItemId(item.id)}
-            onItemDragEnd={() => { setDragItemId(null); setDropItemIdx(null); }}
-            onItemDragOver={(e) => { e.preventDefault(); if (dragItemId && dragItemId !== item.id) setDropItemIdx(idx); }}
+            isItemDropTarget={dropTarget?.swimlaneId === swimlane.id && dropTarget?.index === idx}
+            onItemDragStart={() => onItemDragStart(item.id)}
+            onItemDragEnd={onItemDragEnd}
+            onItemDragOver={(e) => { e.preventDefault(); if (dragItemId && dragItemId !== item.id) onItemDragOver(swimlane.id, idx, e); }}
             onItemDrop={() => {
               if (dragItemId && dragItemId !== item.id) {
-                onReorderItem(dragItemId, idx);
+                onItemDrop(swimlane.id, idx);
               }
-              setDragItemId(null);
-              setDropItemIdx(null);
             }}
           />
         ))}

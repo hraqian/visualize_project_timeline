@@ -160,6 +160,7 @@ interface ProjectActions {
   setItemRow: (id: string, row: number) => void;
   reorderItem: (id: string, newIndex: number) => void;
   moveItemToSwimlane: (id: string, swimlaneId: string | null) => void;
+  moveItemToGroup: (id: string, targetSwimlaneId: string | null, targetIndex: number) => void;
 
   // Swimlanes
   addSwimlane: (name: string) => void;
@@ -406,6 +407,28 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set((state) => ({
       items: state.items.map((i) => (i.id === id ? { ...i, swimlaneId, row: 0 } : i)),
     })),
+
+  moveItemToGroup: (id, targetSwimlaneId, targetIndex) =>
+    set((state) => {
+      // Move item to target swimlane
+      const moved = state.items.map((i) =>
+        i.id === id ? { ...i, swimlaneId: targetSwimlaneId } : i
+      );
+      // Reorder within the new group
+      const target = moved.find((i) => i.id === id);
+      if (!target) return state;
+      const siblings = moved
+        .filter((i) => i.swimlaneId === targetSwimlaneId)
+        .sort((a, b) => a.row - b.row);
+      const without = siblings.filter((i) => i.id !== id);
+      without.splice(targetIndex, 0, target);
+      const rowMap = new Map(without.map((i, idx) => [i.id, idx]));
+      return {
+        items: moved.map((i) =>
+          rowMap.has(i.id) ? { ...i, row: rowMap.get(i.id)! } : i
+        ),
+      };
+    }),
 
   // ─── Swimlanes ──────────────────────────────────────────────────────
   addSwimlane: (name) => {
