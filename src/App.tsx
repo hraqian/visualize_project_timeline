@@ -1,40 +1,73 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
-import { DataView } from '@/components/DataView/DataView';
+import { DataView, AddDropdownButton } from '@/components/DataView/DataView';
 import { TimelineView } from '@/components/TimelineView/TimelineView';
 import { StylePane } from '@/components/StylePane/StylePane';
-import { Pencil } from 'lucide-react';
+import {
+  Pencil,
+  Plus,
+  Download,
+  Settings,
+  List,
+  GanttChart,
+} from 'lucide-react';
 import type { ActiveView } from '@/types';
 
 function App() {
   const activeView = useProjectStore((s) => s.activeView);
   const setActiveView = useProjectStore((s) => s.setActiveView);
-  const selectedItemId = useProjectStore((s) => s.selectedItemId);
   const projectName = useProjectStore((s) => s.projectName);
   const setProjectName = useProjectStore((s) => s.setProjectName);
+  const addItem = useProjectStore((s) => s.addItem);
+  const addSwimlane = useProjectStore((s) => s.addSwimlane);
+  const swimlanes = useProjectStore((s) => s.swimlanes);
+  const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
+  const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(projectName);
 
-  const commitName = () => {
+  const commitName = useCallback(() => {
     const trimmed = nameValue.trim();
     if (trimmed) setProjectName(trimmed);
     else setNameValue(projectName);
     setEditingName(false);
-  };
+  }, [nameValue, projectName, setProjectName]);
 
-  const viewTabs: { id: ActiveView; label: string }[] = [
-    { id: 'data', label: 'Data' },
-    { id: 'timeline', label: 'Timeline' },
+  const handleAddTask = useCallback(() => {
+    const targetSwimlane = swimlanes.length > 0
+      ? [...swimlanes].sort((a, b) => a.order - b.order)[0]
+      : null;
+    if (!targetSwimlane) return;
+    addItem({ name: 'New Task', type: 'task', swimlaneId: targetSwimlane.id });
+  }, [swimlanes, addItem]);
+
+  const handleAddMilestone = useCallback(() => {
+    const targetSwimlane = swimlanes.length > 0
+      ? [...swimlanes].sort((a, b) => a.order - b.order)[0]
+      : null;
+    if (!targetSwimlane) return;
+    addItem({ name: 'New Milestone', type: 'milestone', swimlaneId: targetSwimlane.id });
+  }, [swimlanes, addItem]);
+
+  const handleAddSwimlane = useCallback(() => {
+    addSwimlane('New Swimlane');
+  }, [addSwimlane]);
+
+  const viewTabs: { id: ActiveView; label: string; icon: typeof List }[] = [
+    { id: 'data', label: 'Data', icon: List },
+    { id: 'timeline', label: 'Timeline', icon: GanttChart },
   ];
+
+  const isTimeline = activeView === 'timeline';
 
   return (
     <div className="h-full flex flex-col bg-[var(--color-bg)]">
-      {/* ─── Top header: project name (centered) ─── */}
-      <div className="flex items-center justify-center py-3 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] shrink-0">
+      {/* ─── Row 1: Project title banner ─── */}
+      <div className="flex items-center justify-center h-10 bg-[#4f46e5] shrink-0 relative">
         {editingName ? (
           <input
-            className="text-lg font-semibold text-[var(--color-text)] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-md px-3 py-1 outline-none focus:border-indigo-500 min-w-[240px] text-center"
+            className="text-sm font-semibold text-white bg-white/20 border border-white/30 rounded-md px-3 py-1 outline-none focus:border-white/60 min-w-[200px] text-center placeholder:text-white/50"
             value={nameValue}
             onChange={(e) => setNameValue(e.target.value)}
             onBlur={commitName}
@@ -53,33 +86,101 @@ function App() {
               setNameValue(projectName);
               setEditingName(true);
             }}
-            className="group flex items-center gap-2 text-lg font-semibold text-[var(--color-text)] hover:text-indigo-600 transition-colors"
+            className="group flex items-center gap-2 text-sm font-semibold text-white hover:text-white/90 transition-colors"
           >
-            {projectName}
+            <span>{projectName}</span>
+            <span className="text-xs font-normal text-white/60">- Saved</span>
             <Pencil
-              size={14}
-              className="opacity-0 group-hover:opacity-50 transition-opacity"
+              size={12}
+              className="opacity-0 group-hover:opacity-60 transition-opacity text-white"
             />
           </button>
         )}
       </div>
 
-      {/* ─── View tabs ─── */}
-      <div className="flex items-center justify-center py-2 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] shrink-0">
-        <div className="flex bg-[var(--color-bg)] rounded-lg p-0.5 gap-0.5">
-          {viewTabs.map((v) => (
-            <button
-              key={v.id}
-              onClick={() => setActiveView(v.id)}
-              className={`px-5 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-                activeView === v.id
-                  ? 'bg-indigo-500/15 text-indigo-600 shadow-sm'
-                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
-              }`}
-            >
-              {v.label}
-            </button>
-          ))}
+      {/* ─── Row 2: Toolbar ─── */}
+      <div className="flex items-center h-12 px-4 border-b border-[var(--color-border)] bg-[var(--color-bg)] shrink-0">
+        {/* Left: Add buttons */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {isTimeline ? (
+            <>
+              <button
+                onClick={handleAddTask}
+                disabled={swimlanes.length === 0}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <Plus size={14} />
+                Task
+              </button>
+              <button
+                onClick={handleAddMilestone}
+                disabled={swimlanes.length === 0}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <Plus size={14} />
+                Milestone
+              </button>
+              <button
+                onClick={handleAddSwimlane}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
+              >
+                <Plus size={14} />
+                Swimlane
+              </button>
+            </>
+          ) : (
+            <AddDropdownButton onAdd={(type) => {
+              if (type === 'swimlane') {
+                handleAddSwimlane();
+              } else {
+                const targetSwimlane = [...swimlanes].sort((a, b) => a.order - b.order)[0];
+                if (targetSwimlane) {
+                  addItem({ name: type === 'task' ? 'New Task' : 'New Milestone', type, swimlaneId: targetSwimlane.id });
+                }
+              }
+            }} />
+          )}
+        </div>
+
+        {/* Center: View tabs */}
+        <div className="flex items-center gap-1 shrink-0">
+          {viewTabs.map((v) => {
+            const Icon = v.icon;
+            const isActive = activeView === v.id;
+            return (
+              <button
+                key={v.id}
+                onClick={() => {
+                  setActiveView(v.id);
+                  setSelectedItem(null);
+                  setStylePaneSection(null);
+                }}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-white text-[#4f46e5] shadow-sm border border-[var(--color-border)]'
+                    : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
+                }`}
+              >
+                <Icon size={16} className={isActive ? 'text-[#4f46e5]' : ''} />
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right: Download + Settings */}
+        <div className="flex items-center gap-2 flex-1 justify-end">
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
+          >
+            <Download size={14} />
+            Download
+          </button>
+          <button
+            className="p-1.5 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
+          >
+            <Settings size={16} />
+          </button>
         </div>
       </div>
 
@@ -88,8 +189,8 @@ function App() {
         <div className="flex-1 overflow-hidden">
           {activeView === 'data' ? <DataView /> : <TimelineView />}
         </div>
-        {selectedItemId && (
-          <div className="w-[340px] border-l border-[var(--color-border)] overflow-y-auto scrollbar-thin">
+        {isTimeline && (
+          <div className="w-[320px] border-l border-[var(--color-border)] overflow-y-auto scrollbar-thin shrink-0">
             <StylePane />
           </div>
         )}

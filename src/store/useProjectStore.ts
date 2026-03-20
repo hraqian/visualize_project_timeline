@@ -13,8 +13,10 @@ import type {
   TimescaleConfig,
   TimescaleTierConfig,
   StatusLabel,
+  OptionalColumn,
+  StylePaneSection,
 } from '@/types';
-import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_STATUS_LABELS } from '@/types';
+import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, shiftDependents } from '@/utils';
 
 // ─── Sample Data ─────────────────────────────────────────────────────────────
@@ -31,84 +33,84 @@ function createSampleData(): Pick<ProjectState, 'items' | 'swimlanes' | 'depende
     {
       id: 'i1', name: 'Project Kickoff', type: 'milestone',
       startDate: '2026-04-01', endDate: '2026-04-01',
-      percentComplete: 100, statusId: 'on-track', visible: true, swimlaneId: 's1', row: 0,
+      percentComplete: 100, statusId: 'on-track', assignedTo: 'Alex Chen', visible: true, swimlaneId: 's1', row: 0,
       taskStyle: { ...DEFAULT_TASK_STYLE }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE, icon: 'star-filled', color: '#f59e0b' },
       dependsOn: [], isCriticalPath: false,
     },
     {
       id: 'i2', name: 'Requirements Gathering', type: 'task',
       startDate: '2026-04-02', endDate: '2026-04-18',
-      percentComplete: 80, statusId: 'on-track', visible: true, swimlaneId: 's1', row: 0,
+      percentComplete: 80, statusId: 'on-track', assignedTo: 'Sarah Kim', visible: true, swimlaneId: 's1', row: 0,
       taskStyle: { ...DEFAULT_TASK_STYLE, color: '#6366f1' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
       dependsOn: ['i1'], isCriticalPath: false,
     },
     {
       id: 'i3', name: 'Stakeholder Review', type: 'milestone',
       startDate: '2026-04-21', endDate: '2026-04-21',
-      percentComplete: 0, statusId: null, visible: true, swimlaneId: 's1', row: 1,
+      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's1', row: 1,
       taskStyle: { ...DEFAULT_TASK_STYLE }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE, icon: 'flag-filled', color: '#ec4899' },
       dependsOn: ['i2'], isCriticalPath: false,
     },
     {
       id: 'i4', name: 'UI/UX Wireframes', type: 'task',
       startDate: '2026-04-22', endDate: '2026-05-09',
-      percentComplete: 45, statusId: 'potential-risk', visible: true, swimlaneId: 's2', row: 0,
+      percentComplete: 45, statusId: 'potential-risk', assignedTo: 'James Lee', visible: true, swimlaneId: 's2', row: 0,
       taskStyle: { ...DEFAULT_TASK_STYLE, color: '#8b5cf6' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
       dependsOn: ['i3'], isCriticalPath: false,
     },
     {
       id: 'i5', name: 'Visual Design System', type: 'task',
       startDate: '2026-05-01', endDate: '2026-05-20',
-      percentComplete: 20, statusId: 'at-risk', visible: true, swimlaneId: 's2', row: 1,
+      percentComplete: 20, statusId: 'at-risk', assignedTo: 'Emily Park', visible: true, swimlaneId: 's2', row: 1,
       taskStyle: { ...DEFAULT_TASK_STYLE, color: '#a855f7' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
       dependsOn: [], isCriticalPath: false,
     },
     {
       id: 'i6', name: 'Design Approval', type: 'milestone',
       startDate: '2026-05-22', endDate: '2026-05-22',
-      percentComplete: 0, statusId: null, visible: true, swimlaneId: 's2', row: 0,
+      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's2', row: 0,
       taskStyle: { ...DEFAULT_TASK_STYLE }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE, icon: 'check', color: '#22c55e' },
       dependsOn: ['i4', 'i5'], isCriticalPath: false,
     },
     {
       id: 'i7', name: 'Frontend Development', type: 'task',
       startDate: '2026-05-25', endDate: '2026-07-03',
-      percentComplete: 0, statusId: null, visible: true, swimlaneId: 's3', row: 0,
+      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's3', row: 0,
       taskStyle: { ...DEFAULT_TASK_STYLE, color: '#3b82f6' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
       dependsOn: ['i6'], isCriticalPath: false,
     },
     {
       id: 'i8', name: 'Backend API', type: 'task',
       startDate: '2026-05-25', endDate: '2026-06-26',
-      percentComplete: 0, statusId: null, visible: true, swimlaneId: 's3', row: 1,
+      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's3', row: 1,
       taskStyle: { ...DEFAULT_TASK_STYLE, color: '#06b6d4' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
       dependsOn: ['i6'], isCriticalPath: false,
     },
     {
       id: 'i9', name: 'Database Setup', type: 'task',
       startDate: '2026-05-25', endDate: '2026-06-06',
-      percentComplete: 0, statusId: null, visible: true, swimlaneId: 's3', row: 2,
+      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's3', row: 2,
       taskStyle: { ...DEFAULT_TASK_STYLE, color: '#14b8a6' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
       dependsOn: ['i6'], isCriticalPath: false,
     },
     {
       id: 'i10', name: 'Integration Testing', type: 'task',
       startDate: '2026-07-06', endDate: '2026-07-17',
-      percentComplete: 0, statusId: null, visible: true, swimlaneId: 's4', row: 0,
+      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's4', row: 0,
       taskStyle: { ...DEFAULT_TASK_STYLE, color: '#22c55e' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
       dependsOn: ['i7', 'i8'], isCriticalPath: false,
     },
     {
       id: 'i11', name: 'UAT & Bug Fixes', type: 'task',
       startDate: '2026-07-20', endDate: '2026-07-31',
-      percentComplete: 0, statusId: null, visible: true, swimlaneId: 's4', row: 0,
+      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's4', row: 0,
       taskStyle: { ...DEFAULT_TASK_STYLE, color: '#f97316' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
       dependsOn: ['i10'], isCriticalPath: false,
     },
     {
       id: 'i12', name: 'Go Live!', type: 'milestone',
       startDate: '2026-08-03', endDate: '2026-08-03',
-      percentComplete: 0, statusId: null, visible: true, swimlaneId: 's4', row: 1,
+      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's4', row: 1,
       taskStyle: { ...DEFAULT_TASK_STYLE }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE, icon: 'flag-filled', color: '#ef4444', size: 24 },
       dependsOn: ['i11'], isCriticalPath: false,
     },
@@ -138,13 +140,17 @@ interface ProjectActions {
   // View
   setActiveView: (view: ActiveView) => void;
   setSelectedItem: (id: string | null) => void;
+  setStylePaneSection: (section: StylePaneSection | null) => void;
   setZoom: (zoom: number) => void;
 
   // Project
   setProjectName: (name: string) => void;
+  setTimelineTitle: (title: string) => void;
 
   // Items
   addItem: (item: Partial<ProjectItem> & { name: string; type: ItemType; swimlaneId: string }) => void;
+  addItemRelative: (referenceId: string, position: 'above' | 'below') => void;
+  duplicateItem: (id: string) => void;
   updateItem: (id: string, updates: Partial<ProjectItem>) => void;
   deleteItem: (id: string) => void;
   toggleVisibility: (id: string) => void;
@@ -152,10 +158,14 @@ interface ProjectActions {
   moveItem: (id: string, daysDelta: number) => void;
   resizeItem: (id: string, newEndDate: string) => void;
   setItemRow: (id: string, row: number) => void;
+  reorderItem: (id: string, newIndex: number) => void;
   moveItemToSwimlane: (id: string, swimlaneId: string) => void;
 
   // Swimlanes
   addSwimlane: (name: string) => void;
+  addSwimlaneRelative: (referenceId: string, position: 'above' | 'below') => void;
+  duplicateSwimlane: (id: string) => void;
+  hideSwimlaneItems: (id: string) => void;
   updateSwimlane: (id: string, updates: Partial<Swimlane>) => void;
   deleteSwimlane: (id: string) => void;
   reorderSwimlane: (id: string, newOrder: number) => void;
@@ -169,6 +179,12 @@ interface ProjectActions {
   updateMilestoneStyle: (id: string, style: Partial<MilestoneStyle>) => void;
   applyStyleToAll: (id: string) => void;
   applyPartialStyleToAll: (id: string, keys: string[]) => void;
+
+  applyTaskBarStyleToAll: (
+    id: string,
+    properties: { color?: boolean; barShape?: boolean; thickness?: boolean; spacing?: boolean },
+    excludeSwimlanes: boolean,
+  ) => void;
 
   // Status Labels
   addStatusLabel: (label: StatusLabel) => void;
@@ -185,6 +201,20 @@ interface ProjectActions {
   toggleCriticalPath: () => void;
   recalcCriticalPath: () => void;
 
+  // Column Visibility
+  toggleColumn: (column: OptionalColumn) => void;
+
+  // Multi-select (checkboxes)
+  toggleCheckedItem: (id: string) => void;
+  checkAllItems: () => void;
+  uncheckAllItems: () => void;
+  setCheckedItems: (ids: string[]) => void;
+
+  // Bulk actions
+  duplicateCheckedItems: () => void;
+  hideCheckedItems: () => void;
+  deleteCheckedItems: () => void;
+  setColorForCheckedItems: (color: string) => void;
 }
 
 type ProjectStore = ProjectState & ProjectActions;
@@ -194,23 +224,29 @@ const sample = createSampleData();
 export const useProjectStore = create<ProjectStore>((set, get) => ({
   // ─── Initial State ───────────────────────────────────────────────────
   projectName: 'Project Timeline',
+  timelineTitle: 'Project Timeline',
   items: sample.items,
   swimlanes: sample.swimlanes,
   dependencies: sample.dependencies,
   statusLabels: [...DEFAULT_STATUS_LABELS],
+  columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
+  checkedItemIds: [],
   timescale: getDefaultTimescale(),
   activeView: 'timeline',
   selectedItemId: null,
+  stylePaneSection: null,
   showCriticalPath: false,
   zoom: 8,
 
   // ─── View ────────────────────────────────────────────────────────────
   setActiveView: (view) => set({ activeView: view }),
   setSelectedItem: (id) => set({ selectedItemId: id }),
+  setStylePaneSection: (section) => set({ stylePaneSection: section }),
   setZoom: (zoom) => set({ zoom: Math.max(2, Math.min(30, zoom)) }),
 
   // ─── Project ─────────────────────────────────────────────────────────
   setProjectName: (name) => set({ projectName: name }),
+  setTimelineTitle: (title) => set({ timelineTitle: title }),
 
   // ─── Items ───────────────────────────────────────────────────────────
   addItem: (partial) => {
@@ -223,6 +259,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       endDate: partial.endDate || (partial.type === 'milestone' ? (partial.startDate || today) : addDays(parseISO(partial.startDate || today), 7).toISOString().split('T')[0]),
       percentComplete: partial.percentComplete ?? 0,
       statusId: partial.statusId ?? null,
+      assignedTo: partial.assignedTo ?? '',
       visible: partial.visible ?? true,
       swimlaneId: partial.swimlaneId,
       row: partial.row ?? 0,
@@ -232,6 +269,62 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       isCriticalPath: false,
     };
     set((state) => ({ items: [...state.items, newItem] }));
+  },
+
+  addItemRelative: (referenceId, position) => {
+    const state = get();
+    const ref = state.items.find((i) => i.id === referenceId);
+    if (!ref) return;
+    const today = new Date().toISOString().split('T')[0];
+    const newRow = position === 'above' ? ref.row : ref.row + 1;
+    // Shift rows of items in the same swimlane that are at or after the new row
+    const shifted = state.items.map((i) => {
+      if (i.swimlaneId === ref.swimlaneId && i.row >= newRow && i.id !== referenceId) {
+        return { ...i, row: i.row + 1 };
+      }
+      // For 'below', also shift the reference item's siblings that share a higher row
+      return i;
+    });
+    const newItem: ProjectItem = {
+      id: uuid(),
+      name: 'New Task',
+      type: 'task',
+      startDate: today,
+      endDate: addDays(parseISO(today), 7).toISOString().split('T')[0],
+      percentComplete: 0,
+      statusId: null,
+      assignedTo: '',
+      visible: true,
+      swimlaneId: ref.swimlaneId,
+      row: newRow,
+      taskStyle: { ...DEFAULT_TASK_STYLE },
+      milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
+      dependsOn: [],
+      isCriticalPath: false,
+    };
+    set({ items: [...shifted, newItem] });
+  },
+
+  duplicateItem: (id) => {
+    const state = get();
+    const source = state.items.find((i) => i.id === id);
+    if (!source) return;
+    const newItem: ProjectItem = {
+      ...source,
+      id: uuid(),
+      name: `${source.name} (copy)`,
+      dependsOn: [],
+      isCriticalPath: false,
+      row: source.row + 1,
+    };
+    // Shift rows of items below in the same swimlane
+    const shifted = state.items.map((i) => {
+      if (i.swimlaneId === source.swimlaneId && i.row > source.row) {
+        return { ...i, row: i.row + 1 };
+      }
+      return i;
+    });
+    set({ items: [...shifted, newItem] });
   },
 
   updateItem: (id, updates) =>
@@ -292,6 +385,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       items: state.items.map((i) => (i.id === id ? { ...i, row } : i)),
     })),
 
+  reorderItem: (id, newIndex) =>
+    set((state) => {
+      const target = state.items.find((i) => i.id === id);
+      if (!target) return state;
+      const siblings = state.items
+        .filter((i) => i.swimlaneId === target.swimlaneId)
+        .sort((a, b) => a.row - b.row);
+      const without = siblings.filter((i) => i.id !== id);
+      without.splice(newIndex, 0, target);
+      const rowMap = new Map(without.map((i, idx) => [i.id, idx]));
+      return {
+        items: state.items.map((i) =>
+          rowMap.has(i.id) ? { ...i, row: rowMap.get(i.id)! } : i
+        ),
+      };
+    }),
+
   moveItemToSwimlane: (id, swimlaneId) =>
     set((state) => ({
       items: state.items.map((i) => (i.id === id ? { ...i, swimlaneId, row: 0 } : i)),
@@ -315,6 +425,60 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       ],
     }));
   },
+
+  addSwimlaneRelative: (referenceId, position) => {
+    const state = get();
+    const sorted = [...state.swimlanes].sort((a, b) => a.order - b.order);
+    const refIndex = sorted.findIndex((s) => s.id === referenceId);
+    if (refIndex === -1) return;
+    const colors = ['#6366f1', '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
+    const newSwimlane: Swimlane = {
+      id: uuid(),
+      name: 'New Swimlane',
+      color: colors[state.swimlanes.length % colors.length],
+      order: 0,
+      collapsed: false,
+    };
+    const insertIndex = position === 'above' ? refIndex : refIndex + 1;
+    sorted.splice(insertIndex, 0, newSwimlane);
+    set({
+      swimlanes: sorted.map((s, i) => ({ ...s, order: i })),
+    });
+  },
+
+  duplicateSwimlane: (id) => {
+    const state = get();
+    const source = state.swimlanes.find((s) => s.id === id);
+    if (!source) return;
+    const sorted = [...state.swimlanes].sort((a, b) => a.order - b.order);
+    const sourceIndex = sorted.findIndex((s) => s.id === id);
+    const newSwimlaneId = uuid();
+    const newSwimlane: Swimlane = {
+      id: newSwimlaneId,
+      name: `${source.name} (copy)`,
+      color: source.color,
+      order: 0,
+      collapsed: false,
+    };
+    sorted.splice(sourceIndex + 1, 0, newSwimlane);
+    const sourceItems = state.items.filter((i) => i.swimlaneId === id);
+    const newItems = sourceItems.map((item) => ({
+      ...item,
+      id: uuid(),
+      swimlaneId: newSwimlaneId,
+    }));
+    set({
+      swimlanes: sorted.map((s, i) => ({ ...s, order: i })),
+      items: [...state.items, ...newItems],
+    });
+  },
+
+  hideSwimlaneItems: (id) =>
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.swimlaneId === id ? { ...i, visible: false } : i
+      ),
+    })),
 
   updateSwimlane: (id, updates) =>
     set((state) => ({
@@ -417,6 +581,32 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }));
   },
 
+  applyTaskBarStyleToAll: (id, properties, excludeSwimlanes) => {
+    const state = get();
+    const source = state.items.find((i) => i.id === id);
+    if (!source || source.type !== 'task') return;
+
+    const keys: (keyof typeof properties)[] = [];
+    if (properties.color) keys.push('color');
+    if (properties.barShape) keys.push('barShape');
+    if (properties.thickness) keys.push('thickness');
+    if (properties.spacing) keys.push('spacing');
+    if (keys.length === 0) return;
+
+    const partial: Record<string, unknown> = {};
+    for (const k of keys) {
+      partial[k] = (source.taskStyle as Record<string, unknown>)[k];
+    }
+
+    set((st) => ({
+      items: st.items.map((i) => {
+        if (i.id === id || i.type !== 'task') return i;
+        if (excludeSwimlanes && i.swimlaneId !== null) return i;
+        return { ...i, taskStyle: { ...i.taskStyle, ...partial } };
+      }),
+    }));
+  },
+
   // ─── Status Labels ──────────────────────────────────────────────────
   addStatusLabel: (label) =>
     set((state) => ({ statusLabels: [...state.statusLabels, label] })),
@@ -484,5 +674,84 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       items: state.items.map((i) => ({ ...i, isCriticalPath: critical.has(i.id) })),
     });
   },
+
+  // ─── Column Visibility ──────────────────────────────────────────────
+  toggleColumn: (column) =>
+    set((state) => ({
+      columnVisibility: {
+        ...state.columnVisibility,
+        [column]: !state.columnVisibility[column],
+      },
+    })),
+
+  // ─── Multi-select (checkboxes) ─────────────────────────────────────
+  toggleCheckedItem: (id) =>
+    set((state) => {
+      const exists = state.checkedItemIds.includes(id);
+      return {
+        checkedItemIds: exists
+          ? state.checkedItemIds.filter((i) => i !== id)
+          : [...state.checkedItemIds, id],
+      };
+    }),
+
+  checkAllItems: () =>
+    set((state) => ({
+      checkedItemIds: state.items.map((i) => i.id),
+    })),
+
+  uncheckAllItems: () => set({ checkedItemIds: [] }),
+
+  setCheckedItems: (ids) => set({ checkedItemIds: ids }),
+
+  // ─── Bulk Actions ──────────────────────────────────────────────────
+  duplicateCheckedItems: () => {
+    const state = get();
+    const toDuplicate = state.items.filter((i) => state.checkedItemIds.includes(i.id));
+    const newItems = toDuplicate.map((item) => ({
+      ...item,
+      id: uuid(),
+      name: `${item.name} (copy)`,
+      dependsOn: [],
+      isCriticalPath: false,
+    }));
+    set((s) => ({
+      items: [...s.items, ...newItems],
+      checkedItemIds: newItems.map((i) => i.id), // select the duplicates
+    }));
+  },
+
+  hideCheckedItems: () =>
+    set((state) => ({
+      items: state.items.map((i) =>
+        state.checkedItemIds.includes(i.id) ? { ...i, visible: false } : i
+      ),
+      checkedItemIds: [],
+    })),
+
+  deleteCheckedItems: () =>
+    set((state) => {
+      const idsToDelete = new Set(state.checkedItemIds);
+      return {
+        items: state.items.filter((i) => !idsToDelete.has(i.id)),
+        dependencies: state.dependencies.filter(
+          (d) => !idsToDelete.has(d.fromId) && !idsToDelete.has(d.toId)
+        ),
+        checkedItemIds: [],
+        selectedItemId: idsToDelete.has(state.selectedItemId ?? '') ? null : state.selectedItemId,
+      };
+    }),
+
+  setColorForCheckedItems: (color) =>
+    set((state) => ({
+      items: state.items.map((i) => {
+        if (!state.checkedItemIds.includes(i.id)) return i;
+        return {
+          ...i,
+          taskStyle: { ...i.taskStyle, color },
+          milestoneStyle: { ...i.milestoneStyle, color },
+        };
+      }),
+    })),
 
 }));

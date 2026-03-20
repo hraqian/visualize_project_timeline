@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 19, 2026
+> **Last updated**: March 20, 2026 (session 5)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -10,7 +10,7 @@
 **Project**: A **Project Visualization App** with three "command centers":
 1. **Data View** — Spreadsheet-style editor for project items
 2. **Timeline View** — Drag-and-drop Gantt canvas
-3. **Style Pane** — Designer side panel (opens when an item is selected)
+3. **Style Pane** — Designer side panel (opens when an item is selected in Timeline view)
 
 **Location**: `/Users/aleqian/Documents/MyProjects/project-timeline`
 
@@ -28,8 +28,15 @@
 ### Design Principles
 - **Light theme only** (dark theme was removed)
 - Default font color: `#334155` (dark slate)
-- Clean, professional visuals — nice colors, no clutter
+- Clean, professional, spacious design — no clutter
 - No emojis in code or UI
+- No "Add note" feature
+- **Date format**: `MM/dd/yyyy`
+- User is particular about minimal changes — do exactly what's asked
+
+### Git
+- Repo initialized on `main` branch
+- Git identity: `aleqian` / `aleqian@users.noreply.github.com`
 
 ---
 
@@ -38,25 +45,32 @@
 ### File Structure
 ```
 src/
-├── App.tsx                              # Root layout: project name (top center), view tabs, view content + StylePane
+├── App.tsx                              # Root layout: banner + toolbar + main content (202 lines)
 ├── index.css                            # CSS variables (light-only), Tailwind directives
 ├── main.tsx                             # Entry point
 ├── types/
-│   └── index.ts                         # All TypeScript types, interfaces, constants
+│   └── index.ts                         # All TypeScript types, interfaces, constants (311 lines)
 ├── store/
-│   └── useProjectStore.ts               # Zustand store — all state + actions
+│   └── useProjectStore.ts               # Zustand store — all state + actions (757 lines)
 ├── utils/
 │   └── index.ts                         # Utility functions (timescale, critical path, project range)
 ├── components/
 │   ├── DataView/
-│   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups
+│   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups (1509 lines)
 │   │   └── TypePicker.tsx               # Type column cell + popover (shape/color picker)
 │   ├── TimelineView/
-│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines
+│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines (788 lines)
 │   ├── StylePane/
-│   │   └── StylePane.tsx                # Per-item style editor (colors, shapes, fonts, etc.)
+│   │   └── StylePane.tsx                # Per-item style editor — heavily extended (1911 lines)
 │   └── common/
-│       └── MilestoneIconComponent.tsx   # Renders milestone icons using Lucide
+│       ├── MilestoneIconComponent.tsx   # Renders milestone icons using Lucide
+│       ├── AdvancedColorPicker.tsx      # Full Office-style color picker with theme/standard/recent colors
+│       ├── ShapeDropdown.tsx            # Clean trigger + 6-col icon grid; exports ShapePreview
+│       ├── SizeControl.tsx              # S/M/L toggles + numeric stepper
+│       ├── SpacingControl.tsx           # Tight/Normal/Wide toggle with SVG icons
+│       ├── FontDropdowns.tsx            # FontFamilyDropdown + FontSizeDropdown (reusable)
+│       ├── DateFormatDropdown.tsx       # 11 date-fns formats with sample date preview
+│       └── DurationFormatDropdown.tsx   # Cascading dropdown with 5 categories + hover submenus
 ```
 
 ### Key Types (`src/types/index.ts`)
@@ -64,56 +78,97 @@ src/
 ```typescript
 type ItemType = 'task' | 'milestone';
 type ActiveView = 'data' | 'timeline';
+type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector';
 
 type BarShape = 'rounded' | 'square' | 'flat' | 'capsule' | 'chevron' | 'double-chevron'
-  | 'arrow-right' | 'pointed' | 'notched' | 'tab' | 'arrow-both' | 'trapezoid';
+  | 'arrow-right' | 'pointed' | 'notched' | 'tab' | 'arrow-both' | 'trapezoid'; // 12 variants
 
 type MilestoneIcon = 'diamond' | 'diamond-filled' | 'triangle' | 'triangle-filled'
   | 'flag' | 'flag-filled' | 'star' | 'star-filled' | 'circle' | 'circle-filled'
-  | 'square-ms' | 'square-ms-filled' | 'check' | 'arrow-up' | 'arrow-right' | 'hexagon';
+  | 'square-ms' | 'square-ms-filled' | 'check' | 'arrow-up' | 'arrow-right' | 'hexagon'; // 16 variants
+
+type LabelPosition = 'far-left' | 'left' | 'center' | 'right' | 'above' | 'below';
+type TextAlign = 'left' | 'center' | 'right';
+
+type DateFormat = 'MMM d' | "MMM d ''yy" | 'MMM d, yyyy' | 'MMM yyyy' | 'MMMM d, yyyy'
+  | 'MMMM dd, yyyy' | 'MM/dd/yyyy' | 'EEE M/d' | "EEE M/d/yy" | 'EEE MMM d' | "EEE MMM d, ''yy"; // 11 formats
+
+type DurationFormat = 'd' | 'days' | 'w' | 'wks' | 'weeks' | 'mons' | 'months'
+  | 'q' | 'qrts' | 'quarters' | 'y' | 'yrs' | 'years'; // 13 formats in 5 categories
 
 interface TaskStyle {
-  barShape: BarShape; color: string; thickness: number;
+  // Bar properties
+  barShape: BarShape; color: string; thickness: number; spacing: number;
+  // Show/hide toggles (persisted per-item, not local state)
+  showTitle: boolean;       // default true
+  showDate: boolean;        // default false
+  showDuration: boolean;    // default false
+  showPercentComplete: boolean; // default false
+  showVerticalConnector: boolean; // default false
+  // Title label styling
   labelPosition: LabelPosition; fontSize: number; fontColor: string;
   fontFamily: string; fontWeight: number;
+  fontStyle: 'normal' | 'italic'; textDecoration: 'none' | 'underline';
+  textAlign: TextAlign;
+  // Date label styling
+  dateFormat: DateFormat; dateLabelPosition: LabelPosition;
+  dateFontSize: number; dateFontColor: string; dateFontFamily: string;
+  dateFontWeight: number; dateFontStyle: 'normal' | 'italic';
+  dateTextDecoration: 'none' | 'underline'; dateTextAlign: TextAlign;
+  // Duration label styling
+  durationFormat: DurationFormat; durationLabelPosition: LabelPosition;
+  durationFontSize: number; durationFontColor: string; durationFontFamily: string;
+  durationFontWeight: number; durationFontStyle: 'normal' | 'italic';
+  durationTextDecoration: 'none' | 'underline'; durationTextAlign: TextAlign;
 }
 
 interface MilestoneStyle {
   icon: MilestoneIcon; size: number; color: string;
   fontSize: number; fontColor: string; labelPosition: LabelPosition;
   fontFamily: string; fontWeight: number;
+  fontStyle: 'normal' | 'italic'; textDecoration: 'none' | 'underline';
 }
 
 interface ProjectItem {
   id: string; name: string; type: ItemType;
   startDate: string; endDate: string;           // ISO date strings
   percentComplete: number; statusId: string | null;
-  visible: boolean; swimlaneId: string; row: number;
+  assignedTo: string;                            // person name, '' if unassigned
+  visible: boolean; swimlaneId: string | null;   // null = independent (no swimlane)
+  row: number;
   taskStyle: TaskStyle; milestoneStyle: MilestoneStyle;
   dependsOn: string[]; isCriticalPath: boolean;
 }
 
 interface StatusLabel { id: string; label: string; color: string; }
+interface ColumnVisibility { percentComplete: boolean; assignedTo: boolean; status: boolean; }
 
 interface ProjectState {
-  projectName: string; items: ProjectItem[]; swimlanes: Swimlane[];
+  projectName: string; timelineTitle: string;
+  items: ProjectItem[]; swimlanes: Swimlane[];
   dependencies: Dependency[]; statusLabels: StatusLabel[];
-  selectedItemId: string | null; activeView: ActiveView;
-  showCriticalPath: boolean; zoom: number; timescale: TimescaleConfig;
-  // ... plus all actions
+  columnVisibility: ColumnVisibility;
+  checkedItemIds: string[];   // multi-select tracking
+  timescale: TimescaleConfig;
+  activeView: ActiveView;
+  selectedItemId: string | null;
+  stylePaneSection: StylePaneSection | null; // which section expanded in StylePane
+  showCriticalPath: boolean; zoom: number;
 }
 ```
 
 ### Store Actions (`src/store/useProjectStore.ts`)
-- CRUD: `addItem`, `updateItem`, `deleteItem`, `toggleVisibility`, `toggleItemType`
-- Swimlanes: `addSwimlane`, `updateSwimlane`, `deleteSwimlane`
-- Dependencies: `addDependency`, `removeDependency`
-- Styles: `updateTaskStyle`, `updateMilestoneStyle`, `applyStyleToAll`, `applyPartialStyleToAll`
-- Status: `addStatusLabel`, `updateStatusLabel`, `removeStatusLabel`
-- Global: `setProjectName`, `setActiveView`, `setSelectedItem`, `setZoom`
-- Critical path: `toggleCriticalPath`, `recalcCriticalPath` (currently dormant — UI toggle removed)
-- Movement: `moveItem` (shift by days), `moveItemToSwimlane`
-- Timescale: `updateTimescale`, `updateTier`
+- **Global**: `setActiveView`, `setSelectedItem`, `setStylePaneSection`, `setZoom`, `setProjectName`, `setTimelineTitle`
+- **Items**: `addItem`, `addItemRelative`, `duplicateItem`, `updateItem`, `deleteItem`, `toggleVisibility`, `toggleItemType`, `moveItem`, `resizeItem`, `setItemRow`, `reorderItem`, `moveItemToSwimlane`
+- **Swimlanes**: `addSwimlane`, `addSwimlaneRelative`, `duplicateSwimlane`, `hideSwimlaneItems`, `updateSwimlane`, `deleteSwimlane`, `reorderSwimlane`
+- **Dependencies**: `addDependency`, `removeDependency`
+- **Styles**: `updateTaskStyle`, `updateMilestoneStyle`, `applyStyleToAll`, `applyPartialStyleToAll`, `applyTaskBarStyleToAll`
+- **Status**: `addStatusLabel`, `updateStatusLabel`, `removeStatusLabel`
+- **Timescale**: `updateTimescale`, `updateTier`, `addTier`, `removeTier`
+- **Critical path**: `toggleCriticalPath`, `recalcCriticalPath` (UI toggle removed, logic kept dormant)
+- **Columns**: `toggleColumn`
+- **Multi-select**: `toggleCheckedItem`, `checkAllItems`, `uncheckAllItems`, `setCheckedItems`
+- **Bulk ops**: `duplicateCheckedItems`, `hideCheckedItems`, `deleteCheckedItems`, `setColorForCheckedItems`
 
 ### Sample Data
 - **4 swimlanes**: Planning, Development, Testing, Deployment
@@ -123,98 +178,271 @@ interface ProjectState {
 
 ---
 
-## App Layout (current state)
+## App Layout
 
-```
-┌─────────────────────────────────────────────────────────┐
-│              [Project Name - click to edit]              │  ← App.tsx (centered, editable)
-├─────────────────────────────────────────────────────────┤
-│                  [Data] [Timeline]                       │  ← App.tsx (view toggle tabs)
-├──────────────────────────────────────────┬──────────────┤
-│                                          │              │
-│  Data View or Timeline View              │  Style Pane  │  ← Shows when item selected
-│  (fills remaining space)                 │  (340px)     │
-│                                          │              │
-└──────────────────────────────────────────┴──────────────┘
-```
+### Row 1 (top banner)
+- Colored bar: `#4f46e5` (indigo-600)
+- Project name centered with " - Saved" suffix, white text
 
-### Data View Layout
-- **Sub-header**: Add dropdown button (right-aligned) — can add Swimlane/Task/Milestone
-- **Table**: columns = grip | vis | type | name | start | end | duration | progress | status | actions
-  - Type column: custom TypePickerCell with shape/color popover
-  - Duration: auto-calculated (inclusive: same day = 1 day), editable
-  - Status: dropdown with configurable labels (gear icon in header opens config panel)
-  - Actions: trash icon, only visible on row hover
-- **Swimlane groups**: collapsible, with inline "Add task or milestone" at bottom of each
-- **Bottom**: "+ Add Swimlane" button below last swimlane
-- **StatusConfigPanel**: absolutely-positioned overlay (right side, z-40)
+### Row 2 (toolbar)
+- Left: view-specific add buttons
+- Center: `Data` / `Timeline` tabs
+- Right: `Download` + gear icon
 
-### Timeline View Layout
-- **Sub-header**: Zoom controls (right-aligned) — zoom in/out buttons with level display
-- **Canvas**: Swimlane labels (left sticky column) + timescale tiers + task bars/milestones + dependency arrows + today line
-- Task bars render with CSS clip-path for non-rectangular shapes (chevron, arrow, etc.)
-- Milestones render with Lucide icons via MilestoneIconComponent
+### Main content
+- Data View or Timeline View fills remaining space
+- StylePane always visible in Timeline view (340px right panel)
+- Empty state: "Select tasks to style them" when no item selected
+
+### StylePane Structure
+- **Tabs**: `Items` and `Timescale`
+- Items tab has **3 sub-icons** (task, milestone, swimlane) at top
+- Task sub-tab has **6 collapsible sections** (accordion-style, one at a time, driven by `stylePaneSection` in Zustand):
+
+| # | Section | Collapse Arrow | Toggle | Default | Status |
+|---|---------|---------------|--------|---------|--------|
+| 1 | Task bar | Yes | No | — | COMPLETED |
+| 2 | Task title | Yes | Yes (green) | ON | COMPLETED |
+| 3 | Task date | Yes | Yes | OFF | COMPLETED |
+| 4 | Task duration | Yes | Yes | OFF | COMPLETED |
+| 5 | Task % complete | Yes | Yes | OFF | TODO |
+| 6 | Vertical connector | Yes | Yes | OFF | TODO |
+
+---
+
+## Section Details
+
+### Task Bar (COMPLETED)
+- Row 1: Color (AdvancedColorPicker) + Shape (ShapeDropdown)
+- Row 2: Size (S/M/L toggle + numeric stepper via SizeControl)
+- Row 3: Spacing (Tight/Normal/Wide toggle via SpacingControl)
+- Row 4: Apply to all tasks (boxed: `border border-[var(--color-border)] rounded-lg p-3`)
+
+### Task Title (COMPLETED)
+- Row 1: Color (fontColor AdvancedColorPicker) + Text (FontFamilyDropdown + FontSizeDropdown)
+- Row 2: B / I / U toggles + separator + alignment buttons (left/center/right SVG icons)
+  - **Alignment buttons only shown when position is center, above, or below**
+- Row 3: Position — 6 position icons (far-left, left, center, right, above, below) using PositionIcon component
+- Row 4: Apply to all tasks (boxed, with Alignment property card)
+
+### Task Date (COMPLETED)
+- Row 1: Color (dateFontColor) + Text (date-specific FontFamily + FontSize)
+- Row 2: B / I / U + separator + alignment buttons (conditional on position = center/above/below)
+- Row 3: Format — DateFormatDropdown with 11 formats + sample preview
+- Row 4: Position — 6 position icons (uses LABEL_POSITIONS)
+- Row 5: Apply to all tasks (boxed)
+
+### Task Duration (COMPLETED)
+- Row 1: Color (durationFontColor) + Text (duration-specific FontFamily + FontSize)
+- Row 2: B / I / U + separator + alignment buttons (conditional on position = center/above/below)
+- Row 3: Format — DurationFormatDropdown (cascading submenu with 5 categories)
+- Row 4: Position — **5 icons only (no Far Left)**, uses `SECONDARY_LABEL_POSITIONS`
+- Row 5: Apply to all tasks (boxed, TaskDurationApplyToAll component)
+
+### DurationFormatDropdown Categories
+| Category | Formats |
+|----------|---------|
+| Days | `d`, `days` |
+| Weeks | `w`, `wks`, `weeks` |
+| Months | `mons`, `months` |
+| Quarters | `q`, `qrts`, `quarters` |
+| Years | `y`, `yrs`, `years` |
+
+---
+
+## Position vs Alignment (Justification)
+
+**Position** controls *where* the label appears relative to the bar:
+- `far-left`, `left`, `right` — side positions (label outside bar)
+- `center` — label inside the bar
+- `above`, `below` — label above/below bar
+
+**Alignment** (textAlign) controls *how text is justified* within the label container:
+- Only applies to `center`, `above`, and `below` positions
+- Side positions (far-left, left, right) don't show alignment buttons — text flows naturally
+- Alignment buttons conditionally hidden/shown based on current position setting
+
+---
+
+## TimelineView Label Rendering
+
+Three label types rendered for tasks, each conditional on its show toggle:
+
+1. **Title label** (`style.showTitle`) — displays `item.name` + optional % badge
+2. **Date label** (`style.showDate`) — displays `"start - end"` formatted per `dateFormat`
+3. **Duration label** (`style.showDuration`) — displays computed duration via `formatDuration()` helper
+
+### Duration Computation
+- Duration is **inclusive** (same day = 1 day): `differenceInDays(end, start) + 1`
+- Weeks = days/7, Months = days/30.44, Quarters = days/91.31, Years = days/365.25
+- Fractional values shown with 1 decimal, trailing `.0` stripped
+- Duration is computed (not stored) — derived from `startDate` and `endDate`
+
+### Label Positioning Logic
+For `center` position: `left: 0, right: 0, maxWidth: 'none', paddingLeft: 4, paddingRight: 4` + user's `textAlign`
+For `above`/`below`: `left: 0` with stacking margins to avoid overlapping other labels in the same position
+For side positions: positioned outside the bar with appropriate margins
+
+### Label Stacking (above/below)
+When multiple labels share the same vertical position (above or below), they stack with 16px offsets:
+- Date checks if title is also above/below
+- Duration checks if both title and date are above/below
+
+---
+
+## Shared Components (`src/components/common/`)
+
+| Component | File | Description |
+|-----------|------|-------------|
+| AdvancedColorPicker | AdvancedColorPicker.tsx | Full Office-style picker: theme colors (10 columns x 6 shades), standard colors, recent colors (module-level persistence) |
+| ShapeDropdown | ShapeDropdown.tsx | Trigger showing current shape + 6-col icon grid dropdown; exports `ShapePreview` |
+| SizeControl | SizeControl.tsx | S/M/L toggle buttons + numeric stepper with +/- |
+| SpacingControl | SpacingControl.tsx | Tight/Normal/Wide toggle with inline SVG line-spacing icons |
+| FontDropdowns | FontDropdowns.tsx | `FontFamilyDropdown` (shows font name in its own font) + `FontSizeDropdown` (numeric) |
+| DateFormatDropdown | DateFormatDropdown.tsx | 11 date-fns format options with live sample date preview |
+| DurationFormatDropdown | DurationFormatDropdown.tsx | Cascading dropdown: 5 category rows with hover submenus |
+| MilestoneIconComponent | MilestoneIconComponent.tsx | Renders 16 milestone icon variants using Lucide icons |
+
+---
+
+## PositionIcon SVGs (redesigned)
+- 28x20 viewBox, `shapeRendering="crispEdges"`, serif "T" at 9-11px, sharp lines
+- All 6 positions: far-left (arrow+dashes+separator+bar), left (T+separator+bar), center (lines above/below bar), right (bar+separator+T), above (T above line+bar), below (bar+line+T below)
+
+---
+
+## "Apply to All Tasks" Pattern
+All sections use a **boxed style**: `border border-[var(--color-border)] rounded-lg p-3` (NOT a horizontal `border-t` divider).
+Contains:
+- Collapsible header with Paintbrush icon + "Apply to all tasks" text + chevron
+- Property cards grid (2 columns) with checkboxes per property
+- "Exclude swimlanes" checkbox option
+- Apply button with success state (green check + "Applied!" for 1.2s)
+
+`applyPartialStyleToAll` works generically — copies any named keys from source item's `taskStyle` to all other tasks.
 
 ---
 
 ## What Has Been Completed
 
-### Phase 1 — Core Build (prior sessions)
+### Phase 1 — Core Build (session 1)
 - Full project scaffold with all types, Zustand store, sample data
 - Data View, Timeline View, Style Pane, Toolbar — all functional
 - Dependencies & critical path computation
 - Fiscal year config, zoom controls
-- Configurable text properties (fontFamily, fontWeight, fontSize, fontColor)
-- Granular "Apply to All" with per-property-group buttons
 
-### Phase 2 — Cleanup (this session)
-1. ✅ Dark theme removal (index.css, types, store, App, Toolbar, DataView)
-2. ✅ Auto-fit text removal (types, StylePane, TimelineView)
+### Phase 2 — Cleanup + Data View Redesign (session 1)
+- Dark theme removal
+- Auto-fit text removal
+- StatusLabel type, statusId on ProjectItem
+- DataView complete rewrite (all columns, inline editing, smart date/duration editing)
+- Toolbar removed, functionality moved to App.tsx sub-headers
+- TypePicker with shape/color popover
 
-### Phase 3 — Data View Redesign (this session)
-3. ✅ Added StatusLabel type, statusId on ProjectItem, projectName + statusLabels on ProjectState
-4. ✅ Store: projectName, statusLabels, status CRUD actions, updated sample data
-5. ✅ Toolbar simplified → then deleted entirely (functionality moved to App.tsx and sub-headers)
-6. ✅ DataView: complete rewrite with all 7 requirements:
-   - a. Top-left Add dropdown (swimlane/task/milestone)
-   - b. Inline "Add task or milestone" at bottom of each swimlane
-   - c. Actions column: hover-only visibility
-   - d. Swimlane column removed
-   - e. Bottom "Add Swimlane" button
-   - f. Type column: now a dropdown (was toggle)
-   - g. Duration column: editable, auto-calc with start/end
-   - h. Status column: dropdown + config panel (gear icon)
-   - i. Tab renamed to "Data"
-   - j. Editable project name (now moved to App.tsx top-center)
+### Phase 3 — Data View Visual Cleanup (session 2)
+- Full DataView visual polish (14 requirements)
+- AssignedTo field added
+- Row separators, compact rows, hover-only actions
 
-### Phase 4 — Layout Optimization (this session)
-7. ✅ Project name moved to top-center of App.tsx (shared across views)
-8. ✅ View tabs (Data/Timeline) below project name in App.tsx
-9. ✅ "Project Timeline" logo removed
-10. ✅ Critical path toggle removed from UI (logic kept dormant)
-11. ✅ Zoom controls moved into TimelineView sub-header
-12. ✅ Toolbar.tsx deleted
+### Phase 4 — Multi-select, Row Actions, Polish (session 3)
+- Multi-select checkboxes + bulk actions (copy, hide, delete, color)
+- Selection toolbar replacing header when items checked
+- Row more-menu (add above/below, duplicate, hide, delete)
+- Smart date/duration editing
+- Dynamic column visibility
 
-### Phase 5 — Type Column Redesign (this session)
-13. ✅ BarShape expanded from 3 to 12 variants
-14. ✅ TypePicker.tsx: compact cell (shape icon + color + type letter + arrow)
-15. ✅ TypePickerPopover: Task shapes (3×4 grid) | Milestone shapes (4×4 grid) + Color swatches + Done
-16. ✅ TaskShapePreview: inline SVG component for shape grid
-17. ✅ TimelineView TaskBar: updated to render new shapes via CSS clip-path
-18. ✅ StylePane: bar shape options expanded to 12, rendered in 4-column grid
+### Phase 5 — App Layout + StylePane Rewrite (session 4)
+- App.tsx rewrite: banner (#4f46e5) + toolbar + content
+- StylePane rewrite: Items/Timescale tabs, 3 sub-icons (task/milestone/swimlane)
+- 6 CollapsibleRow sections with Toggle switches
+- Swimlane + item drag-and-drop in DataView
+- TimelineView: centered graph title, swimlane bands
+
+### Phase 6 — Shared Components + StylePane Sections (sessions 4-5)
+- AdvancedColorPicker (Office-style with theme/standard/recent)
+- ShapeDropdown (clean trigger + 6-col icon grid)
+- SizeControl, SpacingControl, FontDropdowns (all reusable)
+- Task bar section fully wired (Color+Shape, Size, Spacing, Apply to all)
+- Task title section fully wired (Color+Text, B/I/U+alignment, Position, Apply to all)
+- fontStyle + textDecoration added to TaskStyle and MilestoneStyle
+- PositionIcon SVGs redesigned (28x20, crispEdges, serif T)
+- TimelineView label positioning: all 6 LabelPosition values for TaskBar and MilestoneItem
+- fontStyle + textDecoration applied in TimelineView label rendering
+
+### Phase 7 — Date + Duration Sections (session 5)
+- DateFormatDropdown created (11 date-fns formats with sample preview)
+- Task date section fully wired (Color+Text, B/I/U+alignment, Format, Position, Apply to all)
+- Show/hide toggles moved from local state to TaskStyle (showTitle, showDate, showDuration, showPercentComplete, showVerticalConnector)
+- TextAlign type added; alignment buttons in all 3 completed sections
+- dateTextAlign, textAlign (title) added to TaskStyle
+- TimelineView title label conditional on showTitle
+- TimelineView date label renders when showDate is true
+- "Apply to all tasks" changed to boxed style (border rounded-lg p-3) across all sections
+- DurationFormat type + all duration fields added to TaskStyle
+- DurationFormatDropdown created (cascading with 5 categories + hover submenus)
+- SECONDARY_LABEL_POSITIONS constant (5 positions, no Far Left)
+- Task duration section fully wired (all 5 rows)
+- TaskDurationApplyToAll component added
+- formatDuration helper in TimelineView (inclusive day count, unit conversion)
+- Duration label div added to TaskBar JSX in TimelineView
+- **Alignment/justification fix**: center position no longer forces textAlign: 'center'; uses user's textAlign setting instead
+- **Alignment buttons conditionally shown**: only for center/above/below positions (not side positions)
+- textAlign added to TaskStyle type + defaults + TaskTitleApplyToAll property cards
 
 ---
 
-## Known Issues / Future Work
-- StatusConfigPanel positioning: uses `absolute` within `relative` DataView wrapper — works but may need visual QA
-- Critical path toggle was removed from UI; `showCriticalPath` defaults to `false` in store. Logic is intact and can be re-enabled.
-- Some unused assets remain: `src/App.css`, `src/assets/hero.png`, `src/assets/react.svg`, `src/assets/vite.svg`
-- No tests exist yet
-- Drag-and-drop reordering within swimlanes (grip handle) has visual affordance but may not be fully wired
-- The "arrow-right" bar shape and the "arrow-right" milestone icon share a name conceptually but are different types (`BarShape` vs `MilestoneIcon`)
+## Known Pre-existing Build Errors
+
+These errors exist in the codebase but don't affect runtime (Vite dev server works fine):
+- `AdvancedColorPicker.tsx(169)`: unused `onClose` variable
+- `ShapeDropdown.tsx(91)`: unused `color` variable
+- `DataView.tsx(679)`: unused `swimlaneIndex`
+- `DataView.tsx(1188)`: unused `itemId`
+- `StylePane.tsx(41)`: unused `BAR_SHAPES`
+- `StylePane.tsx(189)`: `Swimlane | null | undefined` not assignable to `Swimlane | undefined`
+- `TimelineView.tsx(74,78,156)`: `string | null` not assignable to `string` (swimlaneId)
+- `TimelineView.tsx(145)`: unused `timescaleHeight`
+- `useProjectStore.ts(565,573,598)`: TaskStyle/MilestoneStyle to Record<string, unknown> conversion
 
 ---
 
-## Build Status
-- `npx tsc --noEmit` → ✅ passes
-- `npx vite build` → ✅ passes (2065 modules, ~285KB JS, ~27KB CSS)
+## What's Next (TODO)
+
+### Immediate
+1. **Task % Complete section** — StylePane controls + TimelineView rendering
+   - Needs: percent complete display fields in TaskStyle (if adding font/position controls)
+   - Rendering: show "X%" label on bar, styled per properties
+2. **Vertical Connector section** — StylePane controls + TimelineView rendering
+   - Needs: vertical connector style fields in TaskStyle (color, thickness, etc.)
+   - Rendering: draw vertical lines between dependent tasks
+
+### Cleanup
+3. Replace old `ColorPicker` used in milestone/swimlane sections with `AdvancedColorPicker`
+4. Replace old `ApplyToAllSection` used in milestone section with new boxed pattern
+
+---
+
+## CSS Variables (from `src/index.css`)
+```css
+--color-bg: #ffffff
+--color-bg-secondary: #f8fafc
+--color-bg-tertiary: #e2e8f0
+--color-surface: #ffffff
+--color-surface-hover: #f1f5f9
+--color-border: #e2e8f0
+--color-text: #334155
+--color-text-secondary: #64748b
+--color-text-muted: #94a3b8
+```
+
+---
+
+## Important Implementation Notes
+
+- Recent colors in AdvancedColorPicker are stored at module level (persist across mounts but not page refreshes)
+- `applyPartialStyleToAll` works generically — copies any named keys from source item's taskStyle to all other tasks
+- `applyTaskBarStyleToAll` accepts specific bar properties (shape, color, thickness, spacing) with excludeSwimlanes option
+- Duration is computed from startDate/endDate, not stored — there is no `duration` field on ProjectItem
+- `checkedItemIds: string[]` stored in Zustand for multi-select
+- `stylePaneSection` in Zustand controls which accordion section is expanded (only one at a time)
+- Show/hide toggles are in TaskStyle (persisted per item), toggled via CollapsibleRow's toggle prop

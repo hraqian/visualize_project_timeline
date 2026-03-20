@@ -1,18 +1,40 @@
 import { useRef, useState, useCallback, useMemo } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
-import { parseISO, differenceInDays, addDays, subDays } from 'date-fns';
+import { parseISO, differenceInDays, addDays, subDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, getProjectRange } from '@/utils';
-import { ZoomIn, ZoomOut } from 'lucide-react';
-import type { ProjectItem, Swimlane } from '@/types';
+import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
+import type { ProjectItem, Swimlane, DurationFormat } from '@/types';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const SWIMLANE_LABEL_WIDTH = 180;
+const ROW_HEIGHT = 44;
+const SWIMLANE_BADGE_WIDTH = 120;
+const SWIMLANE_PADDING_TOP = 10;
+const SWIMLANE_PADDING_BOTTOM = 10;
+const INDEPENDENT_SECTION_PADDING = 12;
 
-const ROW_HEIGHT = 48;
-const SWIMLANE_HEADER_HEIGHT = 32;
-const SWIMLANE_PADDING = 8;
+// ─── Duration Formatting ─────────────────────────────────────────────────────
+
+function formatDuration(startDate: string, endDate: string, fmt: DurationFormat): string {
+  const days = differenceInDays(parseISO(endDate), parseISO(startDate)) + 1; // inclusive
+  switch (fmt) {
+    case 'd': return `${days}d`;
+    case 'days': return `${days} days`;
+    case 'w': { const w = (days / 7).toFixed(1).replace(/\.0$/, ''); return `${w}w`; }
+    case 'wks': { const w = (days / 7).toFixed(1).replace(/\.0$/, ''); return `${w} wks`; }
+    case 'weeks': { const w = (days / 7).toFixed(1).replace(/\.0$/, ''); return `${w} weeks`; }
+    case 'mons': { const m = (days / 30.44).toFixed(1).replace(/\.0$/, ''); return `${m} mons`; }
+    case 'months': { const m = (days / 30.44).toFixed(1).replace(/\.0$/, ''); return `${m} months`; }
+    case 'q': { const q = (days / 91.31).toFixed(1).replace(/\.0$/, ''); return `${q}q`; }
+    case 'qrts': { const q = (days / 91.31).toFixed(1).replace(/\.0$/, ''); return `${q} qrts`; }
+    case 'quarters': { const q = (days / 91.31).toFixed(1).replace(/\.0$/, ''); return `${q} quarters`; }
+    case 'y': { const y = (days / 365.25).toFixed(1).replace(/\.0$/, ''); return `${y}y`; }
+    case 'yrs': { const y = (days / 365.25).toFixed(1).replace(/\.0$/, ''); return `${y} yrs`; }
+    case 'years': { const y = (days / 365.25).toFixed(1).replace(/\.0$/, ''); return `${y} years`; }
+    default: return `${days} days`;
+  }
+}
 
 // ─── TimelineView ────────────────────────────────────────────────────────────
 
@@ -25,14 +47,19 @@ export function TimelineView() {
   const setZoom = useProjectStore((s) => s.setZoom);
   const selectedItemId = useProjectStore((s) => s.selectedItemId);
   const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
+  const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
   const moveItem = useProjectStore((s) => s.moveItem);
   const moveItemToSwimlane = useProjectStore((s) => s.moveItemToSwimlane);
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
+  const timelineTitle = useProjectStore((s) => s.timelineTitle);
+  const setTimelineTitle = useProjectStore((s) => s.setTimelineTitle);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragStartX, setDragStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleValue, setTitleValue] = useState(timelineTitle);
 
   const sortedSwimlanes = useMemo(
     () => [...swimlanes].sort((a, b) => a.order - b.order),
@@ -40,6 +67,17 @@ export function TimelineView() {
   );
 
   const visibleItems = useMemo(() => items.filter((i) => i.visible), [items]);
+
+  // Items NOT in any existing swimlane (independent items)
+  const swimlaneIds = useMemo(() => new Set(swimlanes.map((s) => s.id)), [swimlanes]);
+  const independentItems = useMemo(
+    () => visibleItems.filter((i) => !swimlaneIds.has(i.swimlaneId)),
+    [visibleItems, swimlaneIds]
+  );
+  const swimlanedItems = useMemo(
+    () => visibleItems.filter((i) => swimlaneIds.has(i.swimlaneId)),
+    [visibleItems, swimlaneIds]
+  );
 
   // Compute project range with padding
   const { origin, totalDays } = useMemo(() => {
@@ -64,23 +102,82 @@ export function TimelineView() {
     return differenceInDays(today, parseISO(origin)) * zoom;
   }, [origin, zoom]);
 
+  // ─── Layout computation ────────────────────────────────────────────
+
+  // Independent items section height
+  const independentHeight = useMemo(() => {
+    if (independentItems.length === 0) return 0;
+    const maxRow = Math.max(...independentItems.map((i) => i.row), 0);
+    return (maxRow + 1) * ROW_HEIGHT + INDEPENDENT_SECTION_PADDING * 2;
+  }, [independentItems]);
+
   // Swimlane layout: compute y offset for each swimlane
   const swimlaneLayout = useMemo(() => {
-    let y = 0;
-    const layout: { swimlane: Swimlane; y: number; height: number }[] = [];
+    let y = independentHeight;
+    const layout: { swimlane: Swimlane; y: number; height: number; contentY: number }[] = [];
     for (const sl of sortedSwimlanes) {
-      const slItems = visibleItems.filter((i) => i.swimlaneId === sl.id);
+      const slItems = swimlanedItems.filter((i) => i.swimlaneId === sl.id);
       const maxRow = slItems.length > 0 ? Math.max(...slItems.map((i) => i.row)) : 0;
-      const height = SWIMLANE_HEADER_HEIGHT + (maxRow + 1) * ROW_HEIGHT + SWIMLANE_PADDING * 2;
-      layout.push({ swimlane: sl, y, height });
+      const contentHeight = (maxRow + 1) * ROW_HEIGHT;
+      const height = SWIMLANE_PADDING_TOP + contentHeight + SWIMLANE_PADDING_BOTTOM;
+      layout.push({ swimlane: sl, y, height, contentY: y + SWIMLANE_PADDING_TOP });
       y += height;
     }
     return layout;
-  }, [sortedSwimlanes, visibleItems]);
+  }, [sortedSwimlanes, swimlanedItems, independentHeight]);
 
-  const canvasHeight = swimlaneLayout.reduce((sum, sl) => sum + sl.height, 0);
+  const canvasHeight = (swimlaneLayout.length > 0
+    ? swimlaneLayout[swimlaneLayout.length - 1].y + swimlaneLayout[swimlaneLayout.length - 1].height
+    : independentHeight) || ROW_HEIGHT * 2;
 
-  // Drag handlers
+  // Compute timescale tiers
+  const tierLabels = useMemo(() => {
+    const rangeStart = parseISO(origin);
+    const rangeEnd = addDays(rangeStart, totalDays);
+    return timescale.tiers
+      .filter((t) => t.visible)
+      .map((tier) => ({
+        tier,
+        labels: generateTierLabels(tier.unit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth),
+      }));
+  }, [origin, totalDays, timescale]);
+
+  const timescaleHeight = tierLabels.length * 28;
+
+  // Dependency lines SVG paths
+  const depPaths = useMemo(() => {
+    return dependencies
+      .map((dep) => {
+        const from = visibleItems.find((i) => i.id === dep.fromId);
+        const to = visibleItems.find((i) => i.id === dep.toId);
+        if (!from || !to) return null;
+
+        const getItemY = (item: ProjectItem) => {
+          if (!swimlaneIds.has(item.swimlaneId)) {
+            return INDEPENDENT_SECTION_PADDING + item.row * ROW_HEIGHT + ROW_HEIGHT / 2;
+          }
+          const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
+          if (!sl) return 0;
+          return sl.contentY + item.row * ROW_HEIGHT + ROW_HEIGHT / 2;
+        };
+
+        const fromX = itemToX(from.endDate) + (from.type === 'milestone' ? from.milestoneStyle.size / 2 : 0);
+        const fromY = getItemY(from);
+        const toX = itemToX(to.startDate) - (to.type === 'milestone' ? to.milestoneStyle.size / 2 : 0);
+        const toY = getItemY(to);
+
+        const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
+
+        const midX = (fromX + toX) / 2;
+        const path = `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`;
+
+        return { path, isCritical, key: `${dep.fromId}-${dep.toId}` };
+      })
+      .filter(Boolean);
+  }, [dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath]);
+
+  // ─── Drag handlers ─────────────────────────────────────────────────
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, itemId: string) => {
       e.stopPropagation();
@@ -109,50 +206,6 @@ export function TimelineView() {
     setDragOffset(0);
   }, [draggingId, dragOffset, zoom, moveItem]);
 
-  // Compute timescale tiers
-  const tierLabels = useMemo(() => {
-    const rangeStart = parseISO(origin);
-    const rangeEnd = addDays(rangeStart, totalDays);
-    return timescale.tiers
-      .filter((t) => t.visible)
-      .map((tier) => ({
-        tier,
-        labels: generateTierLabels(tier.unit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth),
-      }));
-  }, [origin, totalDays, timescale]);
-
-  const timescaleHeight = tierLabels.length * 28;
-
-  // Dependency lines SVG paths
-  const depPaths = useMemo(() => {
-    return dependencies
-      .map((dep) => {
-        const from = visibleItems.find((i) => i.id === dep.fromId);
-        const to = visibleItems.find((i) => i.id === dep.toId);
-        if (!from || !to) return null;
-
-        const fromSl = swimlaneLayout.find((sl) => sl.swimlane.id === from.swimlaneId);
-        const toSl = swimlaneLayout.find((sl) => sl.swimlane.id === to.swimlaneId);
-        if (!fromSl || !toSl) return null;
-
-        const fromX = itemToX(from.endDate) + (from.type === 'milestone' ? from.milestoneStyle.size / 2 : 0);
-        const fromY = fromSl.y + SWIMLANE_HEADER_HEIGHT + from.row * ROW_HEIGHT + ROW_HEIGHT / 2;
-
-        const toX = itemToX(to.startDate) - (to.type === 'milestone' ? to.milestoneStyle.size / 2 : 0);
-        const toY = toSl.y + SWIMLANE_HEADER_HEIGHT + to.row * ROW_HEIGHT + ROW_HEIGHT / 2;
-
-        const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
-
-        // S-curve path
-        const midX = (fromX + toX) / 2;
-        const path = `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`;
-
-        return { path, isCritical, key: `${dep.fromId}-${dep.toId}` };
-      })
-      .filter(Boolean);
-  }, [dependencies, visibleItems, swimlaneLayout, itemToX, showCriticalPath]);
-
-  // Handle drop on swimlane
   const handleDropOnSwimlane = useCallback(
     (swimlaneId: string, e: React.DragEvent) => {
       e.preventDefault();
@@ -164,28 +217,96 @@ export function TimelineView() {
     [moveItemToSwimlane]
   );
 
+  // Title editing
+  const commitTitle = useCallback(() => {
+    const trimmed = titleValue.trim();
+    if (trimmed) setTimelineTitle(trimmed);
+    else setTitleValue(timelineTitle);
+    setEditingTitle(false);
+  }, [titleValue, timelineTitle, setTimelineTitle]);
+
+  // ─── Render helpers ────────────────────────────────────────────────
+
+  const renderItem = (item: ProjectItem, yBase: number) => {
+    const x = itemToX(item.startDate);
+    const y = yBase + item.row * ROW_HEIGHT;
+    const isDragging = draggingId === item.id;
+    const translateX = isDragging ? dragOffset : 0;
+    const isSelected = selectedItemId === item.id;
+
+    if (item.type === 'milestone') {
+      return (
+        <MilestoneItem
+          key={item.id}
+          item={item}
+          x={x}
+          y={y}
+          translateX={translateX}
+          isSelected={isSelected}
+          isDragging={isDragging}
+          onMouseDown={(e) => handleMouseDown(e, item.id)}
+          onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('bar'); }}
+          onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('title'); }}
+        />
+      );
+    }
+
+    const width = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+
+    return (
+      <TaskBar
+        key={item.id}
+        item={item}
+        x={x}
+        y={y}
+        width={width}
+        translateX={translateX}
+        isSelected={isSelected}
+        isDragging={isDragging}
+        onMouseDown={(e) => handleMouseDown(e, item.id)}
+        onClickBar={() => { setSelectedItem(item.id); setStylePaneSection('bar'); }}
+        onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('title'); }}
+      />
+    );
+  };
+
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-[var(--color-bg)]">
-      {/* Toolbar with zoom controls */}
-      <div className="px-5 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex items-center justify-end shrink-0">
-        <div className="flex items-center gap-1">
+    <div className="relative h-full flex flex-col overflow-hidden bg-[var(--color-bg)]">
+      {/* ─── Timeline graph title (large, centered) ─── */}
+      <div className="py-6 px-8 shrink-0 flex items-center justify-center">
+        {editingTitle ? (
+          <input
+            className="text-2xl font-bold text-[var(--color-text)] bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-4 py-2 outline-none focus:border-indigo-500 min-w-[300px] text-center"
+            value={titleValue}
+            onChange={(e) => setTitleValue(e.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitTitle();
+              if (e.key === 'Escape') {
+                setTitleValue(timelineTitle);
+                setEditingTitle(false);
+              }
+            }}
+            autoFocus
+          />
+        ) : (
           <button
-            onClick={() => setZoom(zoom - 2)}
-            className="p-1.5 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
+            onClick={() => {
+              setTitleValue(timelineTitle);
+              setEditingTitle(true);
+            }}
+            className="group flex items-center gap-3 text-2xl font-bold text-[var(--color-text)] hover:text-[var(--color-text-secondary)] transition-colors"
           >
-            <ZoomOut size={16} />
+            {timelineTitle}
+            <Pencil
+              size={16}
+              className="opacity-0 group-hover:opacity-40 transition-opacity"
+            />
           </button>
-          <span className="text-xs text-[var(--color-text-muted)] w-8 text-center">{zoom}x</span>
-          <button
-            onClick={() => setZoom(zoom + 2)}
-            className="p-1.5 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
-          >
-            <ZoomIn size={16} />
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Timeline content */}
+      {/* ─── Scrollable timeline content ─── */}
       <div
         ref={containerRef}
         className="flex-1 overflow-auto scrollbar-thin relative"
@@ -193,209 +314,170 @@ export function TimelineView() {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        <div className="flex" style={{ minWidth: SWIMLANE_LABEL_WIDTH + totalWidth }}>
-          {/* Swimlane Labels Column */}
-          <div
-            className="sticky left-0 z-20 bg-[var(--color-bg)] border-r border-[var(--color-border)] shrink-0"
-            style={{ width: SWIMLANE_LABEL_WIDTH }}
-          >
-            {/* Timescale spacer */}
-            <div
-              className="bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]"
-              style={{ height: timescaleHeight }}
-            />
-
-            {/* Swimlane labels */}
-            {swimlaneLayout.map(({ swimlane, height }) => (
-              <div
-                key={swimlane.id}
-                className="border-b border-[var(--color-border)]/30"
-                style={{ height }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleDropOnSwimlane(swimlane.id, e)}
-              >
-                <div
-                  className="h-8 flex items-center gap-2 px-3 text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: swimlane.color }}
-                >
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: swimlane.color }} />
-                  {swimlane.name}
-                </div>
+        <div style={{ minWidth: totalWidth, position: 'relative' }}>
+          {/* Timescale Headers */}
+          <div className="sticky top-0 z-10 border-b border-[var(--color-border)]">
+            {tierLabels.map(({ tier, labels }, tierIdx) => (
+              <div key={tierIdx} className="flex h-7 relative" style={{ backgroundColor: tier.backgroundColor }}>
+                {labels.map((label, i) => {
+                  const startX = differenceInDays(label.startDate, parseISO(origin)) * zoom;
+                  const endX = differenceInDays(label.endDate, parseISO(origin)) * zoom + zoom;
+                  const width = Math.max(endX - startX, 1);
+                  return (
+                    <div
+                      key={i}
+                      className="border-r border-white/10 flex items-center justify-center shrink-0 overflow-hidden"
+                      style={{
+                        position: 'absolute',
+                        left: startX,
+                        width,
+                        height: 28,
+                        color: tier.fontColor,
+                        fontSize: tier.fontSize,
+                      }}
+                    >
+                      <span className="truncate px-1">{label.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
 
-          {/* Timeline Area */}
-          <div className="relative" style={{ width: totalWidth }}>
-            {/* Timescale Headers */}
-            <div className="sticky top-0 z-10 border-b border-[var(--color-border)]">
-              {tierLabels.map(({ tier, labels }, tierIdx) => (
-                <div key={tierIdx} className="flex h-7" style={{ backgroundColor: tier.backgroundColor }}>
-                  {labels.map((label, i) => {
-                    const startX = differenceInDays(label.startDate, parseISO(origin)) * zoom;
-                    const endX = differenceInDays(label.endDate, parseISO(origin)) * zoom + zoom;
-                    const width = Math.max(endX - startX, 1);
-                    return (
-                      <div
-                        key={i}
-                        className="border-r border-white/10 flex items-center justify-center shrink-0 overflow-hidden"
-                        style={{
-                          position: 'absolute',
-                          left: startX,
-                          width,
-                          height: 28,
-                          color: tier.fontColor,
-                          fontSize: tier.fontSize,
-                        }}
-                      >
-                        <span className="truncate px-1">{label.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-
-            {/* Grid + Swimlanes */}
-            <div className="relative" style={{ height: canvasHeight }}>
-              {/* Grid lines (monthly) */}
-              {tierLabels.length > 0 &&
-                tierLabels[tierLabels.length - 1].labels.map((label, i) => {
-                  const x = differenceInDays(label.startDate, parseISO(origin)) * zoom;
-                  return (
-                    <div
-                      key={i}
-                      className="absolute top-0 bottom-0 border-l border-[var(--color-border)]/20"
-                      style={{ left: x }}
-                    />
-                  );
-                })}
-
-              {/* Today Line */}
-              {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
-                <div
-                  className="absolute top-0 bottom-0 z-10 pointer-events-none"
-                  style={{ left: todayX }}
-                >
-                  <div
-                    className="w-0.5 h-full"
-                    style={{ backgroundColor: timescale.todayColor }}
-                  />
-                  <div
-                    className="absolute -top-0 -translate-x-1/2 px-1.5 py-0.5 rounded-b text-[10px] font-medium text-white"
-                    style={{ backgroundColor: timescale.todayColor }}
-                  >
-                    Today
-                  </div>
-                </div>
-              )}
-
-              {/* Swimlane backgrounds */}
-              {swimlaneLayout.map(({ swimlane, y, height }, idx) => (
-                <div
-                  key={swimlane.id}
-                  className={`absolute left-0 right-0 border-b border-[var(--color-border)]/30 ${
-                    idx % 2 === 0 ? 'bg-transparent' : 'bg-[var(--color-bg-secondary)]/20'
-                  }`}
-                  style={{ top: y, height }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => handleDropOnSwimlane(swimlane.id, e)}
-                />
-              ))}
-
-              {/* Dependency Lines (SVG) */}
-              <svg
-                className="absolute top-0 left-0 pointer-events-none z-5"
-                width={totalWidth}
-                height={canvasHeight}
-              >
-                <defs>
-                  <marker
-                    id="arrowhead"
-                    markerWidth="8"
-                    markerHeight="6"
-                    refX="7"
-                    refY="3"
-                    orient="auto"
-                  >
-                    <polygon points="0 0, 8 3, 0 6" fill="#64748b" />
-                  </marker>
-                  <marker
-                    id="arrowhead-critical"
-                    markerWidth="8"
-                    markerHeight="6"
-                    refX="7"
-                    refY="3"
-                    orient="auto"
-                  >
-                    <polygon points="0 0, 8 3, 0 6" fill="#ef4444" />
-                  </marker>
-                </defs>
-                {depPaths.map(
-                  (dep) =>
-                    dep && (
-                      <path
-                        key={dep.key}
-                        d={dep.path}
-                        fill="none"
-                        stroke={dep.isCritical ? '#ef4444' : '#475569'}
-                        strokeWidth={dep.isCritical ? 2 : 1.5}
-                        strokeDasharray={dep.isCritical ? 'none' : '4 3'}
-                        markerEnd={dep.isCritical ? 'url(#arrowhead-critical)' : 'url(#arrowhead)'}
-                        opacity={0.7}
-                      />
-                    )
-                )}
-              </svg>
-
-              {/* Task Bars & Milestones */}
-              {visibleItems.map((item) => {
-                const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
-                if (!sl) return null;
-
-                const x = itemToX(item.startDate);
-                const y =
-                  sl.y + SWIMLANE_HEADER_HEIGHT + SWIMLANE_PADDING + item.row * ROW_HEIGHT;
-                const isDragging = draggingId === item.id;
-                const translateX = isDragging ? dragOffset : 0;
-                const isSelected = selectedItemId === item.id;
-
-                if (item.type === 'milestone') {
-                  return (
-                    <MilestoneItem
-                      key={item.id}
-                      item={item}
-                      x={x}
-                      y={y}
-                      translateX={translateX}
-                      isSelected={isSelected}
-                      isDragging={isDragging}
-                      onMouseDown={(e) => handleMouseDown(e, item.id)}
-                      onClick={() => setSelectedItem(item.id)}
-                    />
-                  );
-                }
-
-                const width = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
-
+          {/* ─── Canvas: grid, swimlane bands, items ─── */}
+          <div className="relative" style={{ height: canvasHeight }}>
+            {/* Grid lines */}
+            {tierLabels.length > 0 &&
+              tierLabels[tierLabels.length - 1].labels.map((label, i) => {
+                const x = differenceInDays(label.startDate, parseISO(origin)) * zoom;
                 return (
-                  <TaskBar
-                    key={item.id}
-                    item={item}
-                    x={x}
-                    y={y}
-                    width={width}
-                    translateX={translateX}
-                    isSelected={isSelected}
-                    isDragging={isDragging}
-                    onMouseDown={(e) => handleMouseDown(e, item.id)}
-                    onClick={() => setSelectedItem(item.id)}
+                  <div
+                    key={i}
+                    className="absolute top-0 bottom-0 border-l border-[var(--color-border)]/15"
+                    style={{ left: x }}
                   />
                 );
               })}
-            </div>
+
+            {/* Today Line */}
+            {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
+              <div
+                className="absolute top-0 bottom-0 z-10 pointer-events-none"
+                style={{ left: todayX }}
+              >
+                <div
+                  className="w-0.5 h-full"
+                  style={{ backgroundColor: timescale.todayColor }}
+                />
+                <div
+                  className="absolute -top-0 -translate-x-1/2 px-1.5 py-0.5 rounded-b text-[10px] font-medium text-white"
+                  style={{ backgroundColor: timescale.todayColor }}
+                >
+                  Today
+                </div>
+              </div>
+            )}
+
+            {/* ─── Swimlane bands (grey bg + colored badge) ─── */}
+            {swimlaneLayout.map(({ swimlane, y, height }) => (
+              <div
+                key={swimlane.id}
+                className="absolute left-0 right-0"
+                style={{ top: y, height }}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDropOnSwimlane(swimlane.id, e)}
+              >
+                {/* Grey background band */}
+                <div className="absolute inset-0 bg-[var(--color-bg-secondary)]/50" />
+
+                {/* Colored swimlane badge on left edge */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md text-white text-xs font-semibold tracking-wide z-[6]"
+                  style={{
+                    width: SWIMLANE_BADGE_WIDTH,
+                    backgroundColor: swimlane.color,
+                  }}
+                >
+                  <span className="truncate px-2">{swimlane.name}</span>
+                </div>
+              </div>
+            ))}
+
+            {/* Dependency Lines (SVG) */}
+            <svg
+              className="absolute top-0 left-0 pointer-events-none z-[5]"
+              width={totalWidth}
+              height={canvasHeight}
+            >
+              <defs>
+                <marker
+                  id="arrowhead"
+                  markerWidth="8"
+                  markerHeight="6"
+                  refX="7"
+                  refY="3"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 8 3, 0 6" fill="#64748b" />
+                </marker>
+                <marker
+                  id="arrowhead-critical"
+                  markerWidth="8"
+                  markerHeight="6"
+                  refX="7"
+                  refY="3"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 8 3, 0 6" fill="#ef4444" />
+                </marker>
+              </defs>
+              {depPaths.map(
+                (dep) =>
+                  dep && (
+                    <path
+                      key={dep.key}
+                      d={dep.path}
+                      fill="none"
+                      stroke={dep.isCritical ? '#ef4444' : '#475569'}
+                      strokeWidth={dep.isCritical ? 2 : 1.5}
+                      strokeDasharray={dep.isCritical ? 'none' : '4 3'}
+                      markerEnd={dep.isCritical ? 'url(#arrowhead-critical)' : 'url(#arrowhead)'}
+                      opacity={0.7}
+                    />
+                  )
+              )}
+            </svg>
+
+            {/* ─── Render independent items ─── */}
+            {independentItems.map((item) =>
+              renderItem(item, INDEPENDENT_SECTION_PADDING)
+            )}
+
+            {/* ─── Render swimlaned items ─── */}
+            {swimlanedItems.map((item) => {
+              const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
+              if (!sl) return null;
+              return renderItem(item, sl.contentY);
+            })}
           </div>
         </div>
+      </div>
+
+      {/* ─── Zoom controls (bottom-right overlay) ─── */}
+      <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-white/90 border border-[var(--color-border)] rounded-lg px-2 py-1 shadow-sm z-20">
+        <button
+          onClick={() => setZoom(zoom - 2)}
+          className="p-1 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+        >
+          <ZoomOut size={14} />
+        </button>
+        <span className="text-[11px] text-[var(--color-text-muted)] w-7 text-center">{zoom}px</span>
+        <button
+          onClick={() => setZoom(zoom + 2)}
+          className="p-1 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+        >
+          <ZoomIn size={14} />
+        </button>
       </div>
     </div>
   );
@@ -412,16 +494,16 @@ interface TaskBarProps {
   isSelected: boolean;
   isDragging: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
-  onClick: () => void;
+  onClickBar: () => void;
+  onClickLabel: () => void;
 }
 
-function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClick }: TaskBarProps) {
+function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickLabel }: TaskBarProps) {
   const style = item.taskStyle;
   const barHeight = style.thickness;
   const barY = y + (ROW_HEIGHT - barHeight) / 2;
   const w = Math.max(width, 8);
 
-  // Compute borderRadius (for simple shapes) or clipPath (for complex shapes)
   const insetPx = barHeight * 0.4;
   const insetPct = (insetPx / w) * 100;
 
@@ -462,7 +544,6 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
     case 'trapezoid':
       clipPath = `polygon(${insetPct}% 0%, ${100 - insetPct}% 0%, 100% 100%, 0% 100%)`;
       break;
-    // 'flat' and default: borderRadius = 0, no clipPath
   }
 
   const shapeStyle: React.CSSProperties = clipPath
@@ -481,13 +562,11 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
         transition: isDragging ? 'none' : 'transform 0.15s ease',
       }}
       onMouseDown={onMouseDown}
-      onClick={onClick}
       draggable
       onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
     >
-      {/* Bar Background */}
       <div
-        className="w-full h-full relative overflow-hidden"
+        className="w-full h-full relative overflow-hidden cursor-pointer"
         style={{
           ...shapeStyle,
           backgroundColor: `${style.color}30`,
@@ -498,8 +577,8 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
             ? '0 0 0 2px rgba(239,68,68,0.3)'
             : 'none',
         }}
+        onClick={(e) => { e.stopPropagation(); onClickBar(); }}
       >
-        {/* Progress Fill */}
         <div
           className="absolute top-0 left-0 h-full transition-all duration-300"
           style={{
@@ -509,40 +588,124 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
             opacity: 0.85,
           }}
         />
-
-        {/* Critical Path Indicator */}
         {item.isCriticalPath && !clipPath && (
           <div className="absolute inset-0 border-2 border-red-500 rounded-inherit" style={{ borderRadius }} />
         )}
       </div>
 
-      {/* Label */}
-      <div
-        className="absolute whitespace-nowrap truncate"
-        style={{
-          fontSize: style.fontSize,
-          fontFamily: style.fontFamily,
-          fontWeight: style.fontWeight,
-          color: style.fontColor,
-          maxWidth: 200,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          ...(style.labelPosition === 'inside'
-            ? { left: 8, top: '50%', transform: 'translateY(-50%)' }
-            : style.labelPosition === 'above'
-            ? { left: 0, bottom: '100%', marginBottom: 2 }
-            : style.labelPosition === 'left'
-            ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
-            : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
-        }}
-      >
-        <span>{item.name}</span>
-        {item.percentComplete > 0 && item.percentComplete < 100 && (
-          <span className="text-[10px] text-[var(--color-text-muted)] ml-1">{item.percentComplete}%</span>
-        )}
-      </div>
+      {/* Title Label */}
+      {style.showTitle && (
+        <div
+          className="absolute whitespace-nowrap truncate cursor-pointer"
+          style={{
+            fontSize: style.fontSize,
+            fontFamily: style.fontFamily,
+            fontWeight: style.fontWeight,
+            fontStyle: style.fontStyle ?? 'normal',
+            textDecoration: style.textDecoration ?? 'none',
+            color: style.fontColor,
+            maxWidth: 200,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ...(style.labelPosition === 'far-left'
+              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 24 }
+              : style.labelPosition === 'left'
+              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
+              : style.labelPosition === 'center'
+              ? { left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: style.textAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
+              : style.labelPosition === 'above'
+              ? { left: 0, bottom: '100%', marginBottom: 2 }
+              : style.labelPosition === 'below'
+              ? { left: 0, top: '100%', marginTop: 2 }
+              : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
+          }}
+          onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+        >
+          <span>{item.name}</span>
+          {item.percentComplete > 0 && item.percentComplete < 100 && (
+            <span className="text-[10px] text-[var(--color-text-muted)] ml-1">{item.percentComplete}%</span>
+          )}
+        </div>
+      )}
 
-      {/* Resize Handle (right edge) */}
+      {/* Date Label */}
+      {style.showDate && (
+        <div
+          className="absolute whitespace-nowrap truncate cursor-pointer"
+          style={{
+            fontSize: style.dateFontSize,
+            fontFamily: style.dateFontFamily,
+            fontWeight: style.dateFontWeight,
+            fontStyle: style.dateFontStyle ?? 'normal',
+            textDecoration: style.dateTextDecoration ?? 'none',
+            color: style.dateFontColor,
+            maxWidth: 200,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ...(style.dateLabelPosition === 'far-left'
+              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 24 }
+              : style.dateLabelPosition === 'left'
+              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
+              : style.dateLabelPosition === 'center'
+              ? { left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: style.dateTextAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
+              : style.dateLabelPosition === 'above'
+              ? { left: 0, bottom: '100%', marginBottom: style.showTitle && style.labelPosition === 'above' ? 16 : 2 }
+              : style.dateLabelPosition === 'below'
+              ? { left: 0, top: '100%', marginTop: style.showTitle && style.labelPosition === 'below' ? 16 : 2 }
+              : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
+          }}
+          onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+        >
+          <span>
+            {format(parseISO(item.startDate), style.dateFormat)} - {format(parseISO(item.endDate), style.dateFormat)}
+          </span>
+        </div>
+      )}
+
+      {/* Duration Label */}
+      {style.showDuration && (
+        <div
+          className="absolute whitespace-nowrap truncate cursor-pointer"
+          style={{
+            fontSize: style.durationFontSize,
+            fontFamily: style.durationFontFamily,
+            fontWeight: style.durationFontWeight,
+            fontStyle: style.durationFontStyle ?? 'normal',
+            textDecoration: style.durationTextDecoration ?? 'none',
+            color: style.durationFontColor,
+            maxWidth: 200,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            ...(style.durationLabelPosition === 'left'
+              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
+              : style.durationLabelPosition === 'center'
+              ? { left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: style.durationTextAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
+              : style.durationLabelPosition === 'above'
+              ? {
+                  left: 0,
+                  bottom: '100%',
+                  marginBottom:
+                    ((style.showTitle && style.labelPosition === 'above') ? 16 : 0)
+                    + ((style.showDate && style.dateLabelPosition === 'above') ? 16 : 0)
+                    + 2,
+                }
+              : style.durationLabelPosition === 'below'
+              ? {
+                  left: 0,
+                  top: '100%',
+                  marginTop:
+                    ((style.showTitle && style.labelPosition === 'below') ? 16 : 0)
+                    + ((style.showDate && style.dateLabelPosition === 'below') ? 16 : 0)
+                    + 2,
+                }
+              : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }), // 'right' (default)
+          }}
+          onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+        >
+          <span>{formatDuration(item.startDate, item.endDate, style.durationFormat)}</span>
+        </div>
+      )}
+
       <div className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize opacity-0 group-hover:opacity-100 transition-opacity bg-white/20 rounded-r" />
     </div>
   );
@@ -558,10 +721,11 @@ interface MilestoneItemProps {
   isSelected: boolean;
   isDragging: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
-  onClick: () => void;
+  onClickIcon: () => void;
+  onClickLabel: () => void;
 }
 
-function MilestoneItem({ item, x, y, translateX, isSelected, isDragging, onMouseDown, onClick }: MilestoneItemProps) {
+function MilestoneItem({ item, x, y, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel }: MilestoneItemProps) {
   const style = item.milestoneStyle;
   const centerY = y + ROW_HEIGHT / 2;
 
@@ -575,15 +739,15 @@ function MilestoneItem({ item, x, y, translateX, isSelected, isDragging, onMouse
         transition: isDragging ? 'none' : 'transform 0.15s ease',
       }}
       onMouseDown={onMouseDown}
-      onClick={onClick}
       draggable
       onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
     >
       <div
-        className={`relative ${isSelected ? 'drop-shadow-lg' : ''}`}
+        className={`relative cursor-pointer ${isSelected ? 'drop-shadow-lg' : ''}`}
         style={{
           filter: isSelected ? `drop-shadow(0 0 6px ${style.color}80)` : 'none',
         }}
+        onClick={(e) => { e.stopPropagation(); onClickIcon(); }}
       >
         <MilestoneIconComponent icon={style.icon} size={style.size} color={style.color} />
         {item.isCriticalPath && (
@@ -591,23 +755,31 @@ function MilestoneItem({ item, x, y, translateX, isSelected, isDragging, onMouse
         )}
       </div>
 
-      {/* Label */}
       <div
-        className="absolute whitespace-nowrap truncate"
+        className="absolute whitespace-nowrap truncate cursor-pointer"
         style={{
           fontSize: style.fontSize,
           fontFamily: style.fontFamily,
           fontWeight: style.fontWeight,
+          fontStyle: style.fontStyle ?? 'normal',
+          textDecoration: style.textDecoration ?? 'none',
           color: style.fontColor,
           maxWidth: 200,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
-          ...(style.labelPosition === 'above'
-            ? { left: '50%', bottom: '100%', transform: 'translateX(-50%)', marginBottom: 4 }
+          ...(style.labelPosition === 'far-left'
+            ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 24 }
             : style.labelPosition === 'left'
             ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
+            : style.labelPosition === 'center'
+            ? { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }
+            : style.labelPosition === 'above'
+            ? { left: '50%', bottom: '100%', transform: 'translateX(-50%)', marginBottom: 4 }
+            : style.labelPosition === 'below'
+            ? { left: '50%', top: '100%', transform: 'translateX(-50%)', marginTop: 4 }
             : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
         }}
+        onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
       >
         <span>{item.name}</span>
       </div>

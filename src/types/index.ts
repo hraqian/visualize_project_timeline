@@ -29,7 +29,19 @@ export type BarShape =
   | 'tab'
   | 'arrow-both'
   | 'trapezoid';
-export type LabelPosition = 'inside' | 'above' | 'right' | 'left';
+export type LabelPosition = 'far-left' | 'left' | 'center' | 'right' | 'above' | 'below';
+export type DateFormat =
+  | 'MMM d'          // Jul 1
+  | "MMM d ''yy"     // Jul 1 '20
+  | 'MMM d, yyyy'    // Jul 1, 2020
+  | 'MMM yyyy'       // Jul 2020
+  | 'MMMM d, yyyy'   // July 1, 2020
+  | 'MMMM dd, yyyy'  // July 01, 2020
+  | 'MM/dd/yyyy'     // 07/01/2020
+  | 'EEE M/d'        // Wed 7/1
+  | "EEE M/d/yy"     // Wed 7/1/20
+  | 'EEE MMM d'      // Wed Jul 1
+  | "EEE MMM d, ''yy"; // Wed Jul 1, '20
 export type MilestoneIcon =
   | 'diamond'
   | 'diamond-filled'
@@ -48,15 +60,55 @@ export type MilestoneIcon =
   | 'arrow-right'
   | 'hexagon';
 
+export type TextAlign = 'left' | 'center' | 'right';
+export type DurationUnit = 'days' | 'weeks' | 'months' | 'quarters' | 'years';
+export type DurationFormat =
+  | 'd' | 'days'                       // Days
+  | 'w' | 'wks' | 'weeks'             // Weeks
+  | 'mons' | 'months'                  // Months
+  | 'q' | 'qrts' | 'quarters'         // Quarters
+  | 'y' | 'yrs' | 'years';            // Years
+
 export interface TaskStyle {
   barShape: BarShape;
   color: string;
   thickness: number; // px height of bar
+  spacing: number; // px vertical gap between task bars
+  // Show/hide toggles
+  showTitle: boolean;
+  showDate: boolean;
+  showDuration: boolean;
+  showPercentComplete: boolean;
+  showVerticalConnector: boolean;
+  // Title label styling
   labelPosition: LabelPosition;
   fontSize: number;
   fontColor: string;
   fontFamily: string;
   fontWeight: number;
+  fontStyle: 'normal' | 'italic';
+  textDecoration: 'none' | 'underline';
+  textAlign: TextAlign;
+  // Date label styling
+  dateFormat: DateFormat;
+  dateLabelPosition: LabelPosition;
+  dateFontSize: number;
+  dateFontColor: string;
+  dateFontFamily: string;
+  dateFontWeight: number;
+  dateFontStyle: 'normal' | 'italic';
+  dateTextDecoration: 'none' | 'underline';
+  dateTextAlign: TextAlign;
+  // Duration label styling
+  durationFormat: DurationFormat;
+  durationLabelPosition: LabelPosition;
+  durationFontSize: number;
+  durationFontColor: string;
+  durationFontFamily: string;
+  durationFontWeight: number;
+  durationFontStyle: 'normal' | 'italic';
+  durationTextDecoration: 'none' | 'underline';
+  durationTextAlign: TextAlign;
 }
 
 export interface MilestoneStyle {
@@ -68,6 +120,8 @@ export interface MilestoneStyle {
   labelPosition: LabelPosition;
   fontFamily: string;
   fontWeight: number;
+  fontStyle: 'normal' | 'italic';
+  textDecoration: 'none' | 'underline';
 }
 
 export interface ProjectItem {
@@ -78,8 +132,9 @@ export interface ProjectItem {
   endDate: string; // ISO date string (same as startDate for milestones)
   percentComplete: number; // 0-100
   statusId: string | null; // references StatusLabel.id
+  assignedTo: string; // person name, empty string if unassigned
   visible: boolean;
-  swimlaneId: string;
+  swimlaneId: string | null;
   row: number; // row within swimlane for stacking
   taskStyle: TaskStyle;
   milestoneStyle: MilestoneStyle;
@@ -126,15 +181,35 @@ export interface TimescaleConfig {
 
 export type ActiveView = 'data' | 'timeline';
 
+export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector';
+
+export type OptionalColumn = 'percentComplete' | 'assignedTo' | 'status';
+
+export interface ColumnVisibility {
+  percentComplete: boolean;
+  assignedTo: boolean;
+  status: boolean;
+}
+
+export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
+  percentComplete: true,
+  assignedTo: true,
+  status: true,
+};
+
 export interface ProjectState {
   projectName: string;
+  timelineTitle: string; // separate title shown inside TimelineView (for exports)
   items: ProjectItem[];
   swimlanes: Swimlane[];
   dependencies: Dependency[];
   statusLabels: StatusLabel[];
+  columnVisibility: ColumnVisibility;
+  checkedItemIds: string[]; // multi-select checkbox state
   timescale: TimescaleConfig;
   activeView: ActiveView;
   selectedItemId: string | null;
+  stylePaneSection: StylePaneSection | null; // which collapsible section is expanded in StylePane
   showCriticalPath: boolean;
   zoom: number; // pixels per day
 }
@@ -165,11 +240,42 @@ export const DEFAULT_TASK_STYLE: TaskStyle = {
   barShape: 'rounded',
   color: '#6366f1',
   thickness: 32,
+  spacing: 8,
+  // Show/hide toggles
+  showTitle: true,
+  showDate: false,
+  showDuration: false,
+  showPercentComplete: false,
+  showVerticalConnector: false,
+  // Title label
   labelPosition: 'right',
   fontSize: 13,
   fontColor: '#334155',
   fontFamily: 'Inter',
   fontWeight: 500,
+  fontStyle: 'normal',
+  textDecoration: 'none',
+  textAlign: 'left',
+  // Date label defaults
+  dateFormat: 'MMM d',
+  dateLabelPosition: 'left',
+  dateFontSize: 9,
+  dateFontColor: '#334155',
+  dateFontFamily: 'Arial',
+  dateFontWeight: 400,
+  dateFontStyle: 'normal',
+  dateTextDecoration: 'none',
+  dateTextAlign: 'left',
+  // Duration label defaults
+  durationFormat: 'days',
+  durationLabelPosition: 'left',
+  durationFontSize: 9,
+  durationFontColor: '#334155',
+  durationFontFamily: 'Arial',
+  durationFontWeight: 400,
+  durationFontStyle: 'normal',
+  durationTextDecoration: 'none',
+  durationTextAlign: 'left',
 };
 
 export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {
@@ -181,6 +287,8 @@ export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {
   labelPosition: 'right',
   fontFamily: 'Inter',
   fontWeight: 500,
+  fontStyle: 'normal',
+  textDecoration: 'none',
 };
 
 export const PRESET_COLORS = [

@@ -1,40 +1,103 @@
 import { useState, useRef, useEffect } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
-import { addDays, parseISO, differenceInDays } from 'date-fns';
+import { addDays, parseISO, differenceInDays, format } from 'date-fns';
 import { v4 as uuid } from 'uuid';
 import {
-  Eye,
-  EyeOff,
   Trash2,
   ChevronDown,
   ChevronRight,
   GripVertical,
   Plus,
-  Settings,
   X,
+  Calendar,
+  UserPlus,
+  Copy,
+  EyeOff,
+  Paintbrush,
+  Check,
+  MoreHorizontal,
+  CopyPlus,
+  Eye,
+  ListPlus,
 } from 'lucide-react';
 import { TypePickerCell } from './TypePicker';
-import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle } from '@/types';
+import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn } from '@/types';
+import { PRESET_COLORS } from '@/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Compute duration in days (inclusive: 1 day = same start & end). */
 function computeDuration(startDate: string, endDate: string): number {
   return differenceInDays(parseISO(endDate), parseISO(startDate)) + 1;
 }
 
-/** Given start + duration → end. */
 function endFromDuration(startDate: string, days: number): string {
   return addDays(parseISO(startDate), Math.max(days - 1, 0)).toISOString().split('T')[0];
 }
 
-/** Given end + duration → start. */
-function startFromDuration(endDate: string, days: number): string {
-  return addDays(parseISO(endDate), -(Math.max(days - 1, 0))).toISOString().split('T')[0];
+function formatDate(dateStr: string): string {
+  return format(parseISO(dateStr), 'MM/dd/yyyy');
 }
 
-// ─── Column count for colSpan ────────────────────────────────────────────────
-const TOTAL_COLUMNS = 10; // grip, vis, type, name, start, end, duration, progress, status, actions
+// ─── Column definitions ──────────────────────────────────────────────────────
+
+const OPTIONAL_COLUMN_LABELS: Record<OptionalColumn, string> = {
+  percentComplete: '% Complete',
+  assignedTo: 'Assigned To',
+  status: 'Status',
+};
+
+// ─── Tooltip ─────────────────────────────────────────────────────────────────
+
+function Tooltip({ label, children, align = 'center' }: { label: string; children: React.ReactNode; align?: 'left' | 'center' | 'right' }) {
+  const positionClass =
+    align === 'left' ? 'left-0' :
+    align === 'right' ? 'right-0' :
+    'left-1/2 -translate-x-1/2';
+  const arrowClass =
+    align === 'left' ? 'left-3' :
+    align === 'right' ? 'right-3' :
+    'left-1/2 -translate-x-1/2';
+
+  return (
+    <div className="relative group/tip inline-flex">
+      {children}
+      <div className={`absolute top-full ${positionClass} mt-1.5 px-2 py-1 text-[11px] font-medium text-white bg-slate-800 rounded shadow-lg whitespace-nowrap opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity duration-150 z-50`}>
+        {label}
+        <div className={`absolute bottom-full ${arrowClass} -mb-px border-4 border-transparent border-b-slate-800`} />
+      </div>
+    </div>
+  );
+}
+
+// ─── Checkbox ────────────────────────────────────────────────────────────────
+
+function Checkbox({
+  checked,
+  indeterminate,
+  onChange,
+  className,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onChange(); }}
+      className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
+        checked || indeterminate
+          ? 'bg-slate-700 border-slate-700 text-white'
+          : 'border-slate-300 hover:border-slate-400 bg-white'
+      } ${className ?? ''}`}
+    >
+      {checked && <Check size={12} strokeWidth={3} />}
+      {indeterminate && !checked && (
+        <div className="w-2 h-0.5 bg-white rounded-full" />
+      )}
+    </button>
+  );
+}
 
 // ─── DataView ────────────────────────────────────────────────────────────────
 
@@ -42,24 +105,52 @@ export function DataView() {
   const items = useProjectStore((s) => s.items);
   const swimlanes = useProjectStore((s) => s.swimlanes);
   const statusLabels = useProjectStore((s) => s.statusLabels);
+  const columnVisibility = useProjectStore((s) => s.columnVisibility);
+  const checkedItemIds = useProjectStore((s) => s.checkedItemIds);
   const updateItem = useProjectStore((s) => s.updateItem);
   const deleteItem = useProjectStore((s) => s.deleteItem);
-  const toggleVisibility = useProjectStore((s) => s.toggleVisibility);
   const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
   const selectedItemId = useProjectStore((s) => s.selectedItemId);
   const updateSwimlane = useProjectStore((s) => s.updateSwimlane);
   const addItem = useProjectStore((s) => s.addItem);
+  const addItemRelative = useProjectStore((s) => s.addItemRelative);
+  const duplicateItem = useProjectStore((s) => s.duplicateItem);
+  const toggleVisibility = useProjectStore((s) => s.toggleVisibility);
   const addSwimlane = useProjectStore((s) => s.addSwimlane);
+  const addSwimlaneRelative = useProjectStore((s) => s.addSwimlaneRelative);
+  const duplicateSwimlane = useProjectStore((s) => s.duplicateSwimlane);
+  const deleteSwimlane = useProjectStore((s) => s.deleteSwimlane);
+  const hideSwimlaneItems = useProjectStore((s) => s.hideSwimlaneItems);
   const updateTaskStyle = useProjectStore((s) => s.updateTaskStyle);
   const updateMilestoneStyle = useProjectStore((s) => s.updateMilestoneStyle);
   const addStatusLabel = useProjectStore((s) => s.addStatusLabel);
-  const updateStatusLabel = useProjectStore((s) => s.updateStatusLabel);
-  const removeStatusLabel = useProjectStore((s) => s.removeStatusLabel);
+  const toggleColumn = useProjectStore((s) => s.toggleColumn);
+  const toggleCheckedItem = useProjectStore((s) => s.toggleCheckedItem);
+  const checkAllItems = useProjectStore((s) => s.checkAllItems);
+  const uncheckAllItems = useProjectStore((s) => s.uncheckAllItems);
+  const duplicateCheckedItems = useProjectStore((s) => s.duplicateCheckedItems);
+  const hideCheckedItems = useProjectStore((s) => s.hideCheckedItems);
+  const deleteCheckedItems = useProjectStore((s) => s.deleteCheckedItems);
+  const setColorForCheckedItems = useProjectStore((s) => s.setColorForCheckedItems);
+  const reorderSwimlane = useProjectStore((s) => s.reorderSwimlane);
+  const reorderItem = useProjectStore((s) => s.reorderItem);
 
   const [collapsedSwimlanes, setCollapsedSwimlanes] = useState<Set<string>>(new Set());
-  const [showStatusConfig, setShowStatusConfig] = useState(false);
+  const [dragSwimId, setDragSwimId] = useState<string | null>(null);
+  const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
 
   const sortedSwimlanes = [...swimlanes].sort((a, b) => a.order - b.order);
+
+  const hasChecked = checkedItemIds.length > 0;
+  const allChecked = items.length > 0 && checkedItemIds.length === items.length;
+  const someChecked = hasChecked && !allChecked;
+
+  // Dynamic column count: always-on columns (checkbox/grip, title, type, duration, start, end) = 6
+  // + optional columns + actions column + column-config column = +2
+  const visibleOptionalCount = (columnVisibility.percentComplete ? 1 : 0)
+    + (columnVisibility.assignedTo ? 1 : 0)
+    + (columnVisibility.status ? 1 : 0);
+  const totalColumns = 6 + visibleOptionalCount + 2; // 6 fixed + optionals + actions + config
 
   const toggleCollapse = (id: string) => {
     setCollapsedSwimlanes((prev) => {
@@ -70,37 +161,60 @@ export function DataView() {
     });
   };
 
-  // ─── Date / Duration auto-calc ──────────────────────────────────────
-
   const handleDateChange = (id: string, field: 'startDate' | 'endDate', value: string) => {
     if (!value) return;
     const item = items.find((i) => i.id === id);
     if (!item) return;
-
     if (item.type === 'milestone') {
-      updateItem(id, { startDate: value, endDate: value });
+      if (field === 'startDate') {
+        // Move the milestone to the new date (keep start=end)
+        updateItem(id, { startDate: value, endDate: value });
+      } else {
+        // End date changed on a milestone
+        if (value === item.startDate) return; // no change
+        if (parseISO(value) < parseISO(item.startDate)) {
+          // End before start: move the milestone to this date
+          updateItem(id, { startDate: value, endDate: value });
+        } else {
+          // End after start: convert to task
+          updateItem(id, { type: 'task', endDate: value });
+        }
+      }
       return;
     }
-
     if (field === 'startDate') {
-      // If end exists, keep end fixed (duration recalculates automatically in display)
-      updateItem(id, { startDate: value });
+      // Preserve duration: shift end date by the same amount
+      const currentDuration = differenceInDays(parseISO(item.endDate), parseISO(item.startDate));
+      const newEnd = addDays(parseISO(value), currentDuration).toISOString().split('T')[0];
+      updateItem(id, { startDate: value, endDate: newEnd });
     } else {
-      updateItem(id, { endDate: value });
+      // End date changed: preserve duration by shifting start date if needed
+      if (parseISO(value) < parseISO(item.startDate)) {
+        const currentDuration = differenceInDays(parseISO(item.endDate), parseISO(item.startDate));
+        const dur = currentDuration > 0 ? currentDuration : 0;
+        const newStart = addDays(parseISO(value), -dur).toISOString().split('T')[0];
+        updateItem(id, { startDate: newStart, endDate: value });
+      } else {
+        updateItem(id, { endDate: value });
+      }
     }
   };
 
   const handleDurationChange = (id: string, days: number) => {
-    if (days < 1) return;
+    if (days < 0) return;
     const item = items.find((i) => i.id === id);
-    if (!item || item.type === 'milestone') return;
-
-    // Keep start fixed, compute new end
+    if (!item) return;
+    if (item.type === 'milestone') {
+      if (days === 0) return; // already a 0-duration milestone
+      // Convert milestone to task when duration > 0
+      const newEnd = endFromDuration(item.startDate, days);
+      updateItem(id, { type: 'task', endDate: newEnd });
+      return;
+    }
+    if (days < 1) return; // tasks must have at least 1-day duration
     const newEnd = endFromDuration(item.startDate, days);
     updateItem(id, { endDate: newEnd });
   };
-
-  // ─── Add items ──────────────────────────────────────────────────────
 
   const handleAddItemToSwimlane = (swimlaneId: string, type: ItemType) => {
     const today = new Date().toISOString().split('T')[0];
@@ -116,51 +230,65 @@ export function DataView() {
     addSwimlane('New Swimlane');
   };
 
+  const handleHeaderCheckbox = () => {
+    if (allChecked || someChecked) {
+      uncheckAllItems();
+    } else {
+      checkAllItems();
+    }
+  };
+
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-[var(--color-bg)] relative">
-      {/* Header with add button */}
-      <div className="px-5 py-2.5 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex items-center justify-end shrink-0">
-        {/* Add dropdown */}
-        <AddDropdownButton onAdd={(type) => {
-          if (type === 'swimlane') {
-            handleAddSwimlane();
-          } else {
-            const targetSwimlane = sortedSwimlanes[0]?.id;
-            if (targetSwimlane) handleAddItemToSwimlane(targetSwimlane, type);
-          }
-        }} />
-      </div>
+    <div className="h-full flex flex-col overflow-hidden bg-white relative">
+      {/* Selection Toolbar — shown when items are checked */}
+      {hasChecked && (
+        <SelectionToolbar
+          count={checkedItemIds.length}
+          onDuplicate={duplicateCheckedItems}
+          onHide={hideCheckedItems}
+          onDelete={deleteCheckedItems}
+          onSetColor={setColorForCheckedItems}
+          onClose={uncheckAllItems}
+        />
+      )}
 
       {/* Table */}
       <div className="flex-1 overflow-auto scrollbar-thin">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
           <thead className="sticky top-0 z-10">
-            <tr className="bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)]">
-              <th className="text-left px-2 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider w-8"></th>
-              <th className="text-left px-2 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider w-8">Vis</th>
-              <th className="text-left px-2 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider w-24">Type</th>
-              <th className="text-left px-3 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider min-w-[180px]">Name</th>
-              <th className="text-left px-2 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider w-32">Start</th>
-              <th className="text-left px-2 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider w-32">End</th>
-              <th className="text-left px-2 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider w-20">Duration</th>
-              <th className="text-left px-2 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider w-28">Progress</th>
-              <th className="text-left px-2 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider w-36">
-                <div className="flex items-center gap-1">
-                  Status
-                  <button
-                    onClick={() => setShowStatusConfig(!showStatusConfig)}
-                    className="p-0.5 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
-                    title="Configure status labels"
-                  >
-                    <Settings size={11} />
-                  </button>
-                </div>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="w-10 px-1 py-2.5">
+                <Checkbox
+                  checked={allChecked}
+                  indeterminate={someChecked}
+                  onChange={handleHeaderCheckbox}
+                />
               </th>
-              <th className="text-left px-2 py-2 text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider w-12"></th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 tracking-wide min-w-[220px]">Title</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-24">Type</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-24">Duration</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-32">Start</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-32">End</th>
+              {columnVisibility.percentComplete && (
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-16">%</th>
+              )}
+              {columnVisibility.assignedTo && (
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-36">Assigned To</th>
+              )}
+              {columnVisibility.status && (
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-36">Status</th>
+              )}
+              <th className="w-10 px-2 py-2.5" />
+              <th className="w-10 px-1 py-2.5">
+                <ColumnConfigButton
+                  columnVisibility={columnVisibility}
+                  onToggle={toggleColumn}
+                />
+              </th>
             </tr>
           </thead>
           <tbody>
-            {sortedSwimlanes.map((swimlane) => {
+            {sortedSwimlanes.map((swimlane, idx) => {
               const swimItems = items
                 .filter((i) => i.swimlaneId === swimlane.id)
                 .sort((a, b) => a.row - b.row);
@@ -170,13 +298,17 @@ export function DataView() {
                 <SwimlaneGroup
                   key={swimlane.id}
                   swimlane={swimlane}
+                  swimlaneIndex={idx}
                   items={swimItems}
                   statusLabels={statusLabels}
+                  columnVisibility={columnVisibility}
+                  totalColumns={totalColumns}
                   isCollapsed={isCollapsed}
+                  checkedItemIds={checkedItemIds}
+                  onToggleChecked={toggleCheckedItem}
                   onToggleCollapse={() => toggleCollapse(swimlane.id)}
                   onUpdateItem={updateItem}
                   onDeleteItem={deleteItem}
-                  onToggleVisibility={toggleVisibility}
                   onSelectItem={setSelectedItem}
                   selectedItemId={selectedItemId}
                   onDateChange={handleDateChange}
@@ -185,16 +317,36 @@ export function DataView() {
                   onUpdateTaskStyle={updateTaskStyle}
                   onUpdateMilestoneStyle={updateMilestoneStyle}
                   onAddItem={(type) => handleAddItemToSwimlane(swimlane.id, type)}
+                  onAddStatusLabel={addStatusLabel}
+                  onAddItemRelative={addItemRelative}
+                  onDuplicateItem={duplicateItem}
+                  onToggleVisibility={toggleVisibility}
+                  onAddSwimlaneRelative={(pos) => addSwimlaneRelative(swimlane.id, pos)}
+                  onDuplicateSwimlane={() => duplicateSwimlane(swimlane.id)}
+                  onDeleteSwimlane={() => deleteSwimlane(swimlane.id)}
+                   onHideSwimlaneItems={() => hideSwimlaneItems(swimlane.id)}
+                   onReorderItem={reorderItem}
+                   isDragging={dragSwimId === swimlane.id}
+                  isDropTarget={dropTargetIdx === idx}
+                  onDragStart={() => setDragSwimId(swimlane.id)}
+                  onDragEnd={() => { setDragSwimId(null); setDropTargetIdx(null); }}
+                  onDragOver={(e) => { e.preventDefault(); if (dragSwimId && dragSwimId !== swimlane.id) setDropTargetIdx(idx); }}
+                  onDrop={() => {
+                    if (dragSwimId && dragSwimId !== swimlane.id) {
+                      reorderSwimlane(dragSwimId, idx);
+                    }
+                    setDragSwimId(null);
+                    setDropTargetIdx(null);
+                  }}
                 />
               );
             })}
 
-            {/* Bottom "Add Swimlane" row */}
             <tr>
-              <td colSpan={TOTAL_COLUMNS} className="px-3 py-2">
+              <td colSpan={totalColumns} className="pt-5 pb-4 px-4">
                 <button
                   onClick={handleAddSwimlane}
-                  className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-muted)] hover:text-indigo-600 transition-colors py-1"
+                  className="flex items-center gap-1.5 text-sm font-medium text-slate-500 border border-slate-300 rounded-md px-3 py-1.5 hover:border-indigo-400 hover:text-indigo-600 transition-all"
                 >
                   <Plus size={14} />
                   Add Swimlane
@@ -204,24 +356,199 @@ export function DataView() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
 
-      {/* Status Label Config Modal */}
-      {showStatusConfig && (
-        <StatusConfigPanel
-          statusLabels={statusLabels}
-          onAdd={addStatusLabel}
-          onUpdate={updateStatusLabel}
-          onRemove={removeStatusLabel}
-          onClose={() => setShowStatusConfig(false)}
-        />
+// ─── Selection Toolbar ──────────────────────────────────────────────────────
+
+function SelectionToolbar({
+  count,
+  onDuplicate,
+  onHide,
+  onDelete,
+  onSetColor,
+  onClose,
+}: {
+  count: number;
+  onDuplicate: () => void;
+  onHide: () => void;
+  onDelete: () => void;
+  onSetColor: (color: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="px-5 py-2 border-b border-slate-200 bg-slate-50 flex items-center gap-1 shrink-0">
+      {/* Action icons */}
+      <div className="flex items-center gap-0.5">
+        <Tooltip label="Duplicate selected" align="left">
+          <button
+            onClick={onDuplicate}
+            className="p-2 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+          >
+            <Copy size={18} />
+          </button>
+        </Tooltip>
+
+        <Tooltip label="Hide selected">
+          <button
+            onClick={onHide}
+            className="p-2 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+          >
+            <EyeOff size={18} />
+          </button>
+        </Tooltip>
+
+        <Tooltip label="Delete selected">
+          <button
+            onClick={onDelete}
+            className="p-2 rounded-md text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 size={18} />
+          </button>
+        </Tooltip>
+      </div>
+
+      {/* Color picker */}
+      <div className="mx-1.5 w-px h-6 bg-slate-200" />
+      <ColorPickerButton onSetColor={onSetColor} />
+
+      {/* Spacer + count + close */}
+      <div className="flex-1" />
+      <span className="text-sm font-medium text-slate-600 mr-2">
+        {count} selected
+      </span>
+      <Tooltip label="Clear selection">
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+        >
+          <X size={16} />
+        </button>
+      </Tooltip>
+    </div>
+  );
+}
+
+// ─── Color Picker Button ────────────────────────────────────────────────────
+
+function ColorPickerButton({ onSetColor }: { onSetColor: (color: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <Tooltip label="Set color">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 hover:border-slate-300 transition-colors text-xs font-medium"
+        >
+          <Paintbrush size={15} />
+          Color
+          <ChevronDown size={12} />
+        </button>
+      </Tooltip>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-40">
+          <div className="grid grid-cols-4 gap-1.5">
+            {PRESET_COLORS.map((color) => (
+              <button
+                key={color}
+                onClick={() => {
+                  onSetColor(color);
+                  setOpen(false);
+                }}
+                className="w-7 h-7 rounded-md border border-slate-100 hover:scale-110 hover:shadow-md transition-all"
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </div>
       )}
+    </div>
+  );
+}
+
+// ─── Column Config Button (+ with dropdown) ─────────────────────────────────
+
+function ColumnConfigButton({
+  columnVisibility,
+  onToggle,
+}: {
+  columnVisibility: { percentComplete: boolean; assignedTo: boolean; status: boolean };
+  onToggle: (column: OptionalColumn) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const columns: OptionalColumn[] = ['percentComplete', 'assignedTo', 'status'];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-0.5 p-1 rounded border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
+      >
+        <Plus size={12} />
+        <ChevronDown size={10} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-2 z-30 min-w-[180px]">
+          <div className="px-3 pb-1.5 text-xs font-semibold text-slate-700">Columns</div>
+          {columns.map((col) => (
+            <button
+              key={col}
+              onClick={() => onToggle(col)}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <span>{OPTIONAL_COLUMN_LABELS[col]}</span>
+              <ToggleSwitch on={columnVisibility[col]} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Toggle Switch ───────────────────────────────────────────────────────────
+
+function ToggleSwitch({ on }: { on: boolean }) {
+  return (
+    <div
+      className={`relative w-8 h-[18px] rounded-full transition-colors ${
+        on ? 'bg-green-500' : 'bg-slate-200'
+      }`}
+    >
+      <div
+        className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${
+          on ? 'translate-x-[14px]' : 'translate-x-0.5'
+        }`}
+      />
     </div>
   );
 }
 
 // ─── Add Dropdown Button ─────────────────────────────────────────────────────
 
-function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlane') => void }) {
+export function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlane') => void }) {
   const [open, setOpen] = useState(false);
   const [defaultAction, setDefaultAction] = useState<ItemType | 'swimlane'>('swimlane');
   const ref = useRef<HTMLDivElement>(null);
@@ -240,29 +567,25 @@ function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlane') => 
     milestone: 'Add Milestone',
   };
 
-  const handlePrimary = () => {
-    onAdd(defaultAction);
-  };
-
   return (
     <div className="relative" ref={ref}>
       <div className="flex">
         <button
-          onClick={handlePrimary}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-md text-xs font-medium bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 transition-all border border-indigo-500/20"
+          onClick={() => onAdd(defaultAction)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-md text-xs font-medium bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-indigo-200"
         >
           <Plus size={14} />
           {labels[defaultAction]}
         </button>
         <button
           onClick={() => setOpen(!open)}
-          className="px-1.5 py-1.5 rounded-r-md text-xs bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 transition-all border border-l-0 border-indigo-500/20"
+          className="px-1.5 py-1.5 rounded-r-md text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-l-0 border-indigo-200"
         >
           <ChevronDown size={12} />
         </button>
       </div>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-lg py-1 z-30 min-w-[160px]">
+        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 min-w-[160px]">
           {(['swimlane', 'task', 'milestone'] as const).map((type) => (
             <button
               key={type}
@@ -271,8 +594,8 @@ function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlane') => 
                 onAdd(type);
                 setOpen(false);
               }}
-              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--color-surface-hover)] transition-colors ${
-                defaultAction === type ? 'text-indigo-600 font-medium' : 'text-[var(--color-text-secondary)]'
+              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors ${
+                defaultAction === type ? 'text-indigo-600 font-medium' : 'text-slate-500'
               }`}
             >
               {labels[type]}
@@ -290,11 +613,14 @@ interface SwimlaneGroupProps {
   swimlane: { id: string; name: string; color: string; order: number };
   items: ReturnType<typeof useProjectStore.getState>['items'];
   statusLabels: StatusLabel[];
+  columnVisibility: { percentComplete: boolean; assignedTo: boolean; status: boolean };
+  totalColumns: number;
   isCollapsed: boolean;
+  checkedItemIds: string[];
+  onToggleChecked: (id: string) => void;
   onToggleCollapse: () => void;
   onUpdateItem: (id: string, updates: Record<string, unknown>) => void;
   onDeleteItem: (id: string) => void;
-  onToggleVisibility: (id: string) => void;
   onSelectItem: (id: string | null) => void;
   selectedItemId: string | null;
   onDateChange: (id: string, field: 'startDate' | 'endDate', value: string) => void;
@@ -303,17 +629,36 @@ interface SwimlaneGroupProps {
   onUpdateTaskStyle: (id: string, style: Partial<TaskStyle>) => void;
   onUpdateMilestoneStyle: (id: string, style: Partial<MilestoneStyle>) => void;
   onAddItem: (type: ItemType) => void;
+  onAddStatusLabel: (label: StatusLabel) => void;
+  onAddItemRelative: (referenceId: string, position: 'above' | 'below') => void;
+  onDuplicateItem: (id: string) => void;
+  onToggleVisibility: (id: string) => void;
+  onAddSwimlaneRelative: (position: 'above' | 'below') => void;
+  onDuplicateSwimlane: () => void;
+  onDeleteSwimlane: () => void;
+  onHideSwimlaneItems: () => void;
+  onReorderItem: (id: string, newIndex: number) => void;
+  swimlaneIndex: number;
+  isDragging: boolean;
+  isDropTarget: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: () => void;
 }
 
 function SwimlaneGroup({
   swimlane,
   items: swimItems,
   statusLabels,
+  columnVisibility,
+  totalColumns,
   isCollapsed,
+  checkedItemIds,
+  onToggleChecked,
   onToggleCollapse,
   onUpdateItem,
   onDeleteItem,
-  onToggleVisibility,
   onSelectItem,
   selectedItemId,
   onDateChange,
@@ -322,24 +667,64 @@ function SwimlaneGroup({
   onUpdateTaskStyle,
   onUpdateMilestoneStyle,
   onAddItem,
+  onAddStatusLabel,
+  onAddItemRelative,
+  onDuplicateItem,
+  onToggleVisibility,
+  onAddSwimlaneRelative,
+  onDuplicateSwimlane,
+  onDeleteSwimlane,
+  onHideSwimlaneItems,
+  onReorderItem,
+  swimlaneIndex,
+  isDragging,
+  isDropTarget,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
 }: SwimlaneGroupProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(swimlane.name);
+  const [dragItemId, setDragItemId] = useState<string | null>(null);
+  const [dropItemIdx, setDropItemIdx] = useState<number | null>(null);
 
   return (
     <>
+      {/* Drop indicator line */}
+      {isDropTarget && (
+        <tr>
+          <td colSpan={totalColumns} className="p-0">
+            <div className="h-0.5 bg-indigo-500 rounded-full" />
+          </td>
+        </tr>
+      )}
+
       {/* Swimlane Header Row */}
       <tr
-        className="bg-[var(--color-bg-tertiary)]/50 cursor-pointer hover:bg-[var(--color-bg-tertiary)] transition-colors"
+        className={`group/swimlane cursor-pointer hover:bg-slate-50 transition-colors ${isDragging ? 'opacity-50' : ''}`}
         onClick={onToggleCollapse}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          onDragStart();
+        }}
+        onDragEnd={onDragEnd}
+        onDragOver={onDragOver}
+        onDrop={(e) => { e.preventDefault(); onDrop(); }}
       >
-        <td className="px-3 py-2" colSpan={TOTAL_COLUMNS}>
-          <div className="flex items-center gap-2">
-            {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: swimlane.color }} />
+        <td className="py-2.5" colSpan={totalColumns}>
+          <div className="flex items-center gap-2 px-4" style={{ borderLeft: `3px solid ${swimlane.color}` }}>
+            <GripVertical
+              size={14}
+              className="text-slate-300 opacity-0 group-hover/swimlane:opacity-100 transition-opacity cursor-grab shrink-0"
+            />
+            <div>
+              {isCollapsed ? <ChevronRight size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+            </div>
             {editingName ? (
               <input
-                className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-2 py-0.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500"
+                className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[13px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
                 onBlur={() => {
@@ -357,7 +742,7 @@ function SwimlaneGroup({
               />
             ) : (
               <span
-                className="font-medium text-sm"
+                className="font-semibold text-[13px] text-slate-700"
                 onDoubleClick={(e) => {
                   e.stopPropagation();
                   setEditingName(true);
@@ -366,172 +751,717 @@ function SwimlaneGroup({
                 {swimlane.name}
               </span>
             )}
-            <span className="text-xs text-[var(--color-text-muted)] ml-1">({swimItems.length})</span>
+
+            {/* More menu — visible on hover */}
+            <div className="opacity-0 group-hover/swimlane:opacity-100 transition-opacity ml-1">
+              <SwimlaneMoreMenu
+                onAddAbove={() => onAddSwimlaneRelative('above')}
+                onAddBelow={() => onAddSwimlaneRelative('below')}
+                onDuplicate={onDuplicateSwimlane}
+                onHideFromTimeline={onHideSwimlaneItems}
+                onDelete={onDeleteSwimlane}
+              />
+            </div>
+
+            <span className="text-[11px] text-slate-400 ml-auto">({swimItems.length})</span>
           </div>
         </td>
       </tr>
 
       {/* Item Rows */}
       {!isCollapsed &&
-        swimItems.map((item) => {
-          const duration =
-            item.type === 'milestone'
-              ? null
-              : computeDuration(item.startDate, item.endDate);
+        swimItems.map((item, idx) => (
+          <ItemRow
+            key={item.id}
+            item={item}
+            statusLabels={statusLabels}
+            columnVisibility={columnVisibility}
+            isSelected={selectedItemId === item.id}
+            isChecked={checkedItemIds.includes(item.id)}
+            hasAnyChecked={checkedItemIds.length > 0}
+            onToggleChecked={() => onToggleChecked(item.id)}
+            onUpdateItem={onUpdateItem}
+            onDeleteItem={onDeleteItem}
+            onSelectItem={onSelectItem}
+            onDateChange={onDateChange}
+            onDurationChange={onDurationChange}
+            onUpdateTaskStyle={onUpdateTaskStyle}
+            onUpdateMilestoneStyle={onUpdateMilestoneStyle}
+            onAddStatusLabel={onAddStatusLabel}
+            onAddItemRelative={onAddItemRelative}
+            onDuplicateItem={onDuplicateItem}
+            onToggleVisibility={onToggleVisibility}
+            isItemDragging={dragItemId === item.id}
+            isItemDropTarget={dropItemIdx === idx}
+            onItemDragStart={() => setDragItemId(item.id)}
+            onItemDragEnd={() => { setDragItemId(null); setDropItemIdx(null); }}
+            onItemDragOver={(e) => { e.preventDefault(); if (dragItemId && dragItemId !== item.id) setDropItemIdx(idx); }}
+            onItemDrop={() => {
+              if (dragItemId && dragItemId !== item.id) {
+                onReorderItem(dragItemId, idx);
+              }
+              setDragItemId(null);
+              setDropItemIdx(null);
+            }}
+          />
+        ))}
 
-          const isSelected = selectedItemId === item.id;
-          const statusLabel = statusLabels.find((s) => s.id === item.statusId) ?? null;
-
-          return (
-            <tr
-              key={item.id}
-              className={`group/row border-b border-[var(--color-border)]/30 transition-colors cursor-pointer ${
-                isSelected
-                  ? 'bg-indigo-50 border-l-2 border-l-indigo-500'
-                  : 'hover:bg-[var(--color-surface-hover)]/50'
-              } ${!item.visible ? 'opacity-40' : ''} ${item.isCriticalPath ? 'bg-red-50' : ''}`}
-              onClick={() => onSelectItem(item.id)}
-            >
-              {/* Drag Handle */}
-              <td className="px-2 py-1.5 text-[var(--color-text-muted)]">
-                <GripVertical size={14} className="opacity-30 group-hover/row:opacity-60 transition-opacity cursor-grab" />
-              </td>
-
-              {/* Visibility */}
-              <td className="px-2 py-1.5">
-                <button
-                  onClick={(e) => { e.stopPropagation(); onToggleVisibility(item.id); }}
-                  className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors"
-                >
-                  {item.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                </button>
-              </td>
-
-              {/* Type (picker) */}
-              <td className="px-2 py-1.5">
-                <TypePickerCell
-                  item={item}
-                  onUpdateItem={onUpdateItem}
-                  onUpdateTaskStyle={onUpdateTaskStyle}
-                  onUpdateMilestoneStyle={onUpdateMilestoneStyle}
-                />
-              </td>
-
-              {/* Name */}
-              <td className="px-3 py-1.5">
-                <input
-                  className="w-full bg-transparent border-none outline-none text-sm text-[var(--color-text)] placeholder-[var(--color-text-muted)] focus:bg-[var(--color-bg)] focus:px-2 focus:py-0.5 focus:rounded focus:border focus:border-[var(--color-border)] transition-all"
-                  value={item.name}
-                  onChange={(e) => onUpdateItem(item.id, { name: e.target.value })}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </td>
-
-              {/* Start Date */}
-              <td className="px-2 py-1.5">
-                <input
-                  type="date"
-                  className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-1.5 py-1 text-xs text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors [color-scheme:light] w-full"
-                  value={item.startDate}
-                  onChange={(e) => onDateChange(item.id, 'startDate', e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </td>
-
-              {/* End Date */}
-              <td className="px-2 py-1.5">
-                {item.type === 'milestone' ? (
-                  <span className="text-xs text-[var(--color-text-muted)] px-1.5">&mdash;</span>
-                ) : (
-                  <input
-                    type="date"
-                    className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-1.5 py-1 text-xs text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors [color-scheme:light] w-full"
-                    value={item.endDate}
-                    onChange={(e) => onDateChange(item.id, 'endDate', e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                )}
-              </td>
-
-              {/* Duration (editable for tasks) */}
-              <td className="px-2 py-1.5">
-                {item.type === 'milestone' ? (
-                  <span className="text-xs text-[var(--color-text-muted)] px-1.5">&mdash;</span>
-                ) : (
-                  <div className="flex items-center gap-0.5">
-                    <input
-                      type="number"
-                      className="w-12 bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-1.5 py-1 text-xs text-center text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
-                      value={duration ?? ''}
-                      min={1}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value);
-                        if (v >= 1) onDurationChange(item.id, v);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                    <span className="text-[10px] text-[var(--color-text-muted)]">d</span>
-                  </div>
-                )}
-              </td>
-
-              {/* Progress */}
-              <td className="px-2 py-1.5">
-                <div className="flex items-center gap-1.5">
-                  <div className="flex-1 h-1.5 bg-[var(--color-bg-tertiary)] rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-300"
-                      style={{
-                        width: `${item.percentComplete}%`,
-                        backgroundColor: item.percentComplete === 100 ? '#22c55e' : item.taskStyle.color,
-                      }}
-                    />
-                  </div>
-                  <input
-                    type="number"
-                    className="w-10 bg-[var(--color-bg)] border border-[var(--color-border)] rounded px-1 py-0.5 text-[11px] text-center text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
-                    value={item.percentComplete}
-                    min={0}
-                    max={100}
-                    onChange={(e) => onUpdateItem(item.id, { percentComplete: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <span className="text-[10px] text-[var(--color-text-muted)]">%</span>
-                </div>
-              </td>
-
-              {/* Status */}
-              <td className="px-2 py-1.5">
-                <StatusDropdown
-                  value={item.statusId}
-                  statusLabels={statusLabels}
-                  onChange={(statusId) => onUpdateItem(item.id, { statusId })}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </td>
-
-              {/* Actions (hover only) */}
-              <td className="px-2 py-1.5">
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDeleteItem(item.id); }}
-                  className="p-1 rounded text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover/row:opacity-100"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </td>
-            </tr>
-          );
-        })}
-
-      {/* Add row (last row within each swimlane) */}
+      {/* Add row */}
       {!isCollapsed && (
-        <tr className="border-b border-[var(--color-border)]/20">
-          <td colSpan={TOTAL_COLUMNS} className="px-3 py-1.5">
+        <tr>
+          <td colSpan={totalColumns} className="pl-14 pr-4 py-1.5">
             <InlineAddRow onAdd={(type) => onAddItem(type)} />
           </td>
         </tr>
       )}
     </>
+  );
+}
+
+// ─── Item Row ────────────────────────────────────────────────────────────────
+
+interface ItemRowProps {
+  item: ReturnType<typeof useProjectStore.getState>['items'][0];
+  statusLabels: StatusLabel[];
+  columnVisibility: { percentComplete: boolean; assignedTo: boolean; status: boolean };
+  isSelected: boolean;
+  isChecked: boolean;
+  hasAnyChecked: boolean;
+  onToggleChecked: () => void;
+  onUpdateItem: (id: string, updates: Record<string, unknown>) => void;
+  onDeleteItem: (id: string) => void;
+  onSelectItem: (id: string | null) => void;
+  onDateChange: (id: string, field: 'startDate' | 'endDate', value: string) => void;
+  onDurationChange: (id: string, days: number) => void;
+  onUpdateTaskStyle: (id: string, style: Partial<TaskStyle>) => void;
+  onUpdateMilestoneStyle: (id: string, style: Partial<MilestoneStyle>) => void;
+  onAddStatusLabel: (label: StatusLabel) => void;
+  onAddItemRelative: (referenceId: string, position: 'above' | 'below') => void;
+  onDuplicateItem: (id: string) => void;
+  onToggleVisibility: (id: string) => void;
+  isItemDragging: boolean;
+  isItemDropTarget: boolean;
+  onItemDragStart: () => void;
+  onItemDragEnd: () => void;
+  onItemDragOver: (e: React.DragEvent) => void;
+  onItemDrop: () => void;
+}
+
+function ItemRow({
+  item,
+  statusLabels,
+  columnVisibility,
+  isSelected,
+  isChecked,
+  hasAnyChecked,
+  onToggleChecked,
+  onUpdateItem,
+  onDeleteItem,
+  onSelectItem,
+  onDateChange,
+  onDurationChange,
+  onUpdateTaskStyle,
+  onUpdateMilestoneStyle,
+  onAddStatusLabel,
+  onAddItemRelative,
+  onDuplicateItem,
+  onToggleVisibility,
+  isItemDragging,
+  isItemDropTarget,
+  onItemDragStart,
+  onItemDragEnd,
+  onItemDragOver,
+  onItemDrop,
+}: ItemRowProps) {
+  const duration = item.type === 'milestone' ? 0 : computeDuration(item.startDate, item.endDate);
+
+  const [editingDuration, setEditingDuration] = useState(false);
+  const [durationValue, setDurationValue] = useState(String(duration));
+  const [editingProgress, setEditingProgress] = useState(false);
+  const [progressValue, setProgressValue] = useState(String(item.percentComplete));
+  const [editingAssigned, setEditingAssigned] = useState(false);
+  const [assignedValue, setAssignedValue] = useState(item.assignedTo);
+
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const endDateRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <>
+      {isItemDropTarget && (
+        <tr>
+          <td colSpan={100} className="p-0">
+            <div className="h-0.5 bg-indigo-500 rounded-full" />
+          </td>
+        </tr>
+      )}
+      <tr
+        className={`group/row transition-colors cursor-pointer border-b border-slate-100 ${
+          isChecked ? 'bg-indigo-50/60' : isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/80'
+        } ${isItemDragging ? 'opacity-50' : ''}`}
+        onClick={() => onSelectItem(item.id)}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.stopPropagation();
+          onItemDragStart();
+        }}
+        onDragEnd={onItemDragEnd}
+        onDragOver={(e) => { e.stopPropagation(); onItemDragOver(e); }}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onItemDrop(); }}
+      >
+      {/* Checkbox / Grip Handle */}
+      <td className="px-1 py-2 text-center">
+        {hasAnyChecked || isChecked ? (
+          <Checkbox checked={isChecked} onChange={onToggleChecked} />
+        ) : (
+          <div className="relative w-[18px] h-[18px] mx-auto">
+            {/* Show grip by default on hover, checkbox on hover of the grip area */}
+            <GripVertical
+              size={14}
+              className="text-slate-300 opacity-0 group-hover/row:opacity-100 transition-opacity cursor-grab absolute inset-0 m-auto group-hover/checkbox:opacity-0"
+            />
+            <div className="opacity-0 group-hover/row:opacity-0 hover:!opacity-100 absolute inset-0">
+              <Checkbox checked={false} onChange={onToggleChecked} />
+            </div>
+          </div>
+        )}
+      </td>
+
+      {/* Title */}
+      <td className="px-4 py-2">
+        <input
+          className="w-full bg-transparent border-none outline-none text-xs text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-indigo-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
+          value={item.name}
+          onChange={(e) => onUpdateItem(item.id, { name: e.target.value })}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </td>
+
+      {/* Type */}
+      <td className="px-3 py-2">
+        <TypePickerCell
+          item={item}
+          onUpdateItem={onUpdateItem}
+          onUpdateTaskStyle={onUpdateTaskStyle}
+          onUpdateMilestoneStyle={onUpdateMilestoneStyle}
+        />
+      </td>
+
+      {/* Duration */}
+      <td className="px-3 py-2">
+        {editingDuration ? (
+          <input
+            type="number"
+            className="w-16 bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700 outline-none focus:border-indigo-500"
+            value={durationValue}
+            min={0}
+            autoFocus
+            onChange={(e) => setDurationValue(e.target.value)}
+            onBlur={() => {
+              const v = parseInt(durationValue);
+              if (!isNaN(v) && v >= 0) onDurationChange(item.id, v);
+              setEditingDuration(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const v = parseInt(durationValue);
+                if (!isNaN(v) && v >= 0) onDurationChange(item.id, v);
+                setEditingDuration(false);
+              }
+              if (e.key === 'Escape') setEditingDuration(false);
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span
+            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDurationValue(String(duration));
+              setEditingDuration(true);
+            }}
+          >
+            {duration} days
+          </span>
+        )}
+      </td>
+
+      {/* Start Date */}
+      <td className="px-3 py-2">
+        <div className="relative flex items-center gap-1.5">
+          <span
+            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              startDateRef.current?.showPicker();
+            }}
+          >
+            {formatDate(item.startDate)}
+          </span>
+          <Calendar
+            size={12}
+            className="text-slate-300 opacity-0 group-hover/row:opacity-100 transition-opacity cursor-pointer shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              startDateRef.current?.showPicker();
+            }}
+          />
+          <input
+            ref={startDateRef}
+            type="date"
+            className="absolute opacity-0 pointer-events-none w-0 h-0"
+            value={item.startDate}
+            onChange={(e) => onDateChange(item.id, 'startDate', e.target.value)}
+            tabIndex={-1}
+          />
+        </div>
+      </td>
+
+      {/* End Date */}
+      <td className="px-3 py-2">
+        <div className="relative flex items-center gap-1.5">
+          <span
+            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              endDateRef.current?.showPicker();
+            }}
+          >
+            {formatDate(item.endDate)}
+          </span>
+          <Calendar
+            size={12}
+            className="text-slate-300 opacity-0 group-hover/row:opacity-100 transition-opacity cursor-pointer shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              endDateRef.current?.showPicker();
+            }}
+          />
+          <input
+            ref={endDateRef}
+            type="date"
+            className="absolute opacity-0 pointer-events-none w-0 h-0"
+            value={item.endDate}
+            onChange={(e) => onDateChange(item.id, 'endDate', e.target.value)}
+            tabIndex={-1}
+          />
+        </div>
+      </td>
+
+      {/* Progress */}
+      {columnVisibility.percentComplete && (
+        <td className="px-3 py-2">
+          {editingProgress ? (
+            <input
+              type="number"
+              className="w-14 bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700 outline-none focus:border-indigo-500"
+              value={progressValue}
+              min={0}
+              max={100}
+              autoFocus
+              onChange={(e) => setProgressValue(e.target.value)}
+              onBlur={() => {
+                const v = Math.min(100, Math.max(0, parseInt(progressValue) || 0));
+                onUpdateItem(item.id, { percentComplete: v });
+                setEditingProgress(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const v = Math.min(100, Math.max(0, parseInt(progressValue) || 0));
+                  onUpdateItem(item.id, { percentComplete: v });
+                  setEditingProgress(false);
+                }
+                if (e.key === 'Escape') setEditingProgress(false);
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span
+            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setProgressValue(String(item.percentComplete));
+              setEditingProgress(true);
+              }}
+            >
+              {item.percentComplete}%
+            </span>
+          )}
+        </td>
+      )}
+
+      {/* Assigned To */}
+      {columnVisibility.assignedTo && (
+        <td className="px-3 py-2">
+          {editingAssigned ? (
+            <input
+              className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700 outline-none focus:border-indigo-500"
+              value={assignedValue}
+              placeholder="Type a name..."
+              autoFocus
+              onChange={(e) => setAssignedValue(e.target.value)}
+              onBlur={() => {
+                onUpdateItem(item.id, { assignedTo: assignedValue.trim() });
+                setEditingAssigned(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onUpdateItem(item.id, { assignedTo: assignedValue.trim() });
+                  setEditingAssigned(false);
+                }
+                if (e.key === 'Escape') {
+                  setAssignedValue(item.assignedTo);
+                  setEditingAssigned(false);
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : item.assignedTo ? (
+            <span
+            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setAssignedValue(item.assignedTo);
+              setEditingAssigned(true);
+              }}
+            >
+              {item.assignedTo}
+            </span>
+          ) : (
+            <button
+              className="flex items-center justify-center w-full h-6 border border-dashed border-slate-200 rounded text-slate-300 hover:border-slate-400 hover:text-slate-400 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAssignedValue('');
+                setEditingAssigned(true);
+              }}
+            >
+              <UserPlus size={12} className="opacity-0 group-hover/row:opacity-100 transition-opacity" />
+            </button>
+          )}
+        </td>
+      )}
+
+      {/* Status */}
+      {columnVisibility.status && (
+         <td className="px-3 py-2">
+          <StatusCell
+            statusId={item.statusId}
+            statusLabels={statusLabels}
+            onChange={(statusId) => onUpdateItem(item.id, { statusId })}
+            onAddStatusLabel={onAddStatusLabel}
+          />
+        </td>
+      )}
+
+      {/* Actions — hover only: trash + more menu */}
+      <td className="px-2 py-2">
+        <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => { e.stopPropagation(); onDeleteItem(item.id); }}
+            className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+          >
+            <Trash2 size={14} />
+          </button>
+          <RowMoreMenu
+            itemId={item.id}
+            isVisible={item.visible}
+            onAddAbove={() => onAddItemRelative(item.id, 'above')}
+            onAddBelow={() => onAddItemRelative(item.id, 'below')}
+            onDuplicate={() => onDuplicateItem(item.id)}
+            onToggleVisibility={() => onToggleVisibility(item.id)}
+            onDelete={() => onDeleteItem(item.id)}
+          />
+        </div>
+      </td>
+
+      {/* Column config spacer */}
+      <td className="w-10" />
+    </tr>
+    </>
+  );
+}
+
+// ─── Row More Menu ───────────────────────────────────────────────────────────
+
+function RowMoreMenu({
+  itemId,
+  isVisible,
+  onAddAbove,
+  onAddBelow,
+  onDuplicate,
+  onToggleVisibility,
+  onDelete,
+}: {
+  itemId: string;
+  isVisible: boolean;
+  onAddAbove: () => void;
+  onAddBelow: () => void;
+  onDuplicate: () => void;
+  onToggleVisibility: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const menuItems = [
+    { icon: <ListPlus size={15} className="rotate-180" />, label: 'Add row above', action: onAddAbove },
+    { icon: <ListPlus size={15} />, label: 'Add row below', action: onAddBelow },
+    { icon: <CopyPlus size={15} />, label: 'Duplicate', action: onDuplicate },
+    { icon: isVisible ? <EyeOff size={15} /> : <Eye size={15} />, label: isVisible ? 'Hide from timeline' : 'Show in timeline', action: onToggleVisibility },
+    { icon: <Trash2 size={15} />, label: 'Delete row', action: onDelete, danger: true },
+  ];
+
+  return (
+    <div className="relative" ref={ref}>
+      <Tooltip label="More" align="right">
+        <button
+          onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+          className="p-1 rounded text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all"
+        >
+          <MoreHorizontal size={14} />
+        </button>
+      </Tooltip>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-40 min-w-[200px]">
+          {menuItems.map((mi, idx) => (
+            <button
+              key={idx}
+              onClick={(e) => {
+                e.stopPropagation();
+                mi.action();
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors ${
+                mi.danger
+                  ? 'text-slate-600 hover:text-red-600 hover:bg-red-50'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="text-slate-400 shrink-0">{mi.icon}</span>
+              {mi.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Swimlane More Menu ──────────────────────────────────────────────────────
+
+function SwimlaneMoreMenu({
+  onAddAbove,
+  onAddBelow,
+  onDuplicate,
+  onHideFromTimeline,
+  onDelete,
+}: {
+  onAddAbove: () => void;
+  onAddBelow: () => void;
+  onDuplicate: () => void;
+  onHideFromTimeline: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [flipUp, setFlipUp] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const menuHeight = 220; // approximate height of 5 menu items
+      setFlipUp(rect.bottom + menuHeight > window.innerHeight);
+    }
+    setOpen(!open);
+  };
+
+  const menuItems = [
+    { icon: <ListPlus size={15} className="rotate-180" />, label: 'Add Swimlane above', action: onAddAbove },
+    { icon: <ListPlus size={15} />, label: 'Add Swimlane below', action: onAddBelow },
+    { icon: <CopyPlus size={15} />, label: 'Duplicate Swimlane', action: onDuplicate },
+    { icon: <EyeOff size={15} />, label: 'Hide from timeline', action: onHideFromTimeline },
+    { icon: <Trash2 size={15} />, label: 'Delete Swimlane', action: onDelete, danger: true },
+  ];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        ref={btnRef}
+        onClick={handleToggle}
+        className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+      >
+        <MoreHorizontal size={14} />
+      </button>
+
+      {open && (
+        <div className={`absolute left-0 ${flipUp ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-40 min-w-[220px]`}>
+          {menuItems.map((mi, idx) => (
+            <button
+              key={idx}
+              onClick={(e) => {
+                e.stopPropagation();
+                mi.action();
+                setOpen(false);
+              }}
+              className={`w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors ${
+                mi.danger
+                  ? 'text-slate-600 hover:text-red-600 hover:bg-red-50'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <span className="text-slate-400 shrink-0">{mi.icon}</span>
+              {mi.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Status Cell ─────────────────────────────────────────────────────────────
+
+function StatusCell({
+  statusId,
+  statusLabels,
+  onChange,
+  onAddStatusLabel,
+}: {
+  statusId: string | null;
+  statusLabels: StatusLabel[];
+  onChange: (statusId: string | null) => void;
+  onAddStatusLabel: (label: StatusLabel) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const currentLabel = statusLabels.find((s) => s.id === statusId) ?? null;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleCreate = () => {
+    const color = PRESET_COLORS[statusLabels.length % PRESET_COLORS.length];
+    const newLabel: StatusLabel = { id: uuid(), label: 'New Status', color };
+    onAddStatusLabel(newLabel);
+    onChange(newLabel.id);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      {/* Trigger */}
+      {currentLabel ? (
+        <button
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium transition-all hover:opacity-80"
+          style={{
+            backgroundColor: `${currentLabel.color}15`,
+            color: currentLabel.color,
+            border: `1px solid ${currentLabel.color}30`,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(!open);
+          }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full"
+            style={{ backgroundColor: currentLabel.color }}
+          />
+          {currentLabel.label}
+        </button>
+      ) : (
+        <button
+          className="flex items-center justify-center w-full h-6 border border-dashed border-slate-200 rounded text-slate-300 hover:border-slate-400 hover:text-slate-400 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(!open);
+          }}
+        >
+          <Plus size={12} className="opacity-0 group-hover/row:opacity-100 transition-opacity" />
+        </button>
+      )}
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-30 min-w-[180px] overflow-hidden">
+          {/* Status list */}
+          <div className="py-1 max-h-[200px] overflow-y-auto">
+            {currentLabel && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(null);
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:bg-slate-50 transition-colors"
+              >
+                Clear status
+              </button>
+            )}
+
+            {statusLabels.map((s) => (
+              <button
+                key={s.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(s.id);
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition-colors flex items-center gap-2.5"
+              >
+                <span
+                  className="w-4 h-4 rounded shrink-0"
+                  style={{ backgroundColor: s.color }}
+                />
+                <span className={`text-slate-700 ${s.id === statusId ? 'font-semibold' : ''}`}>
+                  {s.label}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Create new status */}
+          <div className="border-t border-slate-100">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCreate();
+              }}
+              className="w-full text-left px-3 py-2.5 text-xs text-slate-500 hover:bg-slate-50 transition-colors flex items-center gap-2"
+            >
+              <Plus size={13} className="text-slate-400" />
+              Create new status
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -553,125 +1483,27 @@ function InlineAddRow({ onAdd }: { onAdd: (type: ItemType) => void }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-indigo-600 transition-colors py-0.5"
+        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-600 transition-colors py-0.5"
       >
         <Plus size={13} />
         Add task or milestone
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-lg py-1 z-30 min-w-[140px]">
+        <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 min-w-[140px]">
           <button
             onClick={() => { onAdd('task'); setOpen(false); }}
-            className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+            className="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 transition-colors"
           >
             Add Task
           </button>
           <button
             onClick={() => { onAdd('milestone'); setOpen(false); }}
-            className="w-full text-left px-3 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+            className="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 transition-colors"
           >
             Add Milestone
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Status Dropdown ─────────────────────────────────────────────────────────
-
-function StatusDropdown({
-  value,
-  statusLabels,
-  onChange,
-  onClick,
-}: {
-  value: string | null;
-  statusLabels: StatusLabel[];
-  onChange: (statusId: string | null) => void;
-  onClick: (e: React.MouseEvent) => void;
-}) {
-  const current = statusLabels.find((s) => s.id === value);
-
-  return (
-    <select
-      value={value ?? ''}
-      onChange={(e) => {
-        const v = e.target.value;
-        onChange(v === '' ? null : v);
-      }}
-      onClick={onClick}
-      className="w-full border rounded px-1.5 py-1 text-xs outline-none focus:border-indigo-500 transition-colors cursor-pointer"
-      style={{
-        backgroundColor: current ? `${current.color}15` : 'var(--color-bg)',
-        borderColor: current ? `${current.color}40` : 'var(--color-border)',
-        color: current ? current.color : 'var(--color-text-muted)',
-        fontWeight: current ? 500 : 400,
-      }}
-    >
-      <option value="">—</option>
-      {statusLabels.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.label}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-// ─── Status Config Panel ─────────────────────────────────────────────────────
-
-function StatusConfigPanel({
-  statusLabels,
-  onAdd,
-  onUpdate,
-  onRemove,
-  onClose,
-}: {
-  statusLabels: StatusLabel[];
-  onAdd: (label: StatusLabel) => void;
-  onUpdate: (id: string, updates: Partial<StatusLabel>) => void;
-  onRemove: (id: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="absolute bottom-0 right-0 top-0 w-[320px] bg-[var(--color-bg)] border-l border-[var(--color-border)] shadow-xl z-40 flex flex-col">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-        <span className="text-sm font-semibold text-[var(--color-text)]">Configure Status Labels</span>
-        <button onClick={onClose} className="p-1 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]">
-          <X size={16} />
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {statusLabels.map((s) => (
-          <div key={s.id} className="flex items-center gap-2">
-            <input
-              type="color"
-              value={s.color}
-              onChange={(e) => onUpdate(s.id, { color: e.target.value })}
-              className="w-7 h-7 rounded cursor-pointer border border-[var(--color-border)] shrink-0"
-            />
-            <input
-              className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500"
-              value={s.label}
-              onChange={(e) => onUpdate(s.id, { label: e.target.value })}
-            />
-            <button
-              onClick={() => onRemove(s.id)}
-              className="p-1 rounded text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-500/10 transition-all shrink-0"
-            >
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
-        <button
-          onClick={() => onAdd({ id: uuid(), label: 'New Status', color: '#64748b' })}
-          className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-muted)] hover:text-indigo-600 transition-colors py-1.5"
-        >
-          <Plus size={14} />
-          Add Status Label
-        </button>
-      </div>
     </div>
   );
 }
