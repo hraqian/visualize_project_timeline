@@ -140,6 +140,7 @@ interface ProjectActions {
   // View
   setActiveView: (view: ActiveView) => void;
   setSelectedItem: (id: string | null) => void;
+  setSelectedSwimlane: (id: string | null) => void;
   setStylePaneSection: (section: StylePaneSection | null) => void;
   setZoom: (zoom: number) => void;
 
@@ -235,13 +236,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   timescale: getDefaultTimescale(),
   activeView: 'timeline',
   selectedItemId: null,
+  selectedSwimlaneId: null,
   stylePaneSection: null,
   showCriticalPath: false,
   zoom: 8,
 
   // ─── View ────────────────────────────────────────────────────────────
   setActiveView: (view) => set({ activeView: view }),
-  setSelectedItem: (id) => set({ selectedItemId: id }),
+  setSelectedItem: (id) => set({ selectedItemId: id, selectedSwimlaneId: null }),
+  setSelectedSwimlane: (id) => set({ selectedSwimlaneId: id, selectedItemId: null }),
   setStylePaneSection: (section) => set({ stylePaneSection: section }),
   setZoom: (zoom) => set({ zoom: Math.max(2, Math.min(30, zoom)) }),
 
@@ -512,6 +515,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set((state) => ({
       swimlanes: state.swimlanes.filter((s) => s.id !== id),
       items: state.items.filter((i) => i.swimlaneId !== id),
+      selectedSwimlaneId: state.selectedSwimlaneId === id ? null : state.selectedSwimlaneId,
     })),
 
   reorderSwimlane: (id, newOrder) =>

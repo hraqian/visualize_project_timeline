@@ -48,6 +48,8 @@ export function TimelineView() {
   const setZoom = useProjectStore((s) => s.setZoom);
   const selectedItemId = useProjectStore((s) => s.selectedItemId);
   const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
+  const selectedSwimlaneId = useProjectStore((s) => s.selectedSwimlaneId);
+  const setSelectedSwimlane = useProjectStore((s) => s.setSelectedSwimlane);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
   const moveItem = useProjectStore((s) => s.moveItem);
   const moveItemToSwimlane = useProjectStore((s) => s.moveItemToSwimlane);
@@ -515,10 +517,16 @@ export function TimelineView() {
 
                 {/* Colored swimlane badge on left edge */}
                 <div
-                  className="absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md text-white text-xs font-semibold tracking-wide z-[6]"
+                  className={`absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md text-white text-xs font-semibold tracking-wide z-[6] cursor-pointer transition-shadow ${
+                    selectedSwimlaneId === swimlane.id ? 'ring-2 ring-offset-1 ring-indigo-500' : ''
+                  }`}
                   style={{
                     width: SWIMLANE_BADGE_WIDTH,
                     backgroundColor: swimlane.color,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedSwimlane(swimlane.id);
                   }}
                 >
                   <span className="truncate px-2">{swimlane.name}</span>

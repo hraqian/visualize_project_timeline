@@ -99,6 +99,7 @@ type ItemSubTab = 'task' | 'milestone' | 'swimlane';
 
 export function StylePane() {
   const selectedItemId = useProjectStore((s) => s.selectedItemId);
+  const selectedSwimlaneId = useProjectStore((s) => s.selectedSwimlaneId);
   const items = useProjectStore((s) => s.items);
   const swimlanes = useProjectStore((s) => s.swimlanes);
   const updateTaskStyle = useProjectStore((s) => s.updateTaskStyle);
@@ -114,21 +115,29 @@ export function StylePane() {
   const item = items.find((i) => i.id === selectedItemId);
 
   // Determine which sub-tab to show based on selection
-  const autoSubTab: ItemSubTab = item?.type === 'milestone' ? 'milestone' : 'task';
+  const autoSubTab: ItemSubTab = selectedSwimlaneId
+    ? 'swimlane'
+    : item?.type === 'milestone'
+      ? 'milestone'
+      : 'task';
   const [forcedSubTab, setForcedSubTab] = useState<ItemSubTab | null>(null);
   const activeSubTab = forcedSubTab ?? autoSubTab;
 
   // When selection changes, reset forced sub-tab
   useEffect(() => {
     setForcedSubTab(null);
-  }, [selectedItemId]);
+  }, [selectedItemId, selectedSwimlaneId]);
 
   const handleSubTabClick = (tab: ItemSubTab) => {
     setForcedSubTab(tab === autoSubTab ? null : tab);
   };
 
-  // Swimlane for the selected item
-  const selectedSwimlane = item ? swimlanes.find((s) => s.id === item.swimlaneId) : null;
+  // Swimlane: prefer direct selection, fall back to selected item's swimlane
+  const selectedSwimlane = selectedSwimlaneId
+    ? swimlanes.find((s) => s.id === selectedSwimlaneId)
+    : item
+      ? swimlanes.find((s) => s.id === item.swimlaneId)
+      : undefined;
 
   return (
     <div className="h-full flex flex-col bg-[var(--color-bg)]">
@@ -247,10 +256,28 @@ function ItemsTabContent({
   updateSwimlane: ReturnType<typeof useProjectStore.getState>['updateSwimlane'];
 }) {
   if (!item) {
-    const label = activeSubTab === 'milestone' ? 'milestones' : activeSubTab === 'swimlane' ? 'swimlanes' : 'tasks';
+    // Even without an item selected, show swimlane controls if a swimlane is directly selected
+    if (activeSubTab === 'swimlane' && selectedSwimlane) {
+      return (
+        <SwimlaneStyleControls
+          swimlane={selectedSwimlane}
+          updateSwimlane={updateSwimlane}
+        />
+      );
+    }
+    if (activeSubTab === 'swimlane') {
+      return (
+        <div className="text-center py-12 px-6">
+          <div className="text-sm font-semibold text-[var(--color-text)] mb-1">Select a swimlane to style it</div>
+          <div className="text-xs text-[var(--color-text-muted)]">Styling options will show up here once you select a swimlane.</div>
+        </div>
+      );
+    }
+    const label = activeSubTab === 'milestone' ? 'a milestone' : 'a task';
     return (
-      <div className="text-center text-[var(--color-text-muted)] text-sm py-12">
-        Select {label} to style them
+      <div className="text-center py-12 px-6">
+        <div className="text-sm font-semibold text-[var(--color-text)] mb-1">Select {label} to style it</div>
+        <div className="text-xs text-[var(--color-text-muted)]">Styling options will show up here once you select {label}.</div>
       </div>
     );
   }
@@ -277,10 +304,19 @@ function ItemsTabContent({
   }
 
   // Mismatch: e.g. user selected a task but clicked milestone sub-tab
-  const label = activeSubTab === 'milestone' ? 'milestones' : activeSubTab === 'swimlane' ? 'swimlanes' : 'tasks';
+  if (activeSubTab === 'swimlane') {
+    return (
+      <div className="text-center py-12 px-6">
+        <div className="text-sm font-semibold text-[var(--color-text)] mb-1">Select a swimlane to style it</div>
+        <div className="text-xs text-[var(--color-text-muted)]">Styling options will show up here once you select a swimlane.</div>
+      </div>
+    );
+  }
+  const label = activeSubTab === 'milestone' ? 'a milestone' : 'a task';
   return (
-    <div className="text-center text-[var(--color-text-muted)] text-sm py-12">
-      Select {label} to style them
+    <div className="text-center py-12 px-6">
+      <div className="text-sm font-semibold text-[var(--color-text)] mb-1">Select {label} to style it</div>
+      <div className="text-xs text-[var(--color-text-muted)]">Styling options will show up here once you select {label}.</div>
     </div>
   );
 }

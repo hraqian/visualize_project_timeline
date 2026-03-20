@@ -250,6 +250,7 @@ export interface ProjectState {
   timescale: TimescaleConfig;
   activeView: ActiveView;
   selectedItemId: string | null;
+  selectedSwimlaneId: string | null;
   stylePaneSection: StylePaneSection | null; // which collapsible section is expanded in StylePane
   showCriticalPath: boolean;
   zoom: number; // pixels per day
