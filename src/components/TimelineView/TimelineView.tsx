@@ -1012,8 +1012,28 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
     );
   }
 
-  // ─── Swimlaned milestones: current absolute-positioning behavior ───
+  // ─── Swimlaned milestones: position-based layout ───
   const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_HEIGHT / 2 - style.size / 2;
+
+  // Determine if title and date are on the same side
+  const titlePos = style.labelPosition;
+  const datePos = style.dateLabelPosition;
+  const sameSide = style.showTitle && style.showDate && titlePos === datePos;
+
+  // Helper: compute positioning style for a given side
+  const sideStyle = (side: string) => {
+    switch (side) {
+      case 'above': return { left: '50%', transform: 'translateX(-50%)', bottom: '100%', marginBottom: 2 } as const;
+      case 'below': return { left: '50%', transform: 'translateX(-50%)', top: '100%', marginTop: 2 } as const;
+      case 'left': return { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 6 } as const;
+      case 'right': return { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 6 } as const;
+      default: return { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 6 } as const;
+    }
+  };
+
+  // Helper: text alignment for vertical sides
+  const textAlignForSide = (side: string) =>
+    side === 'above' || side === 'below' ? 'center' as const : 'left' as const;
 
   return (
     <div
@@ -1041,61 +1061,90 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         )}
       </div>
 
-      {/* Title label */}
-      {style.showTitle && (
+      {sameSide ? (
+        /* Title and date on the same side — stack them in a single container */
         <div
-          className="absolute whitespace-nowrap truncate cursor-pointer"
+          className="absolute whitespace-nowrap"
           style={{
-            fontSize: style.fontSize,
-            fontFamily: style.fontFamily,
-            fontWeight: style.fontWeight,
-            fontStyle: style.fontStyle ?? 'normal',
-            textDecoration: style.textDecoration ?? 'none',
-            color: style.fontColor,
-            maxWidth: 200,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            ...(style.labelPosition === 'far-left'
-              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 24 }
-              : style.labelPosition === 'left'
-              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
-              : style.labelPosition === 'center'
-              ? { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }
-              : style.labelPosition === 'above'
-              ? { left: '50%', bottom: '100%', transform: 'translateX(-50%)', marginBottom: 4 }
-              : style.labelPosition === 'below'
-              ? { left: '50%', top: '100%', transform: 'translateX(-50%)', marginTop: 4 }
-              : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
+            ...sideStyle(titlePos),
+            textAlign: textAlignForSide(titlePos),
           }}
-          onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
         >
-          <span>{item.name}</span>
+          <div
+            className="truncate cursor-pointer"
+            style={{
+              fontSize: style.fontSize,
+              fontFamily: style.fontFamily,
+              fontWeight: style.fontWeight,
+              fontStyle: style.fontStyle ?? 'normal',
+              textDecoration: style.textDecoration ?? 'none',
+              color: style.fontColor,
+              maxWidth: 200,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+            onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+          >
+            {item.name}
+          </div>
+          <div
+            className="cursor-pointer"
+            style={{
+              fontSize: style.dateFontSize,
+              fontFamily: style.dateFontFamily,
+              fontWeight: style.dateFontWeight,
+              fontStyle: style.dateFontStyle ?? 'normal',
+              textDecoration: style.dateTextDecoration ?? 'none',
+              color: style.dateFontColor,
+            }}
+            onClick={(e) => { e.stopPropagation(); onClickDate(); }}
+          >
+            {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
+          </div>
         </div>
-      )}
+      ) : (
+        <>
+          {/* Title label */}
+          {style.showTitle && (
+            <div
+              className="absolute whitespace-nowrap truncate cursor-pointer"
+              style={{
+                fontSize: style.fontSize,
+                fontFamily: style.fontFamily,
+                fontWeight: style.fontWeight,
+                fontStyle: style.fontStyle ?? 'normal',
+                textDecoration: style.textDecoration ?? 'none',
+                color: style.fontColor,
+                maxWidth: 200,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                ...sideStyle(titlePos),
+              }}
+              onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+            >
+              <span>{item.name}</span>
+            </div>
+          )}
 
-      {/* Date label */}
-      {style.showDate && (
-        <div
-          className="absolute whitespace-nowrap cursor-pointer"
-          style={{
-            fontSize: style.dateFontSize,
-            fontFamily: style.dateFontFamily,
-            fontWeight: style.dateFontWeight,
-            fontStyle: style.dateFontStyle ?? 'normal',
-            textDecoration: style.dateTextDecoration ?? 'none',
-            color: style.dateFontColor,
-            ...(style.dateLabelPosition === 'above'
-              ? { left: '50%', transform: 'translateX(-50%)', bottom: '100%', marginBottom: 2 }
-              : style.dateLabelPosition === 'left'
-              ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 6 }
-              : style.dateLabelPosition === 'right'
-              ? { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 6 }
-              : { left: '50%', transform: 'translateX(-50%)', top: '100%', marginTop: 2 }),
-          }}
-          onClick={(e) => { e.stopPropagation(); onClickDate(); }}
-        >
-          {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
-        </div>
+          {/* Date label */}
+          {style.showDate && (
+            <div
+              className="absolute whitespace-nowrap cursor-pointer"
+              style={{
+                fontSize: style.dateFontSize,
+                fontFamily: style.dateFontFamily,
+                fontWeight: style.dateFontWeight,
+                fontStyle: style.dateFontStyle ?? 'normal',
+                textDecoration: style.dateTextDecoration ?? 'none',
+                color: style.dateFontColor,
+                ...sideStyle(datePos),
+              }}
+              onClick={(e) => { e.stopPropagation(); onClickDate(); }}
+            >
+              {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -1406,6 +1406,31 @@ function MilestoneStyleControls({
             </button>
           </div>
 
+          {/* Row 3: Position (only for swimlaned milestones) */}
+          {item.swimlaneId !== null && (
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Position
+              </label>
+              <div className="flex gap-1">
+                {MILESTONE_DATE_POSITIONS.map((pos) => (
+                  <button
+                    key={pos.id}
+                    onClick={() => updateMilestoneStyle(item.id, { labelPosition: pos.id })}
+                    className={`flex items-center justify-center w-10 h-9 rounded border transition-colors ${
+                      style.labelPosition === pos.id
+                        ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)] text-[var(--color-text)]'
+                        : 'border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
+                    }`}
+                    title={pos.label}
+                  >
+                    <MilestonePositionIcon position={pos.id} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Apply to all milestones */}
           <MilestoneTitleApplyToAll item={item} />
         </div>
@@ -1498,28 +1523,30 @@ function MilestoneStyleControls({
             />
           </div>
 
-          {/* Row 4: Position */}
-          <div>
-            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-              Position
-            </label>
-            <div className="flex gap-1">
-              {MILESTONE_DATE_POSITIONS.map((pos) => (
-                <button
-                  key={pos.id}
-                  onClick={() => updateMilestoneStyle(item.id, { dateLabelPosition: pos.id })}
-                  className={`flex items-center justify-center w-10 h-9 rounded border transition-colors ${
-                    style.dateLabelPosition === pos.id
-                      ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)] text-[var(--color-text)]'
-                      : 'border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
-                  }`}
-                  title={pos.label}
-                >
-                  <MilestoneDatePositionIcon position={pos.id} />
-                </button>
-              ))}
+          {/* Row 4: Position (only for swimlaned milestones) */}
+          {item.swimlaneId !== null && (
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Position
+              </label>
+              <div className="flex gap-1">
+                {MILESTONE_DATE_POSITIONS.map((pos) => (
+                  <button
+                    key={pos.id}
+                    onClick={() => updateMilestoneStyle(item.id, { dateLabelPosition: pos.id })}
+                    className={`flex items-center justify-center w-10 h-9 rounded border transition-colors ${
+                      style.dateLabelPosition === pos.id
+                        ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)] text-[var(--color-text)]'
+                        : 'border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
+                    }`}
+                    title={pos.label}
+                  >
+                    <MilestonePositionIcon position={pos.id} />
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Apply to all milestones */}
           <MilestoneDateApplyToAll item={item} />
@@ -1751,7 +1778,7 @@ function PositionIcon({ position }: { position: LabelPosition }) {
 }
 
 // Milestone date position icons: "T" + diamond shape in 4 arrangements
-function MilestoneDatePositionIcon({ position }: { position: LabelPosition }) {
+function MilestonePositionIcon({ position }: { position: LabelPosition }) {
   const dia = '#9ca3af';  // gray-400 (diamond shape)
   const tk = '#334155';   // slate-800 (text "T")
   // Diamond path centered at (cx, cy) with radius r
