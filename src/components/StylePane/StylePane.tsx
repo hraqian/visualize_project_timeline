@@ -2,6 +2,7 @@ import { useProjectStore } from '@/store/useProjectStore';
 import {
   Paintbrush,
   ChevronRight,
+  ChevronDown,
   Trash2,
   ListChecks,
   Diamond,
