@@ -29,6 +29,7 @@ import {
   type ConnectorThickness,
 } from '@/types';
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1615,6 +1616,7 @@ function ApplyToAllBox({
   const [expanded, setExpanded] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     if (!expanded) return;
@@ -1630,8 +1632,18 @@ function ApplyToAllBox({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [expanded]);
 
+  useEffect(() => {
+    if (expanded && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPopoverPos({
+        top: rect.top - 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, [expanded]);
+
   return (
-    <div className="relative border border-[var(--color-border)] rounded-lg p-3">
+    <div className="border border-[var(--color-border)] rounded-lg p-3">
       <button
         ref={triggerRef}
         onClick={() => setExpanded(!expanded)}
@@ -1645,11 +1657,15 @@ function ApplyToAllBox({
         />
       </button>
 
-      {expanded && (
+      {expanded && popoverPos && createPortal(
         <div
           ref={popoverRef}
-          className="absolute right-0 bottom-full mb-2 z-50 bg-white border border-[var(--color-border)] rounded-lg shadow-lg p-3 space-y-3"
-          style={{ minWidth: 'max-content' }}
+          className="fixed z-[9999] bg-white border border-[var(--color-border)] rounded-lg shadow-lg p-3 space-y-3"
+          style={{
+            right: popoverPos.right,
+            bottom: window.innerHeight - popoverPos.top,
+            minWidth: 'max-content',
+          }}
         >
           <div className="flex gap-2">
             {children}
@@ -1680,7 +1696,8 @@ function ApplyToAllBox({
               {applied ? 'Applied!' : 'Apply'}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
