@@ -1093,7 +1093,7 @@ function PropertyCard({
 }) {
   return (
     <div
-      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border cursor-pointer transition-all min-w-[70px] ${
+      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border cursor-pointer transition-all flex-1 ${
         checked
           ? 'border-[var(--color-border)] bg-[var(--color-bg-secondary)]'
           : 'border-[var(--color-border)] bg-[var(--color-bg-secondary)]'
@@ -1630,7 +1630,7 @@ function ApplyToAllBox({
 
       {expanded && (
         <div className="mt-3 space-y-3">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2">
             {children}
           </div>
 
