@@ -129,6 +129,8 @@ export interface MilestoneStyle {
   icon: MilestoneIcon;
   size: number;
   color: string;
+  // Title
+  showTitle: boolean;
   fontSize: number;
   fontColor: string;
   labelPosition: LabelPosition;
@@ -136,6 +138,22 @@ export interface MilestoneStyle {
   fontWeight: number;
   fontStyle: 'normal' | 'italic';
   textDecoration: 'none' | 'underline';
+  textAlign: 'left' | 'center' | 'right';
+  // Date
+  showDate: boolean;
+  dateFontSize: number;
+  dateFontColor: string;
+  dateFontFamily: string;
+  dateFontWeight: number;
+  dateFontStyle: 'normal' | 'italic';
+  dateTextDecoration: 'none' | 'underline';
+  dateLabelPosition: LabelPosition;
+  dateTextAlign: 'left' | 'center' | 'right';
+  dateFormat: string;
+  // Connector
+  showConnector: boolean;
+  connectorColor: string;
+  connectorThickness: ConnectorThickness;
 }
 
 export interface ProjectItem {
@@ -195,7 +213,7 @@ export interface TimescaleConfig {
 
 export type ActiveView = 'data' | 'timeline';
 
-export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector';
+export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector' | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector';
 
 export type OptionalColumn = 'percentComplete' | 'assignedTo' | 'status';
 
@@ -308,6 +326,8 @@ export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {
   icon: 'diamond-filled',
   size: 20,
   color: '#f59e0b',
+  // Title
+  showTitle: true,
   fontSize: 13,
   fontColor: '#334155',
   labelPosition: 'right',
@@ -315,6 +335,22 @@ export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {
   fontWeight: 500,
   fontStyle: 'normal',
   textDecoration: 'none',
+  textAlign: 'left',
+  // Date
+  showDate: true,
+  dateFontSize: 11,
+  dateFontColor: '#64748b',
+  dateFontFamily: 'Inter',
+  dateFontWeight: 400,
+  dateFontStyle: 'normal',
+  dateTextDecoration: 'none',
+  dateLabelPosition: 'right',
+  dateTextAlign: 'left',
+  dateFormat: 'MM/dd/yyyy',
+  // Connector
+  showConnector: false,
+  connectorColor: '#9ca3af',
+  connectorThickness: 'thin',
 };
 
 export const PRESET_COLORS = [

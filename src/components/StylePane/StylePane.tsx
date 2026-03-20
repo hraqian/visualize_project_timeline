@@ -1,11 +1,8 @@
 import { useProjectStore } from '@/store/useProjectStore';
 import {
   Paintbrush,
-  Copy,
-  ChevronDown,
   ChevronRight,
   Trash2,
-  Check,
   ListChecks,
   Diamond,
   Layers,
@@ -20,7 +17,6 @@ import { FontFamilyDropdown, FontSizeDropdown } from '@/components/common/FontDr
 import { DateFormatDropdown } from '@/components/common/DateFormatDropdown';
 import { DurationFormatDropdown } from '@/components/common/DurationFormatDropdown';
 import {
-  PRESET_COLORS,
   FONT_FAMILIES,
   FONT_WEIGHTS,
   type BarShape,
@@ -84,8 +80,6 @@ export function StylePane() {
   const swimlanes = useProjectStore((s) => s.swimlanes);
   const updateTaskStyle = useProjectStore((s) => s.updateTaskStyle);
   const updateMilestoneStyle = useProjectStore((s) => s.updateMilestoneStyle);
-  const applyStyleToAll = useProjectStore((s) => s.applyStyleToAll);
-  const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const deleteItem = useProjectStore((s) => s.deleteItem);
   const updateSwimlane = useProjectStore((s) => s.updateSwimlane);
   const timescale = useProjectStore((s) => s.timescale);
@@ -195,8 +189,6 @@ export function StylePane() {
             selectedSwimlane={selectedSwimlane}
             updateTaskStyle={updateTaskStyle}
             updateMilestoneStyle={updateMilestoneStyle}
-            applyStyleToAll={applyStyleToAll}
-            applyPartialStyleToAll={applyPartialStyleToAll}
             deleteItem={deleteItem}
             updateSwimlane={updateSwimlane}
           />
@@ -220,8 +212,6 @@ function ItemsTabContent({
   selectedSwimlane,
   updateTaskStyle,
   updateMilestoneStyle,
-  applyStyleToAll,
-  applyPartialStyleToAll,
   deleteItem,
   updateSwimlane,
 }: {
@@ -230,8 +220,6 @@ function ItemsTabContent({
   selectedSwimlane: ReturnType<typeof useProjectStore.getState>['swimlanes'][number] | undefined;
   updateTaskStyle: ReturnType<typeof useProjectStore.getState>['updateTaskStyle'];
   updateMilestoneStyle: ReturnType<typeof useProjectStore.getState>['updateMilestoneStyle'];
-  applyStyleToAll: ReturnType<typeof useProjectStore.getState>['applyStyleToAll'];
-  applyPartialStyleToAll: ReturnType<typeof useProjectStore.getState>['applyPartialStyleToAll'];
   deleteItem: ReturnType<typeof useProjectStore.getState>['deleteItem'];
   updateSwimlane: ReturnType<typeof useProjectStore.getState>['updateSwimlane'];
 }) {
@@ -252,11 +240,7 @@ function ItemsTabContent({
 
   if (activeSubTab === 'milestone' && item.type === 'milestone') {
     return (
-      <>
-        <ItemHeader item={item} onDelete={() => deleteItem(item.id)} />
-        <MilestoneStyleControls item={item} updateMilestoneStyle={updateMilestoneStyle} />
-        <ApplyToAllSection item={item} applyStyleToAll={applyStyleToAll} applyPartialStyleToAll={applyPartialStyleToAll} />
-      </>
+      <MilestoneStyleControls item={item} updateMilestoneStyle={updateMilestoneStyle} />
     );
   }
 
@@ -1126,115 +1110,61 @@ function MilestoneStyleControls({
   item: ReturnType<typeof useProjectStore.getState>['items'][number];
   updateMilestoneStyle: ReturnType<typeof useProjectStore.getState>['updateMilestoneStyle'];
 }) {
+  const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
+  const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
+
+  const handleToggleExpand = (key: string) => {
+    setStylePaneSection(stylePaneSection === key ? null : key as any);
+  };
+
   const style = item.milestoneStyle;
 
   return (
-    <>
-      <Section title="Color">
-        <ColorPicker value={style.color} onChange={(color) => updateMilestoneStyle(item.id, { color })} />
-      </Section>
+    <div className="-mx-4 -mt-1">
+      <CollapsibleRow
+        label="Milestone shape"
+        expanded={stylePaneSection === 'milestoneShape'}
+        onToggleExpand={() => handleToggleExpand('milestoneShape')}
+      >
+        <div className="text-xs text-[var(--color-text-muted)]">Shape controls coming soon</div>
+      </CollapsibleRow>
 
-      <Section title="Icon">
-        <div className="grid grid-cols-8 gap-1.5">
-          {MILESTONE_ICONS.map((icon) => (
-            <button
-              key={icon}
-              onClick={() => updateMilestoneStyle(item.id, { icon })}
-              className={`p-2 rounded-md flex items-center justify-center transition-all ${
-                style.icon === icon
-                  ? 'bg-indigo-500/15 border border-indigo-500/40'
-                  : 'bg-[var(--color-bg-secondary)] border border-[var(--color-border)] hover:border-[var(--color-border-light)]'
-              }`}
-              title={icon}
-            >
-              <MilestoneIconComponent icon={icon} size={16} color={style.color} />
-            </button>
-          ))}
-        </div>
-      </Section>
+      <CollapsibleRow
+        label="Milestone title"
+        expanded={stylePaneSection === 'milestoneTitle'}
+        onToggleExpand={() => handleToggleExpand('milestoneTitle')}
+        toggle={{
+          checked: style.showTitle,
+          onChange: (v) => updateMilestoneStyle(item.id, { showTitle: v }),
+        }}
+      >
+        <div className="text-xs text-[var(--color-text-muted)]">Title controls coming soon</div>
+      </CollapsibleRow>
 
-      <Section title="Icon Size">
-        <div className="flex items-center gap-3">
-          <input
-            type="range"
-            min={12}
-            max={36}
-            value={style.size}
-            onChange={(e) => updateMilestoneStyle(item.id, { size: parseInt(e.target.value) })}
-            className="flex-1 accent-indigo-500"
-          />
-          <span className="text-xs text-[var(--color-text-muted)] w-8 text-right">{style.size}px</span>
-        </div>
-      </Section>
+      <CollapsibleRow
+        label="Milestone date"
+        expanded={stylePaneSection === 'milestoneDate'}
+        onToggleExpand={() => handleToggleExpand('milestoneDate')}
+        toggle={{
+          checked: style.showDate,
+          onChange: (v) => updateMilestoneStyle(item.id, { showDate: v }),
+        }}
+      >
+        <div className="text-xs text-[var(--color-text-muted)]">Date controls coming soon</div>
+      </CollapsibleRow>
 
-      <Section title="Label Position">
-        <div className="flex gap-1.5 flex-wrap">
-          {LABEL_POSITIONS.map((pos) => (
-            <button
-              key={pos.id}
-              onClick={() => updateMilestoneStyle(item.id, { labelPosition: pos.id })}
-              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                style.labelPosition === pos.id
-                  ? 'bg-indigo-500/15 text-indigo-600 border border-indigo-500/40'
-                  : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:border-[var(--color-border-light)]'
-              }`}
-            >
-              {pos.label}
-            </button>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Font Size">
-        <div className="flex items-center gap-3">
-          <input
-            type="range"
-            min={10}
-            max={18}
-            value={style.fontSize}
-            onChange={(e) => updateMilestoneStyle(item.id, { fontSize: parseInt(e.target.value) })}
-            className="flex-1 accent-indigo-500"
-          />
-          <span className="text-xs text-[var(--color-text-muted)] w-8 text-right">{style.fontSize}px</span>
-        </div>
-      </Section>
-
-      <Section title="Font Family">
-        <select
-          className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
-          value={style.fontFamily}
-          onChange={(e) => updateMilestoneStyle(item.id, { fontFamily: e.target.value })}
-        >
-          {FONT_FAMILIES.map((font) => (
-            <option key={font} value={font} style={{ fontFamily: font }}>
-              {font}
-            </option>
-          ))}
-        </select>
-      </Section>
-
-      <Section title="Font Weight">
-        <div className="flex gap-1.5 flex-wrap">
-          {FONT_WEIGHTS.map((w) => (
-            <button
-              key={w.value}
-              onClick={() => updateMilestoneStyle(item.id, { fontWeight: w.value })}
-              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                style.fontWeight === w.value
-                  ? 'bg-indigo-500/15 text-indigo-600 border border-indigo-500/40'
-                  : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:border-[var(--color-border-light)]'
-              }`}
-            >
-              {w.label}
-            </button>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Font Color">
-        <ColorPicker value={style.fontColor} onChange={(fontColor) => updateMilestoneStyle(item.id, { fontColor })} />
-      </Section>
-    </>
+      <CollapsibleRow
+        label="Milestone connector"
+        expanded={stylePaneSection === 'milestoneConnector'}
+        onToggleExpand={() => handleToggleExpand('milestoneConnector')}
+        toggle={{
+          checked: style.showConnector,
+          onChange: (v) => updateMilestoneStyle(item.id, { showConnector: v }),
+        }}
+      >
+        <div className="text-xs text-[var(--color-text-muted)]">Connector controls coming soon</div>
+      </CollapsibleRow>
+    </div>
   );
 }
 
@@ -1376,91 +1306,6 @@ function TimescaleTabContent({
         </Section>
       ))}
     </>
-  );
-}
-
-// ─── Apply to All Section ────────────────────────────────────────────────────
-
-const TASK_STYLE_GROUPS = [
-  { label: 'Color', keys: ['color'] },
-  { label: 'Bar Shape', keys: ['barShape'] },
-  { label: 'Bar Thickness', keys: ['thickness'] },
-  { label: 'Label Position', keys: ['labelPosition'] },
-  { label: 'Font', keys: ['fontSize', 'fontFamily', 'fontWeight', 'fontColor'] },
-] as const;
-
-const MILESTONE_STYLE_GROUPS = [
-  { label: 'Color', keys: ['color'] },
-  { label: 'Icon', keys: ['icon'] },
-  { label: 'Icon Size', keys: ['size'] },
-  { label: 'Label Position', keys: ['labelPosition'] },
-  { label: 'Font', keys: ['fontSize', 'fontFamily', 'fontWeight', 'fontColor'] },
-] as const;
-
-function ApplyToAllSection({
-  item,
-  applyStyleToAll,
-  applyPartialStyleToAll,
-}: {
-  item: { id: string; type: string };
-  applyStyleToAll: (id: string) => void;
-  applyPartialStyleToAll: (id: string, keys: string[]) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [appliedKey, setAppliedKey] = useState<string | null>(null);
-  const isTask = item.type === 'task';
-  const groups = isTask ? TASK_STYLE_GROUPS : MILESTONE_STYLE_GROUPS;
-  const typeLabel = isTask ? 'Tasks' : 'Milestones';
-
-  const handleApplyGroup = (keys: readonly string[], label: string) => {
-    applyPartialStyleToAll(item.id, [...keys]);
-    setAppliedKey(label);
-    setTimeout(() => setAppliedKey(null), 1200);
-  };
-
-  const handleApplyAll = () => {
-    applyStyleToAll(item.id);
-    setAppliedKey('__all__');
-    setTimeout(() => setAppliedKey(null), 1200);
-  };
-
-  return (
-    <div className="space-y-2">
-      <button
-        onClick={handleApplyAll}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-500/10 text-indigo-600 border border-indigo-500/25 hover:bg-indigo-500/20 transition-all text-sm font-medium"
-      >
-        {appliedKey === '__all__' ? <Check size={14} /> : <Copy size={14} />}
-        {appliedKey === '__all__' ? 'Applied!' : `Apply All Styles to ${typeLabel}`}
-      </button>
-
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors py-1"
-      >
-        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        Apply individual properties
-      </button>
-
-      {expanded && (
-        <div className="grid grid-cols-2 gap-1.5">
-          {groups.map((g) => (
-            <button
-              key={g.label}
-              onClick={() => handleApplyGroup(g.keys, g.label)}
-              className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-all border ${
-                appliedKey === g.label
-                  ? 'bg-green-500/10 text-green-600 border-green-500/30'
-                  : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] border-[var(--color-border)] hover:border-[var(--color-border-light)] hover:text-[var(--color-text)]'
-              }`}
-            >
-              {appliedKey === g.label ? <Check size={11} /> : <Copy size={11} />}
-              {appliedKey === g.label ? 'Done' : g.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -2027,37 +1872,4 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-// ─── Color Picker ────────────────────────────────────────────────────────────
 
-function ColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
-  return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-8 gap-1.5">
-        {PRESET_COLORS.map((color) => (
-          <button
-            key={color}
-            onClick={() => onChange(color)}
-            className={`w-full aspect-square rounded-md border-2 transition-all hover:scale-110 ${
-              value === color ? 'border-[var(--color-text)] shadow-lg scale-110' : 'border-transparent'
-            }`}
-            style={{ backgroundColor: color }}
-          />
-        ))}
-      </div>
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-8 h-8 rounded cursor-pointer border-none bg-transparent"
-        />
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs text-[var(--color-text)] font-mono outline-none focus:border-indigo-500"
-        />
-      </div>
-    </div>
-  );
-}
