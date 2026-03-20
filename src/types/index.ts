@@ -58,7 +58,15 @@ export type MilestoneIcon =
   | 'check'
   | 'arrow-up'
   | 'arrow-right'
-  | 'hexagon';
+  | 'hexagon'
+  | 'arrow-down'
+  | 'star-6pt'
+  | 'plus'
+  | 'circle-half'
+  | 'pentagon'
+  | 'heart'
+  | 'chevron-right'
+  | 'triangle-down';
 
 export type TextAlign = 'left' | 'center' | 'right';
 export type DurationUnit = 'days' | 'weeks' | 'months' | 'quarters' | 'years';
@@ -129,6 +137,7 @@ export interface MilestoneStyle {
   icon: MilestoneIcon;
   size: number;
   color: string;
+  position: 'above' | 'below';
   // Title
   showTitle: boolean;
   fontSize: number;
@@ -326,6 +335,7 @@ export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {
   icon: 'diamond-filled',
   size: 20,
   color: '#f59e0b',
+  position: 'above',
   // Title
   showTitle: true,
   fontSize: 13,

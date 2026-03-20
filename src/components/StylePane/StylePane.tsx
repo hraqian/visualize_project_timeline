@@ -29,11 +29,25 @@ import { createPortal } from 'react-dom';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const MILESTONE_ICONS: MilestoneIcon[] = [
-  'diamond', 'diamond-filled', 'triangle', 'triangle-filled',
-  'flag', 'flag-filled', 'star', 'star-filled',
-  'circle', 'circle-filled', 'square-ms', 'square-ms-filled',
-  'check', 'arrow-up', 'arrow-right', 'hexagon',
+const MILESTONE_ICONS: { id: MilestoneIcon; label: string }[] = [
+  { id: 'flag', label: 'Flag' },
+  { id: 'triangle-down', label: 'Triangle down' },
+  { id: 'diamond-filled', label: 'Diamond' },
+  { id: 'star', label: 'Star 5 point' },
+  { id: 'star-6pt', label: 'Star 6 point' },
+  { id: 'arrow-up', label: 'Arrow up' },
+  { id: 'arrow-down', label: 'Arrow down' },
+  { id: 'square-ms', label: 'Square outline' },
+  { id: 'square-ms-filled', label: 'Square filled' },
+  { id: 'hexagon', label: 'Hexagon' },
+  { id: 'chevron-right', label: 'Chevron right' },
+  { id: 'triangle', label: 'Triangle up' },
+  { id: 'plus', label: 'Plus' },
+  { id: 'circle', label: 'Circle outline' },
+  { id: 'circle-filled', label: 'Circle filled' },
+  { id: 'pentagon', label: 'Pentagon' },
+  { id: 'diamond', label: 'Diamond outline' },
+  { id: 'heart', label: 'Heart' },
 ];
 
 const BAR_SHAPES: { id: BarShape; label: string }[] = [
@@ -1101,6 +1115,76 @@ function PropertyCard({
   );
 }
 
+// ─── Milestone Shape Dropdown ─────────────────────────────────────────────────
+
+function MilestoneShapeDropdown({
+  value,
+  color,
+  onChange,
+}: {
+  value: MilestoneIcon;
+  color: string;
+  onChange: (icon: MilestoneIcon) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const selectedIcon = MILESTONE_ICONS.find((i) => i.id === value);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-[var(--color-text)] hover:border-[var(--color-text-muted)] transition-colors"
+      >
+        <MilestoneIconComponent icon={value} size={16} color={color} />
+        <span className="flex-1 text-left font-medium">{selectedIcon?.label ?? value}</span>
+        <ChevronRight size={12} className={`text-[var(--color-text-muted)] transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-[var(--color-border)] rounded-lg shadow-lg p-2">
+          <div className="grid grid-cols-6 gap-1">
+            {MILESTONE_ICONS.map((ic) => (
+              <button
+                key={ic.id}
+                onClick={() => { onChange(ic.id); setOpen(false); }}
+                className={`p-2 rounded-md flex items-center justify-center transition-all ${
+                  value === ic.id
+                    ? 'bg-[var(--color-bg-secondary)] border border-[var(--color-border)]'
+                    : 'hover:bg-[var(--color-bg-secondary)]'
+                }`}
+                title={ic.label}
+              >
+                <MilestoneIconComponent icon={ic.id} size={18} color={color} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Milestone Size Presets ──────────────────────────────────────────────────
+
+const MILESTONE_SIZE_PRESETS: { label: string; value: number }[] = [
+  { label: 'S', value: 14 },
+  { label: 'M', value: 20 },
+  { label: 'L', value: 28 },
+];
+
 // ─── Milestone Style Controls ────────────────────────────────────────────────
 
 function MilestoneStyleControls({
@@ -1126,7 +1210,115 @@ function MilestoneStyleControls({
         expanded={stylePaneSection === 'milestoneShape'}
         onToggleExpand={() => handleToggleExpand('milestoneShape')}
       >
-        <div className="text-xs text-[var(--color-text-muted)]">Shape controls coming soon</div>
+        <div className="space-y-4">
+          {/* Row 1: Color + Shape */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Color
+              </label>
+              <AdvancedColorPicker
+                value={style.color}
+                onChange={(color) => updateMilestoneStyle(item.id, { color })}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Shape
+              </label>
+              <MilestoneShapeDropdown
+                value={style.icon}
+                color={style.color}
+                onChange={(icon) => updateMilestoneStyle(item.id, { icon })}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Size */}
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Size
+            </label>
+            <div className="flex items-center gap-1.5">
+              {MILESTONE_SIZE_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  onClick={() => updateMilestoneStyle(item.id, { size: p.value })}
+                  className={`w-9 h-9 rounded-lg text-xs font-medium transition-all border ${
+                    style.size === p.value
+                      ? 'bg-[var(--color-bg-secondary)] border-[var(--color-text-muted)] text-[var(--color-text)]'
+                      : 'bg-white border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-muted)]'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <div className="flex items-center border border-[var(--color-border)] rounded-lg overflow-hidden ml-1">
+                <input
+                  type="number"
+                  min={8}
+                  max={48}
+                  value={style.size}
+                  onChange={(e) => updateMilestoneStyle(item.id, { size: Math.max(8, Math.min(48, parseInt(e.target.value) || 8)) })}
+                  className="w-12 h-9 text-center text-sm text-[var(--color-text)] bg-white outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <div className="flex flex-col border-l border-[var(--color-border)]">
+                  <button
+                    onClick={() => updateMilestoneStyle(item.id, { size: Math.min(48, style.size + 1) })}
+                    className="px-1.5 h-[18px] hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center"
+                  >
+                    <ChevronRight size={10} className="-rotate-90" />
+                  </button>
+                  <button
+                    onClick={() => updateMilestoneStyle(item.id, { size: Math.max(8, style.size - 1) })}
+                    className="px-1.5 h-[18px] hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center border-t border-[var(--color-border)]"
+                  >
+                    <ChevronRight size={10} className="rotate-90" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 3: Position (only if not in a swimlane) */}
+          {item.swimlaneId === null && (
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Position
+              </label>
+              <div className="flex gap-1.5">
+                {(['above', 'below'] as const).map((pos) => (
+                  <button
+                    key={pos}
+                    onClick={() => updateMilestoneStyle(item.id, { position: pos })}
+                    className={`p-2 rounded-lg border transition-all ${
+                      style.position === pos
+                        ? 'bg-[var(--color-bg-secondary)] border-[var(--color-text-muted)]'
+                        : 'bg-white border-[var(--color-border)] hover:border-[var(--color-text-muted)]'
+                    }`}
+                    title={pos === 'above' ? 'Above timeline' : 'Below timeline'}
+                  >
+                    <svg width={28} height={24} viewBox="0 0 28 24" fill="none">
+                      {/* Timeline bar */}
+                      <rect x={0} y={10} width={28} height={4} rx={1} fill="#d1d5db" />
+                      {/* Diamond icon above or below */}
+                      <path
+                        d={pos === 'above'
+                          ? 'M14 1 L18 5 L14 9 L10 5 Z'
+                          : 'M14 15 L18 19 L14 23 L10 19 Z'
+                        }
+                        fill={style.color}
+                      />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Apply to all milestones */}
+          <MilestoneShapeApplyToAll item={item} />
+        </div>
       </CollapsibleRow>
 
       <CollapsibleRow
@@ -1455,12 +1647,14 @@ function ApplyToAllBox({
   excludeSwimlanes,
   setExcludeSwimlanes,
   applied,
+  label = 'Apply to all tasks',
 }: {
   children: React.ReactNode;
   onApply: () => void;
   excludeSwimlanes: boolean;
   setExcludeSwimlanes: (v: boolean) => void;
   applied: boolean;
+  label?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -1499,7 +1693,7 @@ function ApplyToAllBox({
         className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
       >
         <Paintbrush size={13} className="text-[var(--color-text-muted)]" />
-        <span className="flex-1">Apply to all tasks</span>
+        <span className="flex-1">{label}</span>
         <ChevronRight
           size={12}
           className={`text-[var(--color-text-muted)] transition-transform ${expanded ? 'rotate-90' : ''}`}
@@ -1854,6 +2048,49 @@ function ConnectorApplyToAll({ item }: { item: ItemType }) {
       </PropertyCard>
       <PropertyCard label="Thickness" checked={applyProps.connectorThickness} onChange={(v) => setApplyProps((p) => ({ ...p, connectorThickness: v }))}>
         <ThicknessIcon />
+      </PropertyCard>
+    </ApplyToAllBox>
+  );
+}
+
+// ─── Milestone Shape Apply to All ─────────────────────────────────────────────
+
+function MilestoneShapeApplyToAll({ item }: { item: ItemType }) {
+  const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
+  const [applied, setApplied] = useState(false);
+  const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    color: true,
+    icon: true,
+    size: true,
+    position: true,
+  });
+
+  const handleApply = () => {
+    const keys = Object.entries(applyProps)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    if (keys.length === 0) return;
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
+
+  const style = item.milestoneStyle;
+
+  return (
+    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied} label="Apply to all milestones">
+      <PropertyCard label="Color" checked={applyProps.color} onChange={(v) => setApplyProps((p) => ({ ...p, color: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.color }} />
+      </PropertyCard>
+      <PropertyCard label="Shape" checked={applyProps.icon} onChange={(v) => setApplyProps((p) => ({ ...p, icon: v }))}>
+        <MilestoneIconComponent icon={style.icon} size={16} color={style.color} />
+      </PropertyCard>
+      <PropertyCard label="Size" checked={applyProps.size} onChange={(v) => setApplyProps((p) => ({ ...p, size: v }))}>
+        <SizeIcon />
+      </PropertyCard>
+      <PropertyCard label="Position" checked={applyProps.position} onChange={(v) => setApplyProps((p) => ({ ...p, position: v }))}>
+        <PositionIcon5Dot />
       </PropertyCard>
     </ApplyToAllBox>
   );
