@@ -120,10 +120,12 @@ export function TimelineView() {
   // ─── Layout computation ────────────────────────────────────────────
 
   // Height for "above" milestones row (rendered before timescale header)
+  // Use the largest milestone size + small gap so the icon sits tight against the timescale bar
+  const aboveRowGap = 4; // px between milestone bottom edge and timescale bar top
   const aboveHeight = useMemo(() => {
     if (aboveMilestones.length === 0) return 0;
-    // Single row of milestones above the timescale bar
-    return ROW_HEIGHT + INDEPENDENT_SECTION_PADDING;
+    const maxSize = Math.max(...aboveMilestones.map((i) => i.milestoneStyle.size), 20);
+    return maxSize + aboveRowGap * 2;
   }, [aboveMilestones]);
 
   // Independent items section height (only "below" items — those in the canvas)
@@ -301,6 +303,8 @@ export function TimelineView() {
 
   // ─── Render helpers ────────────────────────────────────────────────
 
+  const belowMilestoneGap = 4; // px between timescale bar bottom edge and milestone top edge
+
   const renderItem = (item: ProjectItem, yBase: number) => {
     const x = itemToX(item.startDate);
     const y = yBase + item.row * ROW_HEIGHT;
@@ -309,12 +313,16 @@ export function TimelineView() {
     const isSelected = selectedItemId === item.id;
 
     if (item.type === 'milestone') {
+      // For "below" independent milestones, place icon tight against the timescale bar
+      const isBelow = item.swimlaneId === null && item.milestoneStyle.position === 'below';
+      const belowOverride = isBelow ? belowMilestoneGap : undefined;
       return (
         <MilestoneItem
           key={item.id}
           item={item}
           x={x}
           y={y}
+          iconTopOverride={belowOverride}
           translateX={translateX}
           isSelected={isSelected}
           isDragging={isDragging}
@@ -394,7 +402,8 @@ export function TimelineView() {
             <div className="relative" style={{ height: aboveHeight }}>
               {aboveMilestones.map((item) => {
                 const ax = itemToX(item.startDate);
-                const ay = INDEPENDENT_SECTION_PADDING / 2;
+                // Position icon so its bottom edge is aboveRowGap from the row bottom (timescale bar top)
+                const ay = aboveHeight - item.milestoneStyle.size - aboveRowGap;
                 const isDraggingItem = draggingId === item.id;
                 const txl = isDraggingItem ? dragOffset : 0;
                 const isSel = selectedItemId === item.id;
@@ -403,7 +412,8 @@ export function TimelineView() {
                     key={item.id}
                     item={item}
                     x={ax}
-                    y={ay}
+                    y={0}
+                    iconTopOverride={ay}
                     translateX={txl}
                     isSelected={isSel}
                     isDragging={isDraggingItem}
@@ -879,6 +889,7 @@ interface MilestoneItemProps {
   item: ProjectItem;
   x: number;
   y: number;
+  iconTopOverride?: number;
   translateX: number;
   isSelected: boolean;
   isDragging: boolean;
@@ -887,11 +898,10 @@ interface MilestoneItemProps {
   onClickLabel: () => void;
 }
 
-function MilestoneItem({ item, x, y, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel }: MilestoneItemProps) {
+function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel }: MilestoneItemProps) {
   const style = item.milestoneStyle;
-  const centerY = y + ROW_HEIGHT / 2;
-  // Always vertically center in the allocated row — above/below timescale bar is handled at layout level
-  const iconTop = centerY - style.size / 2;
+  // When iconTopOverride is provided, use it directly; otherwise center in the row
+  const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_HEIGHT / 2 - style.size / 2;
 
   return (
     <div
