@@ -28,7 +28,7 @@ import {
   type MilestoneIcon,
   type ConnectorThickness,
 } from '@/types';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1613,10 +1613,27 @@ function ApplyToAllBox({
   applied: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        popoverRef.current && !popoverRef.current.contains(e.target as Node) &&
+        triggerRef.current && !triggerRef.current.contains(e.target as Node)
+      ) {
+        setExpanded(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [expanded]);
 
   return (
-    <div className="border border-[var(--color-border)] rounded-lg p-3">
+    <div className="relative border border-[var(--color-border)] rounded-lg p-3">
       <button
+        ref={triggerRef}
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
       >
@@ -1629,13 +1646,17 @@ function ApplyToAllBox({
       </button>
 
       {expanded && (
-        <div className="mt-3 space-y-3">
+        <div
+          ref={popoverRef}
+          className="absolute right-0 bottom-full mb-2 z-50 bg-white border border-[var(--color-border)] rounded-lg shadow-lg p-3 space-y-3"
+          style={{ minWidth: 'max-content' }}
+        >
           <div className="flex gap-2">
             {children}
           </div>
 
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer">
+          <div className="flex items-center justify-between gap-4">
+            <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer whitespace-nowrap">
               <input
                 type="checkbox"
                 checked={excludeSwimlanes}
@@ -1650,7 +1671,7 @@ function ApplyToAllBox({
 
             <button
               onClick={onApply}
-              className={`px-6 py-1.5 rounded-lg text-sm font-medium transition-all border ${
+              className={`px-6 py-1.5 rounded-lg text-sm font-medium transition-all border whitespace-nowrap ${
                 applied
                   ? 'bg-green-500/10 text-green-600 border-green-500/30'
                   : 'bg-white text-[var(--color-text)] border-[var(--color-border)] hover:border-[var(--color-text-muted)]'
