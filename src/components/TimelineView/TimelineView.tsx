@@ -422,6 +422,8 @@ export function TimelineView() {
         )}
       </div>
 
+      {/* ─── Card container ─── */}
+      <div className="flex-1 mx-3 mb-3 rounded border border-[var(--color-border)] bg-white overflow-hidden flex flex-col">
       {/* ─── Scrollable timeline content ─── */}
       <div
         ref={containerRef}
@@ -756,6 +758,7 @@ export function TimelineView() {
         >
           <ZoomIn size={14} />
         </button>
+      </div>
       </div>
     </div>
   );
