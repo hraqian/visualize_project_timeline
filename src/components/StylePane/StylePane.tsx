@@ -119,8 +119,17 @@ export function StylePane() {
   const timescale = useProjectStore((s) => s.timescale);
   const updateTimescale = useProjectStore((s) => s.updateTimescale);
   const updateTier = useProjectStore((s) => s.updateTier);
+  const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
 
   const [mainTab, setMainTab] = useState<MainTab>('items');
+
+  // Auto-switch to timescale tab when a timescale section is activated (e.g. clicking tier row)
+  const timescaleSections = ['scale', 'todayMarker', 'elapsedTime', 'leftEndCap', 'rightEndCap'];
+  useEffect(() => {
+    if (stylePaneSection && timescaleSections.includes(stylePaneSection)) {
+      setMainTab('timescale');
+    }
+  }, [stylePaneSection]);
 
   const item = items.find((i) => i.id === selectedItemId);
 
