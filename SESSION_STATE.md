@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 21, 2026 (session 10 — SESSION_STATE refresh)
+> **Last updated**: March 21, 2026 (session 11 — end caps committed)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -288,11 +288,11 @@ interface TimescaleConfig {
 | # | Section | Type | Toggle | Status |
 |---|---------|------|--------|--------|
 | — | Tier settings button | Button → opens TierSettingsModal | — | COMPLETED (modal + preview) |
-| 1 | Scale | CollapsibleRow | No | PLACEHOLDER (local state, not wired to store) |
-| 2 | Today marker | CollapsibleRow | Yes (`showToday`) | PLACEHOLDER (toggle wired, content coming soon) |
-| 3 | Elapsed time | CollapsibleRow | Yes (hardcoded on) | PLACEHOLDER (toggle not wired) |
-| 4 | Left end cap | CollapsibleRow | Yes (hardcoded on) | PLACEHOLDER (toggle not wired) |
-| 5 | Right end cap | CollapsibleRow | Yes (hardcoded on) | PLACEHOLDER (toggle not wired) |
+| 1 | Scale | CollapsibleRow | No | COMPLETED (wired to store) |
+| 2 | Today marker | CollapsibleRow | Yes (`showToday`) | COMPLETED (color, position, auto-adjust) |
+| 3 | Elapsed time | CollapsibleRow | Yes (`showElapsedTime`) | COMPLETED (color, thickness, position synced) |
+| 4 | Left end cap | CollapsibleRow | Yes (`leftEndCap.show`) | COMPLETED (color, font, B/I/U) |
+| 5 | Right end cap | CollapsibleRow | Yes (`rightEndCap.show`) | COMPLETED (color, font, B/I/U) |
 
 ---
 
@@ -609,27 +609,50 @@ Contains:
 - **All tier labels left-aligned** (separators mark beginning of period)
 - **Auto unit option** in tier dropdowns (Auto, Days, Weeks, Months, Quarters, Years)
 
+### Phase 12 — Scale Section + Today Marker + Elapsed Time + End Caps (sessions 10-11)
+- **Scale section wired to store** (`selectedTierIndex` in Zustand):
+  - Single-tier: Units, Format, Separators, Color+Text, B/I/U, alignment, Bar color + Bar Shape
+  - Multi-tier: Same controls but Bar Shape hidden; info banner "Click a tier on the timeline to switch"
+- **Tab auto-switch bug fix** (`6a117df`): `useEffect` in StylePane watches `stylePaneSection` and auto-switches `mainTab` to `'timescale'` when it's a timescale section
+- **Today marker section** (fully implemented):
+  - Color (AdvancedColorPicker wired to `timescale.todayColor`)
+  - Position (above/below timescale icons + Auto-adjust button)
+  - Auto-adjust snaps view to today, shows "Auto-adjusted" when clicked
+  - Today label is bordered white box with colored triangle pointing toward timescale bar
+  - Vertical red line through canvas **removed** (user requested)
+- **Elapsed time section** (fully implemented):
+  - Color (AdvancedColorPicker wired to `timescale.elapsedTimeColor`)
+  - Thickness dropdown (Thin 3px / Thick 6px)
+  - Position synced with today marker via shared `todayPosition` field
+  - Renders as colored strip on timescale header edge, from left to todayX
+- **End cap sections** — Left and Right (fully implemented):
+  - Shared `EndCapSection` component with `side` prop
+  - `EndCapConfig` type: show, fontColor, fontFamily, fontSize, fontWeight, fontStyle, textDecoration
+  - Controls: Color picker, Font family + Font size, B/I/U toggles
+  - Rendering: Year labels flanking the timescale bar (left = start year, right = end year)
+  - TimelineView header restructured to flex row: `[left cap] [bar flex-1] [right cap]`
+  - Defaults: show false, fontColor '#1e293b', fontFamily 'Arial', fontSize 16, fontWeight 700
+- **Types added**: `TodayMarkerPosition`, `ElapsedTimeThickness`, `EndCapConfig`
+- **`TimescaleConfig` expanded**: `todayPosition`, `todayAutoAdjusted`, `showElapsedTime`, `elapsedTimeColor`, `elapsedTimeThickness`, `leftEndCap`, `rightEndCap`
+- **`getDefaultTimescale()`** updated with defaults for all new fields
+
 ---
 
 ## Known Pre-existing Build Errors
 
-`npx tsc --noEmit` passes clean as of session 6. There are 22 pre-existing `tsc -b` errors (unused vars, type mismatches in DataView, store type casts) — these are NOT from our changes.
+`npx tsc --noEmit` passes clean as of session 11.
 
 ---
 
 ## What's Next (TODO)
 
-### Timescale Tab — Scale Section
-1. ~~Wire Scale section controls to the store~~ **DONE** (session 10)
-2. Scale section now reads/writes selected tier's config via `selectedTierIndex` in store
-3. Multi-tier: info banner tells user to click tier on timeline to switch; Bar Shape hidden
-4. Single-tier: all controls + Bar Shape dropdown visible
-
-### Timescale Tab — Remaining Sections
-1. Today marker section content (toggle wired, needs: color picker, line style controls)
-2. Elapsed time section (toggle + controls — visual spec not fully defined yet)
-3. Left end cap section (controls — visual spec TBD, currently renders start year in modal preview)
-4. Right end cap section (controls — visual spec TBD, currently renders end year in modal preview)
+### Timescale Tab
+All sections COMPLETED:
+- ~~Tier settings button + modal~~ DONE
+- ~~Scale section wired to store~~ DONE
+- ~~Today marker section~~ DONE
+- ~~Elapsed time section~~ DONE
+- ~~Left/right end cap sections~~ DONE
 
 ### Swimlane Sections (remaining)
 1. Swimlane spacing section content (placeholder exists)
@@ -671,7 +694,7 @@ Contains:
 - `ApplyToAllBox` supports optional `excludeSwimlanes`/`setExcludeSwimlanes` AND `onlyInSwimlane`/`setOnlyInSwimlane` props (mutually exclusive modes)
 - **CRITICAL**: `buildVisibleTierCells()` is the single source of truth for timescale cell layout — used by both TimelineView and TierSettingsModal preview. Changes to one must be reflected in the other.
 - **CRITICAL**: The padded date range must be computed identically in TimelineView and TierSettingsModal. Both use: `startOfMonth(subDays(projectStart, 14))` for start, `addMonths` for end.
-- `ScaleSection` in StylePane is currently **all local state** — none of its controls write to the store. This needs wiring.
+- `ScaleSection` in StylePane is **wired to the store** via `selectedTierIndex` — reads/writes selected tier's config
 - The `Toggle` component is defined locally inside StylePane.tsx (~line 350)
 - `CollapsibleRow` supports optional `toggle` prop for show/hide switch
 - TierSettingsModal `DEFAULT_3_TIERS`: tier 0 = month/green (#6b7f5c), tier 1 = week/slate (hidden), tier 2 = day/slate (hidden)
