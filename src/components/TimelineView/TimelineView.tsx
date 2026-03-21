@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useMemo } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
-import { generateTierLabels, buildVisibleTierCells, getProjectRange } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, getProjectRange, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness } from '@/types';
 
@@ -172,10 +172,14 @@ export function TimelineView() {
     const rangeEnd = addDays(rangeStart, totalDays);
     return timescale.tiers
       .filter((t) => t.visible)
-      .map((tier) => ({
-        tier,
-        labels: generateTierLabels(tier.unit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth, tier.format),
-      }));
+      .map((tier) => {
+        const resolvedUnit = tier.unit === 'auto' ? resolveAutoUnit(totalDays) : tier.unit;
+        const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
+        return {
+          tier: { ...tier, unit: resolvedUnit },
+          labels: generateTierLabels(resolvedUnit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth, resolvedFormat),
+        };
+      });
   }, [origin, totalDays, timescale]);
 
   const timescaleHeight = tierLabels.length * 28;

@@ -35,7 +35,7 @@ import {
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, differenceInDays, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
-import { generateTierLabels, buildVisibleTierCells, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1949,11 +1949,12 @@ function ScaleSection() {
               value={unitType}
               onChange={(e) => setUnitType(e.target.value)}
             >
-              <option value="year">Years</option>
-              <option value="quarter">Quarters</option>
-              <option value="month">Months</option>
-              <option value="week">Weeks</option>
+              <option value="auto">Auto</option>
               <option value="day">Days</option>
+              <option value="week">Weeks</option>
+              <option value="month">Months</option>
+              <option value="quarter">Quarters</option>
+              <option value="year">Years</option>
             </select>
           </div>
           <div className="flex-1">
@@ -2182,9 +2183,11 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     const BAR_WIDTH_PX = 920;
 
     return visibleTiers.map((tier) => {
-      const labels = generateTierLabels(tier.unit, originDate, rangeEnd, timescale.fiscalYearStartMonth, tier.format);
-      const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, BAR_WIDTH_PX);
-      return { tier, cells };
+      const resolvedUnit = tier.unit === 'auto' ? resolveAutoUnit(totalDays) : tier.unit;
+      const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
+      const labels = generateTierLabels(resolvedUnit, originDate, rangeEnd, timescale.fiscalYearStartMonth, resolvedFormat);
+      const cells = buildVisibleTierCells(labels, resolvedUnit, originDate, totalDays, BAR_WIDTH_PX);
+      return { tier: { ...tier, unit: resolvedUnit }, cells };
     });
   }, [visibleTiers, origin, totalDays, timescale.fiscalYearStartMonth]);
 
@@ -2349,11 +2352,12 @@ function TierColumn({
                 updateTier({ unit: newUnit, format: getDefaultFormatForUnit(newUnit) });
               }}
             >
-              <option value="year">Years</option>
-              <option value="quarter">Quarters</option>
-              <option value="month">Months</option>
-              <option value="week">Weeks</option>
+              <option value="auto">Auto</option>
               <option value="day">Days</option>
+              <option value="week">Weeks</option>
+              <option value="month">Months</option>
+              <option value="quarter">Quarters</option>
+              <option value="year">Years</option>
             </select>
             <select
               className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-2 py-1.5 text-sm text-[var(--color-text)] outline-none"

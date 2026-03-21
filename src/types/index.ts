@@ -234,7 +234,7 @@ export interface Dependency {
 
 // ─── Timescale Types ─────────────────────────────────────────────────────────
 
-export type TimescaleTier = 'year' | 'quarter' | 'month' | 'week' | 'day';
+export type TimescaleTier = 'auto' | 'year' | 'quarter' | 'month' | 'week' | 'day';
 
 // Format options per unit type
 export type YearFormat = 'yyyy' | 'yy';                                           // 2020 | 20

@@ -60,6 +60,8 @@ export interface TimescaleLabel {
 // Map a date to a label string based on unit + format
 function formatTierLabel(date: Date, unit: TimescaleTier, fmt: TierFormat, fiscalYearStartMonth: number): string {
   switch (unit) {
+    case 'auto':
+      return format(date, 'MMM'); // fallback; should be resolved before calling
     case 'year': {
       if (fiscalYearStartMonth !== 1) {
         const fyStart = new Date(date.getFullYear(), fiscalYearStartMonth - 1, 1);
@@ -108,6 +110,7 @@ export function generateTierLabels(
 ): TimescaleLabel[] {
   // Default format per unit when not specified
   const effectiveFmt: TierFormat = fmt ?? ({
+    auto: 'MMM',
     year: 'yyyy',
     quarter: 'Qq yyyy',
     month: 'MMM',
@@ -116,6 +119,9 @@ export function generateTierLabels(
   } as Record<TimescaleTier, TierFormat>)[tier];
 
   switch (tier) {
+    case 'auto':
+      // Should be resolved before calling; fall back to month
+      return generateTierLabels('month', rangeStart, rangeEnd, fiscalYearStartMonth, fmt);
     case 'year': {
       const years = eachYearOfInterval({ start: startOfYear(rangeStart), end: rangeEnd });
       return years.map((y) => {
@@ -348,10 +354,22 @@ export function shiftDependents(
   return updated;
 }
 
+// ─── Auto Unit Resolution ────────────────────────────────────────────────────
+
+/** Resolve 'auto' to a concrete unit based on project duration in days. */
+export function resolveAutoUnit(totalDays: number): Exclude<TimescaleTier, 'auto'> {
+  if (totalDays < 30) return 'day';          // < 1 month
+  if (totalDays < 180) return 'week';         // 1–6 months
+  if (totalDays < 730) return 'month';        // 6 months–2 years
+  if (totalDays < 1825) return 'quarter';     // 2–5 years
+  return 'year';                              // 5+ years
+}
+
 // ─── Timescale Defaults ──────────────────────────────────────────────────────
 
 export function getDefaultFormatForUnit(unit: TimescaleTier): TierFormat {
   const map: Record<TimescaleTier, TierFormat> = {
+    auto: 'MMM',  // fallback; callers should resolve auto first
     year: 'yyyy',
     quarter: 'Qq yyyy',
     month: 'MMM',
@@ -363,6 +381,11 @@ export function getDefaultFormatForUnit(unit: TimescaleTier): TierFormat {
 
 export function getFormatOptionsForUnit(unit: TimescaleTier): { value: TierFormat; label: string }[] {
   switch (unit) {
+    case 'auto':
+      // Show month formats as default for auto; callers can re-resolve
+      return [
+        { value: 'MMM', label: 'Auto' },
+      ];
     case 'year':
       return [
         { value: 'yyyy', label: '2020, 2021' },
