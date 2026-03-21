@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
-import { DataView } from '@/components/DataView/DataView';
+import { DataView, AddDropdownButton } from '@/components/DataView/DataView';
 import { TimelineView } from '@/components/TimelineView/TimelineView';
 import { StylePane } from '@/components/StylePane/StylePane';
 import { ProjectManagerModal } from '@/components/common/ProjectManagerModal';
@@ -133,29 +133,13 @@ function App() {
               </button>
             </>
           ) : (
-            <>
-              <button
-                onClick={handleAddTask}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
-              >
-                <Plus size={14} />
-                Task
-              </button>
-              <button
-                onClick={handleAddMilestone}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
-              >
-                <Plus size={14} />
-                Milestone
-              </button>
-              <button
-                onClick={handleAddSwimlane}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
-              >
-                <Plus size={14} />
-                Swimlane
-              </button>
-            </>
+            <AddDropdownButton onAdd={(type) => {
+              if (type === 'swimlane') {
+                handleAddSwimlane();
+              } else {
+                addItem({ name: type === 'task' ? 'New Task' : 'New Milestone', type });
+              }
+            }} />
           )}
         </div>
 
