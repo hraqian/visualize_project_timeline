@@ -3,6 +3,7 @@ import { useProjectStore } from '@/store/useProjectStore';
 import { DataView, AddDropdownButton } from '@/components/DataView/DataView';
 import { TimelineView } from '@/components/TimelineView/TimelineView';
 import { StylePane } from '@/components/StylePane/StylePane';
+import { ProjectManagerModal } from '@/components/common/ProjectManagerModal';
 import {
   Pencil,
   Plus,
@@ -10,6 +11,8 @@ import {
   Settings,
   List,
   GanttChart,
+  Save,
+  FolderOpen,
 } from 'lucide-react';
 import type { ActiveView } from '@/types';
 
@@ -23,9 +26,12 @@ function App() {
   const swimlanes = useProjectStore((s) => s.swimlanes);
   const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
+  const isDirty = useProjectStore((s) => s.isDirty);
+  const saveProject = useProjectStore((s) => s.saveProject);
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(projectName);
+  const [showProjectManager, setShowProjectManager] = useState(false);
 
   const commitName = useCallback(() => {
     const trimmed = nameValue.trim();
@@ -89,7 +95,9 @@ function App() {
             className="group flex items-center gap-2 text-sm font-semibold text-white hover:text-white/90 transition-colors"
           >
             <span>{projectName}</span>
-            <span className="text-xs font-normal text-white/60">- Saved</span>
+            <span className="text-xs font-normal text-white/60">
+              {isDirty ? '- Unsaved changes' : '- Saved'}
+            </span>
             <Pencil
               size={12}
               className="opacity-0 group-hover:opacity-60 transition-opacity text-white"
@@ -165,8 +173,26 @@ function App() {
           })}
         </div>
 
-        {/* Right: Download + Settings */}
+        {/* Right: Save + Projects + Download + Settings */}
         <div className="flex items-center gap-2 flex-1 justify-end">
+          <button
+            onClick={saveProject}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
+              isDirty
+                ? 'text-white bg-[#4f46e5] border-[#4f46e5] hover:bg-[#4338ca]'
+                : 'text-[var(--color-text-secondary)] border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+          >
+            <Save size={14} />
+            Save
+          </button>
+          <button
+            onClick={() => setShowProjectManager(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
+          >
+            <FolderOpen size={14} />
+            Projects
+          </button>
           <button
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
           >
@@ -192,6 +218,10 @@ function App() {
           </div>
         )}
       </div>
+
+      {showProjectManager && (
+        <ProjectManagerModal onClose={() => setShowProjectManager(false)} />
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import type {
 } from '@/types';
 import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, shiftDependents } from '@/utils';
+import { saveProject as saveProjectToStorage, loadProject as loadProjectFromStorage } from '@/utils/storage';
 
 // ─── Sample Data ─────────────────────────────────────────────────────────────
 
@@ -146,6 +147,11 @@ interface ProjectActions {
   setSwimlaneSpacing: (spacing: number) => void;
   setSelectedTierIndex: (index: number | null) => void;
 
+  // Project persistence
+  saveProject: () => void;
+  loadProject: (id: string) => void;
+  newProject: () => void;
+
   // Project
   setProjectName: (name: string) => void;
   setTimelineTitle: (title: string) => void;
@@ -226,8 +232,31 @@ type ProjectStore = ProjectState & ProjectActions;
 
 const sample = createSampleData();
 
-export const useProjectStore = create<ProjectStore>((set, get) => ({
+// Keys that represent saveable project data (changes to these mark the project dirty)
+const DIRTY_KEYS: Set<string> = new Set([
+  'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies',
+  'statusLabels', 'columnVisibility', 'timescale', 'zoom', 'swimlaneSpacing', 'showCriticalPath',
+]);
+
+export const useProjectStore = create<ProjectStore>((_set, get) => {
+  // Wrap set to auto-mark dirty when saveable data changes
+  const set: typeof _set = (partial, replace) => {
+    _set((prev) => {
+      const next = typeof partial === 'function' ? partial(prev) : partial;
+      // Check if any saveable key is being changed
+      const touchesSaveable = Object.keys(next as object).some((k) => DIRTY_KEYS.has(k));
+      if (touchesSaveable && !(next as Record<string, unknown>).hasOwnProperty('isDirty')) {
+        return { ...next, isDirty: true } as ProjectStore;
+      }
+      return next as ProjectStore;
+    }, replace);
+  };
+
+  return {
   // ─── Initial State ───────────────────────────────────────────────────
+  projectId: uuid(),
+  lastModified: null,
+  isDirty: false,
   projectName: 'Project Timeline',
   timelineTitle: 'Project Timeline',
   items: sample.items,
@@ -254,6 +283,52 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setZoom: (zoom) => set({ zoom: Math.max(2, Math.min(30, zoom)) }),
   setSwimlaneSpacing: (spacing) => set({ swimlaneSpacing: Math.max(0, Math.min(40, spacing)) }),
   setSelectedTierIndex: (index) => set({ selectedTierIndex: index }),
+
+  // ─── Project Persistence ─────────────────────────────────────────────
+  saveProject: () => {
+    const state = get();
+    const now = saveProjectToStorage(state as ProjectState);
+    set({ lastModified: now, isDirty: false });
+  },
+  loadProject: (id) => {
+    const data = loadProjectFromStorage(id);
+    if (!data) return;
+    set({
+      ...data,
+      isDirty: false,
+      // Reset transient UI state
+      activeView: 'timeline',
+      selectedItemId: null,
+      selectedSwimlaneId: null,
+      stylePaneSection: null,
+      checkedItemIds: [],
+      selectedTierIndex: null,
+    });
+  },
+  newProject: () => {
+    set({
+      projectId: uuid(),
+      lastModified: null,
+      isDirty: false,
+      projectName: 'New Project',
+      timelineTitle: 'New Project',
+      items: [],
+      swimlanes: [],
+      dependencies: [],
+      statusLabels: [...DEFAULT_STATUS_LABELS],
+      columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
+      checkedItemIds: [],
+      timescale: getDefaultTimescale(),
+      activeView: 'timeline',
+      selectedItemId: null,
+      selectedSwimlaneId: null,
+      stylePaneSection: null,
+      showCriticalPath: false,
+      zoom: 8,
+      swimlaneSpacing: 5,
+      selectedTierIndex: null,
+    });
+  },
 
   // ─── Project ─────────────────────────────────────────────────────────
   setProjectName: (name) => set({ projectName: name }),
@@ -811,4 +886,5 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }),
     })),
 
-}));
+  };
+});
