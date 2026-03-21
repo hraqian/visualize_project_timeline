@@ -1809,19 +1809,11 @@ function SwimlaneStyleControls({
         expanded={stylePaneSection === 'swimlaneSpacing'}
         onToggleExpand={() => handleToggleExpand('swimlaneSpacing')}
       >
-        <div className="space-y-4">
-          <div>
-            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-2">
-              Spacing
-            </label>
-            <SwimlaneSpacingControl
-              value={swimlane.spacing}
-              onChange={(spacing) => updateSwimlane(swimlane.id, { spacing })}
-            />
-          </div>
-
-          {/* Apply to all swimlanes */}
-          <SwimlaneSpacingApplyToAll swimlane={swimlane} />
+        <div>
+          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-2">
+            Spacing
+          </label>
+          <SwimlaneSpacingSection />
         </div>
       </CollapsibleRow>
     </div>
@@ -2799,14 +2791,9 @@ function SwimlaneSpacingIcon({ gap, active }: { gap: number; active: boolean }) 
   );
 }
 
-function SwimlaneSpacingControl({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  const activePreset = SWIMLANE_SPACING_PRESETS.find((p) => p.value === value);
+function SwimlaneSpacingSection() {
+  const swimlaneSpacing = useProjectStore((s) => s.swimlaneSpacing);
+  const setSwimlaneSpacing = useProjectStore((s) => s.setSwimlaneSpacing);
 
   return (
     <div className="flex items-center gap-2">
@@ -2814,37 +2801,37 @@ function SwimlaneSpacingControl({
         {SWIMLANE_SPACING_PRESETS.map((preset, idx) => (
           <button
             key={preset.value}
-            onClick={() => onChange(preset.value)}
+            onClick={() => setSwimlaneSpacing(preset.value)}
             className={`flex items-center justify-center w-10 h-9 transition-colors ${
-              value === preset.value
+              swimlaneSpacing === preset.value
                 ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
                 : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]'
             } ${idx !== 0 ? 'border-l border-[var(--color-border)]' : ''}`}
             title={`${preset.value}px`}
           >
-            <SwimlaneSpacingIcon gap={preset.gap} active={value === preset.value} />
+            <SwimlaneSpacingIcon gap={preset.gap} active={swimlaneSpacing === preset.value} />
           </button>
         ))}
       </div>
       <div className="flex items-center border border-[var(--color-border)] rounded-md overflow-hidden">
         <input
           type="text"
-          value={value}
+          value={swimlaneSpacing}
           onChange={(e) => {
             const n = parseInt(e.target.value, 10);
-            if (!isNaN(n) && n >= 0 && n <= 40) onChange(n);
+            if (!isNaN(n) && n >= 0 && n <= 40) setSwimlaneSpacing(n);
           }}
           className="w-10 h-9 text-center text-sm bg-[var(--color-bg-secondary)] text-[var(--color-text)] outline-none"
         />
         <div className="flex flex-col border-l border-[var(--color-border)]">
           <button
-            onClick={() => onChange(Math.min(40, value + 1))}
+            onClick={() => setSwimlaneSpacing(Math.min(40, swimlaneSpacing + 1))}
             className="px-1.5 h-[18px] flex items-center justify-center bg-[var(--color-bg-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors text-[var(--color-text-muted)]"
           >
             <ChevronUp size={10} />
           </button>
           <button
-            onClick={() => onChange(Math.max(0, value - 1))}
+            onClick={() => setSwimlaneSpacing(Math.max(0, swimlaneSpacing - 1))}
             className="px-1.5 h-[18px] flex items-center justify-center bg-[var(--color-bg-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors border-t border-[var(--color-border)] text-[var(--color-text-muted)]"
           >
             <ChevronDown size={10} />
@@ -2852,27 +2839,6 @@ function SwimlaneSpacingControl({
         </div>
       </div>
     </div>
-  );
-}
-
-// ─── Swimlane Spacing Apply to All ────────────────────────────────────────────
-
-function SwimlaneSpacingApplyToAll({ swimlane }: { swimlane: Swimlane }) {
-  const applySwimlaneStyleToAll = useProjectStore((s) => s.applySwimlaneStyleToAll);
-  const [applied, setApplied] = useState(false);
-
-  const handleApply = () => {
-    applySwimlaneStyleToAll(swimlane.id, ['spacing']);
-    setApplied(true);
-    setTimeout(() => setApplied(false), 1200);
-  };
-
-  return (
-    <ApplyToAllBox onApply={handleApply} applied={applied} label="Apply to all swimlanes">
-      <PropertyCard label="Spacing" checked={true} onChange={() => {}}>
-        <span className="text-sm font-medium text-[var(--color-text)]">{swimlane.spacing}px</span>
-      </PropertyCard>
-    </ApplyToAllBox>
   );
 }
 

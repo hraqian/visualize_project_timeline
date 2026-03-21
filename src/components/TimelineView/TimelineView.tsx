@@ -13,6 +13,8 @@ const SWIMLANE_BADGE_WIDTH = 120;
 const INDEPENDENT_SECTION_PADDING = 12;
 const CONNECTOR_THICKNESS_MAP: Record<ConnectorThickness, number> = { thin: 1, medium: 2, thick: 3 };
 const OUTLINE_THICKNESS_MAP: Record<OutlineThickness, number> = { none: 0, thin: 1, medium: 2, thick: 3 };
+const SWIMLANE_PADDING_TOP = 10;
+const SWIMLANE_PADDING_BOTTOM = 10;
 
 // ─── Duration Formatting ─────────────────────────────────────────────────────
 
@@ -55,6 +57,7 @@ export function TimelineView() {
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
   const timelineTitle = useProjectStore((s) => s.timelineTitle);
   const setTimelineTitle = useProjectStore((s) => s.setTimelineTitle);
+  const swimlaneSpacing = useProjectStore((s) => s.swimlaneSpacing);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -146,17 +149,18 @@ export function TimelineView() {
   const swimlaneLayout = useMemo(() => {
     let y = independentHeight;
     const layout: { swimlane: Swimlane; y: number; height: number; contentY: number }[] = [];
-    for (const sl of sortedSwimlanes) {
-      const slItems = swimlanedItems.filter((i) => i.swimlaneId === sl.id);
-      const maxRow = slItems.length > 0 ? Math.max(...slItems.map((i) => i.row)) : 0;
+    for (let i = 0; i < sortedSwimlanes.length; i++) {
+      const sl = sortedSwimlanes[i];
+      if (i > 0) y += swimlaneSpacing; // gap between bands
+      const slItems = swimlanedItems.filter((it) => it.swimlaneId === sl.id);
+      const maxRow = slItems.length > 0 ? Math.max(...slItems.map((it) => it.row)) : 0;
       const contentHeight = (maxRow + 1) * ROW_HEIGHT;
-      const pad = sl.spacing;
-      const height = pad + contentHeight + pad;
-      layout.push({ swimlane: sl, y, height, contentY: y + pad });
+      const height = SWIMLANE_PADDING_TOP + contentHeight + SWIMLANE_PADDING_BOTTOM;
+      layout.push({ swimlane: sl, y, height, contentY: y + SWIMLANE_PADDING_TOP });
       y += height;
     }
     return layout;
-  }, [sortedSwimlanes, swimlanedItems, independentHeight]);
+  }, [sortedSwimlanes, swimlanedItems, independentHeight, swimlaneSpacing]);
 
   const canvasHeight = (swimlaneLayout.length > 0
     ? swimlaneLayout[swimlaneLayout.length - 1].y + swimlaneLayout[swimlaneLayout.length - 1].height
