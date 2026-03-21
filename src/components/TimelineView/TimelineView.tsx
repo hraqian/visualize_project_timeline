@@ -448,9 +448,8 @@ export function TimelineView() {
            <div className="sticky top-0 z-10 border-b border-[var(--color-border)]">
              {tierLabels.map(({ tier, labels }, tierIdx) => {
                // Calculate label skip factor for readability
-               // Estimate typical cell width from first label
-               const minLabelWidth: Record<string, number> = { day: 28, week: 44, month: 36, quarter: 36, year: 40 };
-               const minW = minLabelWidth[tier.unit] ?? 36;
+               const minLabelWidth: Record<string, number> = { day: 32, week: 48, month: 40, quarter: 40, year: 44 };
+               const minW = minLabelWidth[tier.unit] ?? 40;
                let skipFactor = 1;
                if (labels.length > 1) {
                  const firstStart = differenceInDays(labels[0].startDate, parseISO(origin)) * zoom;
@@ -461,39 +460,44 @@ export function TimelineView() {
                  }
                }
 
+               // Build merged visible label cells
+               const visibleCells: { label: string; startX: number; width: number; index: number }[] = [];
+               for (let i = 0; i < labels.length; i += skipFactor) {
+                 const startX = differenceInDays(labels[i].startDate, parseISO(origin)) * zoom;
+                 // Span extends to the start of the next visible label (or end of last label)
+                 const endIdx = Math.min(i + skipFactor, labels.length) - 1;
+                 const endX = differenceInDays(labels[endIdx].endDate, parseISO(origin)) * zoom + zoom;
+                 visibleCells.push({
+                   label: labels[i].label,
+                   startX,
+                   width: Math.max(endX - startX, 1),
+                   index: i,
+                 });
+               }
+
                return (
                  <div key={tierIdx} className="flex h-7 relative" style={{ backgroundColor: tier.backgroundColor }}>
-                   {labels.map((label, i) => {
-                     const startX = differenceInDays(label.startDate, parseISO(origin)) * zoom;
-                     const endX = differenceInDays(label.endDate, parseISO(origin)) * zoom + zoom;
-                     const width = Math.max(endX - startX, 1);
-                     const showLabel = i % skipFactor === 0;
-                     // When skipping labels, span across the skipped cells for proper text centering
-                     const spanWidth = showLabel && skipFactor > 1
-                       ? Math.max(width * Math.min(skipFactor, labels.length - i), 1)
-                       : width;
-                     return (
-                       <div
-                         key={i}
-                         className={`flex items-center shrink-0 overflow-hidden ${tier.separators ? 'border-r border-white/20' : ''}`}
-                         style={{
-                           position: 'absolute',
-                           left: startX,
-                           width: showLabel ? spanWidth : width,
-                           height: 28,
-                           color: tier.fontColor,
-                           fontSize: tier.fontSize,
-                           fontFamily: tier.fontFamily,
-                           fontWeight: tier.fontWeight,
-                           fontStyle: tier.fontStyle,
-                           textDecoration: tier.textDecoration,
-                           justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
-                         }}
-                       >
-                         {showLabel && <span className="truncate px-1">{label.label}</span>}
-                       </div>
-                     );
-                   })}
+                   {visibleCells.map((cell, ci) => (
+                     <div
+                       key={cell.index}
+                       className={`flex items-center shrink-0 overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
+                       style={{
+                         position: 'absolute',
+                         left: cell.startX,
+                         width: cell.width,
+                         height: 28,
+                         color: tier.fontColor,
+                         fontSize: tier.fontSize,
+                         fontFamily: tier.fontFamily,
+                         fontWeight: tier.fontWeight,
+                         fontStyle: tier.fontStyle,
+                         textDecoration: tier.textDecoration,
+                         justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
+                       }}
+                     >
+                       <span className="truncate px-1">{cell.label}</span>
+                     </div>
+                   ))}
                  </div>
                );
              })}
