@@ -517,12 +517,18 @@ export function TimelineView() {
 
                 {/* Colored swimlane badge on left edge */}
                 <div
-                  className={`absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md text-white text-xs font-semibold tracking-wide z-[6] cursor-pointer transition-shadow ${
+                  className={`absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md tracking-wide z-[6] cursor-pointer transition-shadow ${
                     selectedSwimlaneId === swimlane.id ? 'ring-2 ring-offset-1 ring-indigo-500' : ''
                   }`}
                   style={{
                     width: SWIMLANE_BADGE_WIDTH,
                     backgroundColor: swimlane.color,
+                    color: swimlane.titleFontColor,
+                    fontSize: swimlane.titleFontSize,
+                    fontFamily: swimlane.titleFontFamily,
+                    fontWeight: swimlane.titleFontWeight,
+                    fontStyle: swimlane.titleFontStyle,
+                    textDecoration: swimlane.titleTextDecoration,
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
