@@ -228,12 +228,6 @@ export function buildVisibleTierCells(
     });
   }
 
-  // Extend last cell to fill any remaining gap (rounding)
-  if (cells.length > 0) {
-    const last = cells[cells.length - 1];
-    last.widthFrac = 1 - last.fraction;
-  }
-
   // Prefix first visible label for sequential units
   if (cells.length > 0 && (unit === 'week' || unit === 'day')) {
     const prefix = unit === 'week' ? 'Week ' : 'Day ';
