@@ -209,6 +209,8 @@ export interface Swimlane {
   // Background: Outline
   outlineThickness: OutlineThickness;
   outlineColor: string;
+  // Spacing
+  spacing: number; // px vertical padding above/below content within the swimlane band
 }
 
 export const DEFAULT_SWIMLANE_STYLE = {
@@ -224,6 +226,7 @@ export const DEFAULT_SWIMLANE_STYLE = {
   bodyTransparency: 80,
   outlineThickness: 'none' as OutlineThickness,
   outlineColor: '#f59e0b',
+  spacing: 5,
 };
 
 export interface Dependency {

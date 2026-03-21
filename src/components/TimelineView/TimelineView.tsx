@@ -10,8 +10,6 @@ import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, Outline
 
 const ROW_HEIGHT = 44;
 const SWIMLANE_BADGE_WIDTH = 120;
-const SWIMLANE_PADDING_TOP = 10;
-const SWIMLANE_PADDING_BOTTOM = 10;
 const INDEPENDENT_SECTION_PADDING = 12;
 const CONNECTOR_THICKNESS_MAP: Record<ConnectorThickness, number> = { thin: 1, medium: 2, thick: 3 };
 const OUTLINE_THICKNESS_MAP: Record<OutlineThickness, number> = { none: 0, thin: 1, medium: 2, thick: 3 };
@@ -152,8 +150,9 @@ export function TimelineView() {
       const slItems = swimlanedItems.filter((i) => i.swimlaneId === sl.id);
       const maxRow = slItems.length > 0 ? Math.max(...slItems.map((i) => i.row)) : 0;
       const contentHeight = (maxRow + 1) * ROW_HEIGHT;
-      const height = SWIMLANE_PADDING_TOP + contentHeight + SWIMLANE_PADDING_BOTTOM;
-      layout.push({ swimlane: sl, y, height, contentY: y + SWIMLANE_PADDING_TOP });
+      const pad = sl.spacing;
+      const height = pad + contentHeight + pad;
+      layout.push({ swimlane: sl, y, height, contentY: y + pad });
       y += height;
     }
     return layout;
