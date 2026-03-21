@@ -2139,6 +2139,8 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   const items = useProjectStore((s) => s.items);
   const timescale = useProjectStore((s) => s.timescale);
   const updateTimescale = useProjectStore((s) => s.updateTimescale);
+  const previewRef = useRef<HTMLDivElement>(null);
+
   // Local draft state — initialize from store tiers, padded to 3
   const [tiers, setTiers] = useState<TimescaleTierConfig[]>(() => {
     const stored = timescale.tiers;
@@ -2162,11 +2164,20 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     return { origin: padStart.toISOString().split('T')[0], totalDays: total };
   }, [items]);
 
+  // Compute a zoom that makes the finest visible tier readable
   const previewZoom = useMemo(() => {
-    // Fit the preview into ~900px wide area
-    const targetWidth = 900;
-    return Math.max(1, targetWidth / totalDays);
-  }, [totalDays]);
+    const visibleTiers = tiers.filter((t) => t.visible);
+    if (visibleTiers.length === 0) return 4;
+    // Find the finest (smallest) unit among visible tiers
+    const unitRank: Record<string, number> = { day: 0, week: 1, month: 2, quarter: 3, year: 4 };
+    const finest = visibleTiers.reduce((a, b) => (unitRank[a.unit] < unitRank[b.unit] ? a : b));
+    // Set zoom so labels of the finest tier are legible
+    const minPxPerUnit: Record<string, number> = { day: 38, week: 50, month: 80, quarter: 120, year: 180 };
+    const avgDaysPerUnit: Record<string, number> = { day: 1, week: 7, month: 30, quarter: 91, year: 365 };
+    const targetPx = minPxPerUnit[finest.unit] ?? 40;
+    const avgDays = avgDaysPerUnit[finest.unit] ?? 1;
+    return targetPx / avgDays;
+  }, [tiers]);
 
   const totalWidth = totalDays * previewZoom;
 
@@ -2186,8 +2197,16 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     return differenceInDays(today, parseISO(origin)) * previewZoom;
   }, [origin, previewZoom]);
 
+  // Scroll preview to center on today on mount
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const containerWidth = el.clientWidth;
+    const scrollTo = Math.max(0, todayX - containerWidth / 2);
+    el.scrollLeft = scrollTo;
+  }, [todayX]);
+
   const handleSave = () => {
-    // Write visible tiers to store (filter out hidden tiers at the end, keep all if any visible)
     updateTimescale({ tiers: tiers });
     onClose();
   };
@@ -2209,8 +2228,11 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8">
           {/* Timescale preview */}
-          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
-            <div className="relative" style={{ width: totalWidth, minWidth: '100%' }}>
+          <div
+            ref={previewRef}
+            className="overflow-x-auto rounded-lg border border-[var(--color-border)]"
+          >
+            <div className="relative" style={{ width: totalWidth }}>
               {tierLabels.map(({ tier, labels }, tierIdx) => (
                 <div
                   key={tierIdx}
@@ -2246,7 +2268,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
               {/* Today marker */}
-              {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
+              {todayX >= 0 && todayX <= totalWidth && (
                 <div
                   className="absolute top-0 z-10 pointer-events-none"
                   style={{ left: todayX, height: tierLabels.length * 28 }}
@@ -2255,12 +2277,6 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                     className="w-0.5 h-full"
                     style={{ backgroundColor: timescale.todayColor }}
                   />
-                  <div
-                    className="absolute top-full mt-0.5 -translate-x-1/2 text-[10px] font-medium"
-                    style={{ color: timescale.todayColor }}
-                  >
-                    Today
-                  </div>
                 </div>
               )}
             </div>
@@ -2371,7 +2387,7 @@ function TierColumn({
             type="checkbox"
             checked={tier.separators}
             onChange={(e) => updateTier({ separators: e.target.checked })}
-            className="accent-indigo-500 w-4 h-4"
+            className="accent-blue-500 w-4 h-4"
           />
           <span className="font-medium">Separators</span>
         </label>
