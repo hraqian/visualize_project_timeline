@@ -3247,6 +3247,8 @@ function TaskBarApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [onlyInSwimlane, setOnlyInSwimlane] = useState(false);
+  const isInSwimlane = item.swimlaneId !== null;
   const [applyProps, setApplyProps] = useState({
     color: true,
     barShape: true,
@@ -3259,7 +3261,7 @@ function TaskBarApplyToAll({ item }: { item: ItemType }) {
       .filter(([, v]) => v)
       .map(([k]) => k);
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
@@ -3267,7 +3269,7 @@ function TaskBarApplyToAll({ item }: { item: ItemType }) {
   const style = item.taskStyle;
 
   return (
-    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+    <ApplyToAllBox onApply={handleApply} applied={applied} {...(isInSwimlane ? { onlyInSwimlane, setOnlyInSwimlane } : { excludeSwimlanes, setExcludeSwimlanes })}>
       <PropertyCard label="Color" checked={applyProps.color} onChange={(v) => setApplyProps((p) => ({ ...p, color: v }))}>
         <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.color }} />
       </PropertyCard>
@@ -3290,6 +3292,8 @@ function TaskTitleApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [onlyInSwimlane, setOnlyInSwimlane] = useState(false);
+  const isInSwimlane = item.swimlaneId !== null;
   const [applyProps, setApplyProps] = useState({
     showTitle: true,
     fontColor: true,
@@ -3304,7 +3308,7 @@ function TaskTitleApplyToAll({ item }: { item: ItemType }) {
     if (applyProps.text) keys.push('fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'textDecoration');
     if (applyProps.labelPosition) keys.push('labelPosition', 'textAlign');
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
@@ -3312,7 +3316,7 @@ function TaskTitleApplyToAll({ item }: { item: ItemType }) {
   const style = item.taskStyle;
 
   return (
-    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+    <ApplyToAllBox onApply={handleApply} applied={applied} {...(isInSwimlane ? { onlyInSwimlane, setOnlyInSwimlane } : { excludeSwimlanes, setExcludeSwimlanes })}>
       <PropertyCard label="Show" checked={applyProps.showTitle} onChange={(v) => setApplyProps((p) => ({ ...p, showTitle: v }))}>
         <ShowIcon />
       </PropertyCard>
@@ -3335,6 +3339,8 @@ function TaskDateApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [onlyInSwimlane, setOnlyInSwimlane] = useState(false);
+  const isInSwimlane = item.swimlaneId !== null;
   const [applyProps, setApplyProps] = useState({
     showDate: true,
     dateFontColor: true,
@@ -3351,7 +3357,7 @@ function TaskDateApplyToAll({ item }: { item: ItemType }) {
     if (applyProps.dateFormat) keys.push('dateFormat');
     if (applyProps.dateLabelPosition) keys.push('dateLabelPosition', 'dateTextAlign');
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
@@ -3359,7 +3365,7 @@ function TaskDateApplyToAll({ item }: { item: ItemType }) {
   const style = item.taskStyle;
 
   return (
-    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+    <ApplyToAllBox onApply={handleApply} applied={applied} {...(isInSwimlane ? { onlyInSwimlane, setOnlyInSwimlane } : { excludeSwimlanes, setExcludeSwimlanes })}>
       <PropertyCard label="Show" checked={applyProps.showDate} onChange={(v) => setApplyProps((p) => ({ ...p, showDate: v }))}>
         <ShowIcon />
       </PropertyCard>
@@ -3385,6 +3391,8 @@ function TaskDurationApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [onlyInSwimlane, setOnlyInSwimlane] = useState(false);
+  const isInSwimlane = item.swimlaneId !== null;
   const [applyProps, setApplyProps] = useState({
     showDuration: true,
     durationFontColor: true,
@@ -3401,7 +3409,7 @@ function TaskDurationApplyToAll({ item }: { item: ItemType }) {
     if (applyProps.durationFormat) keys.push('durationFormat');
     if (applyProps.durationLabelPosition) keys.push('durationLabelPosition', 'durationTextAlign');
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
@@ -3409,7 +3417,7 @@ function TaskDurationApplyToAll({ item }: { item: ItemType }) {
   const style = item.taskStyle;
 
   return (
-    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+    <ApplyToAllBox onApply={handleApply} applied={applied} {...(isInSwimlane ? { onlyInSwimlane, setOnlyInSwimlane } : { excludeSwimlanes, setExcludeSwimlanes })}>
       <PropertyCard label="Show" checked={applyProps.showDuration} onChange={(v) => setApplyProps((p) => ({ ...p, showDuration: v }))}>
         <ShowIcon />
       </PropertyCard>
@@ -3435,6 +3443,8 @@ function TaskPctApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [onlyInSwimlane, setOnlyInSwimlane] = useState(false);
+  const isInSwimlane = item.swimlaneId !== null;
   const [applyProps, setApplyProps] = useState({
     showPercentComplete: true,
     pctFontColor: true,
@@ -3451,7 +3461,7 @@ function TaskPctApplyToAll({ item }: { item: ItemType }) {
     if (applyProps.pctLabelPosition) keys.push('pctLabelPosition');
     if (applyProps.pctHighlightColor) keys.push('pctHighlightColor');
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
@@ -3459,7 +3469,7 @@ function TaskPctApplyToAll({ item }: { item: ItemType }) {
   const style = item.taskStyle;
 
   return (
-    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+    <ApplyToAllBox onApply={handleApply} applied={applied} {...(isInSwimlane ? { onlyInSwimlane, setOnlyInSwimlane } : { excludeSwimlanes, setExcludeSwimlanes })}>
       <PropertyCard label="Show" checked={applyProps.showPercentComplete} onChange={(v) => setApplyProps((p) => ({ ...p, showPercentComplete: v }))}>
         <ShowIcon />
       </PropertyCard>
@@ -3546,6 +3556,8 @@ function ConnectorApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [onlyInSwimlane, setOnlyInSwimlane] = useState(false);
+  const isInSwimlane = item.swimlaneId !== null;
   const [applyProps, setApplyProps] = useState({
     showVerticalConnector: true,
     connectorColor: true,
@@ -3557,7 +3569,7 @@ function ConnectorApplyToAll({ item }: { item: ItemType }) {
       .filter(([, v]) => v)
       .map(([k]) => k);
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
@@ -3565,7 +3577,7 @@ function ConnectorApplyToAll({ item }: { item: ItemType }) {
   const style = item.taskStyle;
 
   return (
-    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied}>
+    <ApplyToAllBox onApply={handleApply} applied={applied} {...(isInSwimlane ? { onlyInSwimlane, setOnlyInSwimlane } : { excludeSwimlanes, setExcludeSwimlanes })}>
       <PropertyCard label="Show" checked={applyProps.showVerticalConnector} onChange={(v) => setApplyProps((p) => ({ ...p, showVerticalConnector: v }))}>
         <ShowIcon />
       </PropertyCard>
