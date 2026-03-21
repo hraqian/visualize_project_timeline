@@ -24,6 +24,7 @@ import {
   type LabelPosition,
   type MilestoneIcon,
   type ConnectorThickness,
+  type OutlineThickness,
   type Swimlane,
 } from '@/types';
 import { useState, useRef, useEffect } from 'react';
@@ -1705,7 +1706,101 @@ function SwimlaneStyleControls({
         expanded={stylePaneSection === 'swimlaneBackground'}
         onToggleExpand={() => handleToggleExpand('swimlaneBackground')}
       >
-        <div className="text-xs text-[var(--color-text-muted)]">Coming soon</div>
+        <div className="space-y-5">
+          {/* ── Header sub-group ── */}
+          <div>
+            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium mb-2">Header</div>
+            <div className="flex gap-3 items-end">
+              <div>
+                <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                  Color
+                </label>
+                <AdvancedColorPicker
+                  value={swimlane.headerColor}
+                  onChange={(headerColor) => updateSwimlane(swimlane.id, { headerColor })}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                  Transparency
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={swimlane.headerTransparency}
+                    onChange={(e) => updateSwimlane(swimlane.id, { headerTransparency: Number(e.target.value) })}
+                    className="flex-1 h-1.5 accent-indigo-500 cursor-pointer"
+                  />
+                  <span className="text-xs text-[var(--color-text-secondary)] w-8 text-right tabular-nums">{swimlane.headerTransparency}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Body sub-group ── */}
+          <div>
+            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium mb-2">Body</div>
+            <div className="flex gap-3 items-end">
+              <div>
+                <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                  Color
+                </label>
+                <AdvancedColorPicker
+                  value={swimlane.bodyColor}
+                  onChange={(bodyColor) => updateSwimlane(swimlane.id, { bodyColor })}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                  Transparency
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={swimlane.bodyTransparency}
+                    onChange={(e) => updateSwimlane(swimlane.id, { bodyTransparency: Number(e.target.value) })}
+                    className="flex-1 h-1.5 accent-indigo-500 cursor-pointer"
+                  />
+                  <span className="text-xs text-[var(--color-text-secondary)] w-8 text-right tabular-nums">{swimlane.bodyTransparency}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Outline sub-group ── */}
+          <div>
+            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium mb-2">Outline</div>
+            <div className="flex gap-3 items-end">
+              <div>
+                <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                  Thickness
+                </label>
+                <OutlineThicknessDropdown
+                  value={swimlane.outlineThickness}
+                  onChange={(outlineThickness) => updateSwimlane(swimlane.id, { outlineThickness })}
+                />
+              </div>
+              {swimlane.outlineThickness !== 'none' && (
+                <div>
+                  <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                    Color
+                  </label>
+                  <AdvancedColorPicker
+                    value={swimlane.outlineColor}
+                    onChange={(outlineColor) => updateSwimlane(swimlane.id, { outlineColor })}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Apply to all swimlanes */}
+          <SwimlaneBackgroundApplyToAll swimlane={swimlane} />
+        </div>
       </CollapsibleRow>
 
       <CollapsibleRow
@@ -2399,6 +2494,37 @@ function ConnectorThicknessDropdown({
   );
 }
 
+// ─── Outline Thickness Dropdown ──────────────────────────────────────────────
+
+const OUTLINE_THICKNESSES: { id: OutlineThickness; label: string }[] = [
+  { id: 'none', label: 'None' },
+  { id: 'thin', label: 'Thin' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'thick', label: 'Thick' },
+];
+
+function OutlineThicknessDropdown({
+  value,
+  onChange,
+}: {
+  value: OutlineThickness;
+  onChange: (v: OutlineThickness) => void;
+}) {
+  return (
+    <select
+      className="w-full h-9 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+      value={value}
+      onChange={(e) => onChange(e.target.value as OutlineThickness)}
+    >
+      {OUTLINE_THICKNESSES.map((t) => (
+        <option key={t.id} value={t.id}>
+          {t.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 // ─── Connector Apply to All ──────────────────────────────────────────────────
 
 function ConnectorApplyToAll({ item }: { item: ItemType }) {
@@ -2593,6 +2719,43 @@ function SwimlaneTitleApplyToAll({ swimlane }: { swimlane: Swimlane }) {
       </PropertyCard>
       <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
         <TextIcon />
+      </PropertyCard>
+    </ApplyToAllBox>
+  );
+}
+
+// ─── Swimlane Background Apply to All ─────────────────────────────────────────
+
+function SwimlaneBackgroundApplyToAll({ swimlane }: { swimlane: Swimlane }) {
+  const applySwimlaneStyleToAll = useProjectStore((s) => s.applySwimlaneStyleToAll);
+  const [applied, setApplied] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    header: true,
+    body: true,
+    outline: true,
+  });
+
+  const handleApply = () => {
+    const keys: (keyof Swimlane)[] = [];
+    if (applyProps.header) keys.push('headerColor', 'headerTransparency');
+    if (applyProps.body) keys.push('bodyColor', 'bodyTransparency');
+    if (applyProps.outline) keys.push('outlineThickness', 'outlineColor');
+    if (keys.length === 0) return;
+    applySwimlaneStyleToAll(swimlane.id, keys);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
+
+  return (
+    <ApplyToAllBox onApply={handleApply} applied={applied} label="Apply to all swimlanes">
+      <PropertyCard label="Header" checked={applyProps.header} onChange={(v) => setApplyProps((p) => ({ ...p, header: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: swimlane.headerColor }} />
+      </PropertyCard>
+      <PropertyCard label="Body" checked={applyProps.body} onChange={(v) => setApplyProps((p) => ({ ...p, body: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: swimlane.bodyColor }} />
+      </PropertyCard>
+      <PropertyCard label="Outline" checked={applyProps.outline} onChange={(v) => setApplyProps((p) => ({ ...p, outline: v }))}>
+        <div className="w-5 h-5 rounded border-2 border-[var(--color-text-muted)]" style={{ borderColor: swimlane.outlineThickness !== 'none' ? swimlane.outlineColor : undefined }} />
       </PropertyCard>
     </ApplyToAllBox>
   );

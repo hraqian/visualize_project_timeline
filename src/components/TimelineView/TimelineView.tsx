@@ -4,7 +4,7 @@ import { parseISO, differenceInDays, addDays, subDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, getProjectRange } from '@/utils';
 import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness } from '@/types';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -14,6 +14,7 @@ const SWIMLANE_PADDING_TOP = 10;
 const SWIMLANE_PADDING_BOTTOM = 10;
 const INDEPENDENT_SECTION_PADDING = 12;
 const CONNECTOR_THICKNESS_MAP: Record<ConnectorThickness, number> = { thin: 1, medium: 2, thick: 3 };
+const OUTLINE_THICKNESS_MAP: Record<OutlineThickness, number> = { none: 0, thin: 1, medium: 2, thick: 3 };
 
 // ─── Duration Formatting ─────────────────────────────────────────────────────
 
@@ -503,42 +504,71 @@ export function TimelineView() {
               </div>
             )}
 
-            {/* ─── Swimlane bands (grey bg + colored badge) ─── */}
-            {swimlaneLayout.map(({ swimlane, y, height }) => (
-              <div
-                key={swimlane.id}
-                className="absolute left-0 right-0"
-                style={{ top: y, height }}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => handleDropOnSwimlane(swimlane.id, e)}
-              >
-                {/* Grey background band */}
-                <div className="absolute inset-0 bg-[var(--color-bg-secondary)]/50" />
-
-                {/* Colored swimlane badge on left edge */}
+            {/* ─── Swimlane bands (bg + colored badge) ─── */}
+            {swimlaneLayout.map(({ swimlane, y, height }) => {
+              const outlinePx = OUTLINE_THICKNESS_MAP[swimlane.outlineThickness];
+              return (
                 <div
-                  className={`absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md tracking-wide z-[6] cursor-pointer transition-shadow ${
-                    selectedSwimlaneId === swimlane.id ? 'ring-2 ring-offset-1 ring-indigo-500' : ''
-                  }`}
+                  key={swimlane.id}
+                  className="absolute left-0 right-0"
                   style={{
-                    width: SWIMLANE_BADGE_WIDTH,
-                    backgroundColor: swimlane.color,
-                    color: swimlane.titleFontColor,
-                    fontSize: swimlane.titleFontSize,
-                    fontFamily: swimlane.titleFontFamily,
-                    fontWeight: swimlane.titleFontWeight,
-                    fontStyle: swimlane.titleFontStyle,
-                    textDecoration: swimlane.titleTextDecoration,
+                    top: y,
+                    height,
+                    ...(outlinePx > 0 ? {
+                      border: `${outlinePx}px solid ${swimlane.outlineColor}`,
+                      borderRadius: 4,
+                    } : undefined),
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedSwimlane(swimlane.id);
-                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => handleDropOnSwimlane(swimlane.id, e)}
                 >
-                  <span className="truncate px-2">{swimlane.name}</span>
+                  {/* Body background band */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundColor: swimlane.bodyColor,
+                      opacity: (100 - swimlane.bodyTransparency) / 100,
+                    }}
+                  />
+
+                  {/* Colored swimlane badge on left edge */}
+                  <div
+                    className={`absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md tracking-wide z-[6] cursor-pointer transition-shadow ${
+                      selectedSwimlaneId === swimlane.id ? 'ring-2 ring-offset-1 ring-indigo-500' : ''
+                    }`}
+                    style={{
+                      width: SWIMLANE_BADGE_WIDTH,
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSwimlane(swimlane.id);
+                    }}
+                  >
+                    {/* Badge background (separate layer so text is not affected by transparency) */}
+                    <div
+                      className="absolute inset-0 rounded-r-md"
+                      style={{
+                        backgroundColor: swimlane.headerColor,
+                        opacity: (100 - swimlane.headerTransparency) / 100,
+                      }}
+                    />
+                    <span
+                      className="truncate px-2 relative"
+                      style={{
+                        color: swimlane.titleFontColor,
+                        fontSize: swimlane.titleFontSize,
+                        fontFamily: swimlane.titleFontFamily,
+                        fontWeight: swimlane.titleFontWeight,
+                        fontStyle: swimlane.titleFontStyle,
+                        textDecoration: swimlane.titleTextDecoration,
+                      }}
+                    >
+                      {swimlane.name}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Dependency Lines (SVG) */}
             <svg

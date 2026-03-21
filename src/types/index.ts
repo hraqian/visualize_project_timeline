@@ -185,6 +185,8 @@ export interface ProjectItem {
   isCriticalPath: boolean;
 }
 
+export type OutlineThickness = 'none' | 'thin' | 'medium' | 'thick';
+
 export interface Swimlane {
   id: string;
   name: string;
@@ -198,6 +200,15 @@ export interface Swimlane {
   titleFontWeight: number;
   titleFontStyle: 'normal' | 'italic';
   titleTextDecoration: 'none' | 'underline';
+  // Background: Header
+  headerColor: string;
+  headerTransparency: number; // 0-100
+  // Background: Body
+  bodyColor: string;
+  bodyTransparency: number; // 0-100
+  // Background: Outline
+  outlineThickness: OutlineThickness;
+  outlineColor: string;
 }
 
 export const DEFAULT_SWIMLANE_STYLE = {
@@ -207,6 +218,12 @@ export const DEFAULT_SWIMLANE_STYLE = {
   titleFontWeight: 600,
   titleFontStyle: 'normal' as const,
   titleTextDecoration: 'none' as const,
+  headerColor: '#6366f1',
+  headerTransparency: 0,
+  bodyColor: '#d1d5db',
+  bodyTransparency: 80,
+  outlineThickness: 'none' as OutlineThickness,
+  outlineColor: '#f59e0b',
 };
 
 export interface Dependency {

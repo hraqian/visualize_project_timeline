@@ -23,10 +23,10 @@ import { getDefaultTimescale, computeCriticalPath, shiftDependents } from '@/uti
 
 function createSampleData(): Pick<ProjectState, 'items' | 'swimlanes' | 'dependencies'> {
   const swimlanes: Swimlane[] = [
-    { id: 's1', name: 'Planning', color: '#6366f1', order: 0, collapsed: false, ...DEFAULT_SWIMLANE_STYLE },
-    { id: 's2', name: 'Design', color: '#8b5cf6', order: 1, collapsed: false, ...DEFAULT_SWIMLANE_STYLE },
-    { id: 's3', name: 'Development', color: '#3b82f6', order: 2, collapsed: false, ...DEFAULT_SWIMLANE_STYLE },
-    { id: 's4', name: 'Testing & Launch', color: '#22c55e', order: 3, collapsed: false, ...DEFAULT_SWIMLANE_STYLE },
+    { id: 's1', name: 'Planning', color: '#6366f1', order: 0, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#6366f1' },
+    { id: 's2', name: 'Design', color: '#8b5cf6', order: 1, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#8b5cf6' },
+    { id: 's3', name: 'Development', color: '#3b82f6', order: 2, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#3b82f6' },
+    { id: 's4', name: 'Testing & Launch', color: '#22c55e', order: 3, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#22c55e' },
   ];
 
   const items: ProjectItem[] = [
@@ -439,16 +439,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const state = get();
     const maxOrder = Math.max(...state.swimlanes.map((s) => s.order), -1);
     const colors = ['#6366f1', '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
+    const chosenColor = colors[state.swimlanes.length % colors.length];
     set((st) => ({
       swimlanes: [
         ...st.swimlanes,
         {
           id: uuid(),
           name,
-          color: colors[st.swimlanes.length % colors.length],
+          color: chosenColor,
           order: maxOrder + 1,
           collapsed: false,
           ...DEFAULT_SWIMLANE_STYLE,
+          headerColor: chosenColor,
         },
       ],
     }));
@@ -460,13 +462,15 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const refIndex = sorted.findIndex((s) => s.id === referenceId);
     if (refIndex === -1) return;
     const colors = ['#6366f1', '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
+    const chosenColor = colors[state.swimlanes.length % colors.length];
     const newSwimlane: Swimlane = {
       id: uuid(),
       name: 'New Swimlane',
-      color: colors[state.swimlanes.length % colors.length],
+      color: chosenColor,
       order: 0,
       collapsed: false,
       ...DEFAULT_SWIMLANE_STYLE,
+      headerColor: chosenColor,
     };
     const insertIndex = position === 'above' ? refIndex : refIndex + 1;
     sorted.splice(insertIndex, 0, newSwimlane);
@@ -483,9 +487,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const sourceIndex = sorted.findIndex((s) => s.id === id);
     const newSwimlaneId = uuid();
     const newSwimlane: Swimlane = {
+      ...source,
       id: newSwimlaneId,
       name: `${source.name} (copy)`,
-      color: source.color,
       order: 0,
       collapsed: false,
     };
