@@ -2128,6 +2128,8 @@ function ApplyToAllBox({
   onApply,
   excludeSwimlanes,
   setExcludeSwimlanes,
+  onlyInSwimlane,
+  setOnlyInSwimlane,
   applied,
   label = 'Apply to all tasks',
 }: {
@@ -2135,6 +2137,8 @@ function ApplyToAllBox({
   onApply: () => void;
   excludeSwimlanes?: boolean;
   setExcludeSwimlanes?: (v: boolean) => void;
+  onlyInSwimlane?: boolean;
+  setOnlyInSwimlane?: (v: boolean) => void;
   applied: boolean;
   label?: string;
 }) {
@@ -2207,6 +2211,19 @@ function ApplyToAllBox({
                 />
                 <span>Exclude swimlanes</span>
                 <span title="Exclude items placed inside swimlanes">
+                  <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
+                </span>
+              </label>
+            ) : setOnlyInSwimlane != null ? (
+              <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={onlyInSwimlane ?? false}
+                  onChange={(e) => setOnlyInSwimlane(e.target.checked)}
+                  className="accent-indigo-500"
+                />
+                <span>Only in this swimlane</span>
+                <span title="Only apply to items in the same swimlane">
                   <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
                 </span>
               </label>
@@ -2576,6 +2593,9 @@ function MilestoneShapeApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [onlyInSwimlane, setOnlyInSwimlane] = useState(false);
+  const isInSwimlane = item.swimlaneId !== null;
+
   const [applyProps, setApplyProps] = useState({
     color: true,
     icon: true,
@@ -2585,10 +2605,15 @@ function MilestoneShapeApplyToAll({ item }: { item: ItemType }) {
 
   const handleApply = () => {
     const keys = Object.entries(applyProps)
-      .filter(([, v]) => v)
+      .filter(([k, v]) => {
+        if (!v) return false;
+        // Position card only exists for independent milestones
+        if (k === 'position' && isInSwimlane) return false;
+        return true;
+      })
       .map(([k]) => k);
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
@@ -2596,7 +2621,14 @@ function MilestoneShapeApplyToAll({ item }: { item: ItemType }) {
   const style = item.milestoneStyle;
 
   return (
-    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied} label="Apply to all milestones">
+    <ApplyToAllBox
+      onApply={handleApply}
+      applied={applied}
+      label="Apply to all milestones"
+      {...(isInSwimlane
+        ? { onlyInSwimlane, setOnlyInSwimlane }
+        : { excludeSwimlanes, setExcludeSwimlanes })}
+    >
       <PropertyCard label="Color" checked={applyProps.color} onChange={(v) => setApplyProps((p) => ({ ...p, color: v }))}>
         <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: style.color }} />
       </PropertyCard>
@@ -2606,9 +2638,11 @@ function MilestoneShapeApplyToAll({ item }: { item: ItemType }) {
       <PropertyCard label="Size" checked={applyProps.size} onChange={(v) => setApplyProps((p) => ({ ...p, size: v }))}>
         <SizeIcon />
       </PropertyCard>
-      <PropertyCard label="Position" checked={applyProps.position} onChange={(v) => setApplyProps((p) => ({ ...p, position: v }))}>
-        <PositionIcon5Dot />
-      </PropertyCard>
+      {!isInSwimlane && (
+        <PropertyCard label="Position" checked={applyProps.position} onChange={(v) => setApplyProps((p) => ({ ...p, position: v }))}>
+          <PositionIcon5Dot />
+        </PropertyCard>
+      )}
     </ApplyToAllBox>
   );
 }
@@ -2619,10 +2653,14 @@ function MilestoneTitleApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [onlyInSwimlane, setOnlyInSwimlane] = useState(false);
+  const isInSwimlane = item.swimlaneId !== null;
+
   const [applyProps, setApplyProps] = useState({
     showTitle: true,
     fontColor: true,
     text: true,
+    labelPosition: true,
   });
 
   const handleApply = () => {
@@ -2630,8 +2668,10 @@ function MilestoneTitleApplyToAll({ item }: { item: ItemType }) {
     if (applyProps.showTitle) keys.push('showTitle');
     if (applyProps.fontColor) keys.push('fontColor');
     if (applyProps.text) keys.push('fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'textDecoration');
+    // Position card only exists for swimlaned milestones
+    if (applyProps.labelPosition && isInSwimlane) keys.push('labelPosition', 'textAlign');
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
@@ -2639,7 +2679,14 @@ function MilestoneTitleApplyToAll({ item }: { item: ItemType }) {
   const style = item.milestoneStyle;
 
   return (
-    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied} label="Apply to all milestones">
+    <ApplyToAllBox
+      onApply={handleApply}
+      applied={applied}
+      label="Apply to all milestones"
+      {...(isInSwimlane
+        ? { onlyInSwimlane, setOnlyInSwimlane }
+        : { excludeSwimlanes, setExcludeSwimlanes })}
+    >
       <PropertyCard label="Show" checked={applyProps.showTitle} onChange={(v) => setApplyProps((p) => ({ ...p, showTitle: v }))}>
         <ShowIcon />
       </PropertyCard>
@@ -2649,6 +2696,11 @@ function MilestoneTitleApplyToAll({ item }: { item: ItemType }) {
       <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
         <TextIcon />
       </PropertyCard>
+      {isInSwimlane && (
+        <PropertyCard label="Position" checked={applyProps.labelPosition} onChange={(v) => setApplyProps((p) => ({ ...p, labelPosition: v }))}>
+          <PositionIcon5Dot />
+        </PropertyCard>
+      )}
     </ApplyToAllBox>
   );
 }
@@ -2659,11 +2711,15 @@ function MilestoneDateApplyToAll({ item }: { item: ItemType }) {
   const applyPartialStyleToAll = useProjectStore((s) => s.applyPartialStyleToAll);
   const [applied, setApplied] = useState(false);
   const [excludeSwimlanes, setExcludeSwimlanes] = useState(false);
+  const [onlyInSwimlane, setOnlyInSwimlane] = useState(false);
+  const isInSwimlane = item.swimlaneId !== null;
+
   const [applyProps, setApplyProps] = useState({
     showDate: true,
     dateFontColor: true,
     text: true,
     dateFormat: true,
+    dateLabelPosition: true,
   });
 
   const handleApply = () => {
@@ -2672,8 +2728,10 @@ function MilestoneDateApplyToAll({ item }: { item: ItemType }) {
     if (applyProps.dateFontColor) keys.push('dateFontColor');
     if (applyProps.text) keys.push('dateFontFamily', 'dateFontSize', 'dateFontWeight', 'dateFontStyle', 'dateTextDecoration');
     if (applyProps.dateFormat) keys.push('dateFormat');
+    // Position card only exists for swimlaned milestones
+    if (applyProps.dateLabelPosition && isInSwimlane) keys.push('dateLabelPosition', 'dateTextAlign');
     if (keys.length === 0) return;
-    applyPartialStyleToAll(item.id, keys, excludeSwimlanes);
+    applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
     setTimeout(() => setApplied(false), 1200);
   };
@@ -2681,7 +2739,14 @@ function MilestoneDateApplyToAll({ item }: { item: ItemType }) {
   const style = item.milestoneStyle;
 
   return (
-    <ApplyToAllBox onApply={handleApply} excludeSwimlanes={excludeSwimlanes} setExcludeSwimlanes={setExcludeSwimlanes} applied={applied} label="Apply to all milestones">
+    <ApplyToAllBox
+      onApply={handleApply}
+      applied={applied}
+      label="Apply to all milestones"
+      {...(isInSwimlane
+        ? { onlyInSwimlane, setOnlyInSwimlane }
+        : { excludeSwimlanes, setExcludeSwimlanes })}
+    >
       <PropertyCard label="Show" checked={applyProps.showDate} onChange={(v) => setApplyProps((p) => ({ ...p, showDate: v }))}>
         <ShowIcon />
       </PropertyCard>
@@ -2694,6 +2759,11 @@ function MilestoneDateApplyToAll({ item }: { item: ItemType }) {
       <PropertyCard label="Format" checked={applyProps.dateFormat} onChange={(v) => setApplyProps((p) => ({ ...p, dateFormat: v }))}>
         <FormatIcon />
       </PropertyCard>
+      {isInSwimlane && (
+        <PropertyCard label="Position" checked={applyProps.dateLabelPosition} onChange={(v) => setApplyProps((p) => ({ ...p, dateLabelPosition: v }))}>
+          <PositionIcon5Dot />
+        </PropertyCard>
+      )}
     </ApplyToAllBox>
   );
 }
