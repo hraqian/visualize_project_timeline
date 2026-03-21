@@ -104,10 +104,10 @@ export function TimelineView() {
     const padStart = startOfMonth(subDays(parseISO(range.start), 14));
     const rawEnd = addDays(parseISO(range.end), 30);
     // Round up to a whole number of months from padStart
-    const monthsNeeded = differenceInCalendarMonths(rawEnd, padStart) + 1;
-    const padEnd = endOfMonth(addMonths(padStart, monthsNeeded - 1));
-    const total = differenceInDays(padEnd, padStart) + 1;
-    return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: padEnd };
+    const numMonths = differenceInCalendarMonths(rawEnd, padStart) + 1;
+    const padEnd = addMonths(padStart, numMonths); // start of the month AFTER the last visible month
+    const total = differenceInDays(padEnd, padStart);
+    return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: subDays(padEnd, 1) };
   }, [items]);
 
   const totalWidth = totalDays * zoom;

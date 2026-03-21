@@ -2161,12 +2161,13 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     const padStart = startOfMonth(subDays(parseISO(range.start), 14));
     const rawEnd = addDays(parseISO(range.end), 30);
     // Round up to a whole number of months from padStart
-    const monthsNeeded = differenceInCalendarMonths(rawEnd, padStart) + 1;
-    const padEnd = endOfMonth(addMonths(padStart, monthsNeeded - 1));
-    const days = differenceInDays(padEnd, padStart) + 1;
+    const numMonths = differenceInCalendarMonths(rawEnd, padStart) + 1;
+    const padEnd = addMonths(padStart, numMonths); // start of the month AFTER the last visible month
+    const days = differenceInDays(padEnd, padStart);
     const sy = padStart.getFullYear();
-    const ey = padEnd.getFullYear() + (padEnd.getMonth() > 0 || padEnd.getDate() > 1 ? 1 : 0);
-    return { origin: padStart.toISOString().split('T')[0], totalDays: days, rangeEndDate: padEnd, startYear: sy, endYear: ey };
+    const lastVisibleMonth = subDays(padEnd, 1);
+    const ey = lastVisibleMonth.getFullYear() + (lastVisibleMonth.getMonth() > 0 || lastVisibleMonth.getDate() > 1 ? 1 : 0);
+    return { origin: padStart.toISOString().split('T')[0], totalDays: days, rangeEndDate: lastVisibleMonth, startYear: sy, endYear: ey };
   }, [items]);
 
   // Today position as fraction (0-1)
