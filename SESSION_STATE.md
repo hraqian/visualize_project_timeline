@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 20, 2026 (session 8)
+> **Last updated**: March 21, 2026 (session 10 — SESSION_STATE refresh)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -49,19 +49,19 @@ src/
 ├── index.css                            # CSS variables (light-only), Tailwind directives
 ├── main.tsx                             # Entry point
 ├── types/
-│   └── index.ts                         # All TypeScript types, interfaces, constants (~335 lines)
+│   └── index.ts                         # All TypeScript types, interfaces, constants (434 lines)
 ├── store/
-│   └── useProjectStore.ts               # Zustand store — all state + actions (757 lines)
+│   └── useProjectStore.ts               # Zustand store — all state + actions (811 lines)
 ├── utils/
-│   └── index.ts                         # Utility functions (timescale, critical path, project range)
+│   └── index.ts                         # Utility functions: timescale generation, buildVisibleTierCells, resolveAutoUnit, critical path, project range (427 lines)
 ├── components/
 │   ├── DataView/
 │   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups (1509 lines)
 │   │   └── TypePicker.tsx               # Type column cell + popover (shape/color picker)
 │   ├── TimelineView/
-│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, vertical connectors (~898 lines)
+│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, timescale header (1209 lines)
 │   ├── StylePane/
-│   │   └── StylePane.tsx                # Per-item style editor — heavily extended (~2200+ lines)
+│   │   └── StylePane.tsx                # Per-item style editor + TierSettingsModal (3496 lines)
 │   └── common/
 │       ├── MilestoneIconComponent.tsx   # Renders milestone icons using Lucide
 │       ├── AdvancedColorPicker.tsx      # Full Office-style color picker with theme/standard/recent colors
@@ -80,7 +80,8 @@ type ItemType = 'task' | 'milestone';
 type ActiveView = 'data' | 'timeline';
 type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector'
   | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector'
-  | 'swimlaneTitle' | 'swimlaneBackground' | 'swimlaneSpacing';
+  | 'swimlaneTitle' | 'swimlaneBackground' | 'swimlaneSpacing'
+  | 'scale' | 'todayMarker' | 'elapsedTime' | 'leftEndCap' | 'rightEndCap';
 
 type BarShape = 'rounded' | 'square' | 'flat' | 'capsule' | 'chevron' | 'double-chevron'
   | 'arrow-right' | 'pointed' | 'notched' | 'tab' | 'arrow-both' | 'trapezoid'; // 12 variants
@@ -190,18 +191,51 @@ interface ProjectState {
   columnVisibility: ColumnVisibility;
   checkedItemIds: string[];   // multi-select tracking
   timescale: TimescaleConfig;
+  swimlaneSpacing: number;    // global, 0-40, default 5
   activeView: ActiveView;
   selectedItemId: string | null;
   selectedSwimlaneId: string | null;  // mutual exclusion with selectedItemId
   stylePaneSection: StylePaneSection | null; // which section expanded in StylePane
   showCriticalPath: boolean; zoom: number;
 }
+
+// ─── Timescale Types ───────────────────────────────────────────────────────
+type TimescaleTier = 'auto' | 'year' | 'quarter' | 'month' | 'week' | 'day';
+
+type YearFormat = 'yyyy' | 'yy';                                           // 2020 | 20
+type QuarterFormat = 'Qq yyyy' | 'Qq';                                     // Q1 2020 | Q1
+type MonthFormat = 'MMM' | 'MMMM' | 'M_letter' | 'MM' | 'M_num';         // Jul | July | J | 07 | 7
+type WeekFormat = 'w_num' | 'Ww';                                          // 1 | Week 1
+type DayFormat = 'd_num' | 'EEE' | 'EEEE' | 'dd' | 'MM/dd';              // 1 | Mon | Monday | 01 | 03/20
+type TierFormat = YearFormat | QuarterFormat | MonthFormat | WeekFormat | DayFormat;
+
+interface TimescaleTierConfig {
+  unit: TimescaleTier;
+  format: TierFormat;
+  visible: boolean;
+  backgroundColor: string;
+  fontColor: string;
+  fontSize: number;
+  fontFamily: string;
+  fontWeight: number;                   // 400 | 700
+  fontStyle: 'normal' | 'italic';
+  textDecoration: 'none' | 'underline';
+  textAlign: 'left' | 'center' | 'right';
+  separators: boolean;
+}
+
+interface TimescaleConfig {
+  tiers: TimescaleTierConfig[];
+  fiscalYearStartMonth: number; // 1-12
+  showToday: boolean;
+  todayColor: string;
+}
 ```
 
 ### Store Actions (`src/store/useProjectStore.ts`)
 - **Global**: `setActiveView`, `setSelectedItem`, `setSelectedSwimlane`, `setStylePaneSection`, `setZoom`, `setProjectName`, `setTimelineTitle`
 - **Items**: `addItem`, `addItemRelative`, `duplicateItem`, `updateItem`, `deleteItem`, `toggleVisibility`, `toggleItemType`, `moveItem`, `resizeItem`, `setItemRow`, `reorderItem`, `moveItemToSwimlane`, `moveItemToGroup`
-- **Swimlanes**: `addSwimlane`, `addSwimlaneRelative`, `duplicateSwimlane`, `hideSwimlaneItems`, `updateSwimlane`, `applySwimlaneStyleToAll`, `deleteSwimlane`, `reorderSwimlane`
+- **Swimlanes**: `addSwimlane`, `addSwimlaneRelative`, `duplicateSwimlane`, `hideSwimlaneItems`, `updateSwimlane`, `applySwimlaneStyleToAll`, `deleteSwimlane`, `reorderSwimlane`, `setSwimlaneSpacing`
 - **Dependencies**: `addDependency`, `removeDependency`
 - **Styles**: `updateTaskStyle`, `updateMilestoneStyle`, `applyStyleToAll`, `applyPartialStyleToAll`, `applyTaskBarStyleToAll`
 - **Status**: `addStatusLabel`, `updateStatusLabel`, `removeStatusLabel`
@@ -215,7 +249,7 @@ interface ProjectState {
 - **4 swimlanes**: Planning, Development, Testing, Deployment
 - **12 items** (i1-i12): mix of tasks and milestones with various status IDs
 - **12 dependencies**: forming a realistic project dependency chain
-- Default zoom: 8, default timescale: months + quarters
+- Default zoom: 8, default timescale: year (#1e293b) + month (#334155) via `getDefaultTimescale()`
 
 ---
 
@@ -248,6 +282,17 @@ interface ProjectState {
 | 4 | Task duration | Yes | Yes | OFF | COMPLETED |
 | 5 | Task % complete | Yes | Yes | OFF | COMPLETED |
 | 6 | Vertical connector | Yes | Yes | OFF | COMPLETED |
+
+- Timescale tab (`TimescaleTabContent`) has:
+
+| # | Section | Type | Toggle | Status |
+|---|---------|------|--------|--------|
+| — | Tier settings button | Button → opens TierSettingsModal | — | COMPLETED (modal + preview) |
+| 1 | Scale | CollapsibleRow | No | PLACEHOLDER (local state, not wired to store) |
+| 2 | Today marker | CollapsibleRow | Yes (`showToday`) | PLACEHOLDER (toggle wired, content coming soon) |
+| 3 | Elapsed time | CollapsibleRow | Yes (hardcoded on) | PLACEHOLDER (toggle not wired) |
+| 4 | Left end cap | CollapsibleRow | Yes (hardcoded on) | PLACEHOLDER (toggle not wired) |
+| 5 | Right end cap | CollapsibleRow | Yes (hardcoded on) | PLACEHOLDER (toggle not wired) |
 
 ---
 
@@ -528,15 +573,62 @@ Contains:
 - **OutlineThicknessDropdown**: select with None/Thin/Medium/Thick options
 - **OUTLINE_THICKNESS_MAP**: `{ none: 0, thin: 1, medium: 2, thick: 3 }`
 
+### Phase 11 — Timescale Tab + Tier Settings Modal (session 9)
+- **Timescale tab layout** (`TimescaleTabContent`):
+  - Tier settings button → opens `TierSettingsModal`
+  - Scale section (CollapsibleRow, placeholder — local state only)
+  - Today marker (CollapsibleRow with toggle wired to `timescale.showToday`)
+  - Elapsed time, Left end cap, Right end cap (CollapsibleRow placeholders)
+- **Tier Settings Modal** (fully implemented):
+  - Full-screen overlay portal, max-width 1100px
+  - **Preview bar** at top with left/right end cap years, visible tier rows, today marker
+  - **3 columns** (Top/Middle/Bottom tier), each with: Show toggle, Units (type + format dropdowns), Separators checkbox, Color + Text (font family/size), B/I/U + alignment, Bar color
+  - Local draft state (3-tier array padded from store), Save writes to store, Cancel discards
+  - `DEFAULT_3_TIERS` fallbacks for missing tiers
+- **Timescale types extended**:
+  - `TimescaleTier` now includes `'auto'`
+  - `TierFormat` union type with per-unit format variants (YearFormat, QuarterFormat, MonthFormat, WeekFormat, DayFormat)
+  - `TimescaleTierConfig` has full styling: unit, format, visible, backgroundColor, fontColor, fontSize, fontFamily, fontWeight, fontStyle, textDecoration, textAlign, separators
+- **Shared `buildVisibleTierCells()` utility** (`src/utils/index.ts`):
+  - Used by both TimelineView and TierSettingsModal preview
+  - Takes raw labels, unit type, origin date, total days, bar width in pixels
+  - Computes skip factor from full interior cell (index 1) with min widths per unit
+  - Returns `TierCell[]` with `{ label, fraction, widthFrac }` in fractional coordinates
+  - Prefixes first visible label with "Week " or "Day " for sequential units
+- **`resolveAutoUnit(totalDays)`**: <30d → day, 30-180 → week, 180-730 → month, 730-1825 → quarter, 1825+ → year
+- **`generateTierLabels()`**: accepts optional 5th `fmt?: TierFormat` parameter; uses `formatTierLabel()` helper
+- **`getFormatOptionsForUnit()`** and **`getDefaultFormatForUnit()`**: helpers for dropdown population
+- **`getDefaultTimescale()`**: returns 2 tiers (year #1e293b + month #334155)
+- **Padded date range** (shared by TimelineView and modal):
+  - Start: `startOfMonth(subDays(projectStart, 14))`
+  - End: `addMonths(padStart, numMonths)` where numMonths = `differenceInCalendarMonths(endMonth, padStart) + 1`
+  - `rangeEndDate`: `subDays(padEnd, 1)` — prevents generating labels for month after
+  - `totalDays`: `differenceInDays(padEnd, padStart)`
+- **TimelineView timescale header**: uses `buildVisibleTierCells()`, renders tier rows with full styling (backgroundColor, fontColor, fontSize, fontFamily, fontWeight, fontStyle, textDecoration, separators as `border-l border-white/20`)
+- **Today marker** in TimelineView: vertical line + "Today" badge, controlled by `timescale.showToday` and `timescale.todayColor`
+- **All tier labels left-aligned** (separators mark beginning of period)
+- **Auto unit option** in tier dropdowns (Auto, Days, Weeks, Months, Quarters, Years)
+
 ---
 
 ## Known Pre-existing Build Errors
 
-`npx tsc --noEmit` passes clean as of session 6. No known type errors.
+`npx tsc --noEmit` passes clean as of session 6. There are 22 pre-existing `tsc -b` errors (unused vars, type mismatches in DataView, store type casts) — these are NOT from our changes.
 
 ---
 
 ## What's Next (TODO)
+
+### Timescale Tab — Scale Section
+1. Wire Scale section controls to the store (currently all local `useState` placeholders)
+   - Units (unit type + format) — should read/write to which tier? Or is this a "global" scale override? **Needs spec clarification**
+   - Separators, Color + Text, B/I/U + alignment, Bar style (color + shape)
+
+### Timescale Tab — Remaining Sections
+1. Today marker section content (toggle wired, needs: color picker, line style controls)
+2. Elapsed time section (toggle + controls — visual spec not fully defined yet)
+3. Left end cap section (controls — visual spec TBD, currently renders start year in modal preview)
+4. Right end cap section (controls — visual spec TBD, currently renders end year in modal preview)
 
 ### Swimlane Sections (remaining)
 1. Swimlane spacing section content (placeholder exists)
@@ -567,9 +659,17 @@ Contains:
 ## Important Implementation Notes
 
 - Recent colors in AdvancedColorPicker are stored at module level (persist across mounts but not page refreshes)
-- `applyPartialStyleToAll` works generically — copies any named keys from source item's taskStyle to all other tasks
+- `applyPartialStyleToAll` works generically — copies any named keys from source item's taskStyle to all other tasks. Supports 4th parameter `onlyInSwimlane?: boolean` to filter to same swimlane.
 - `applyTaskBarStyleToAll` accepts specific bar properties (shape, color, thickness, spacing) with excludeSwimlanes option
 - Duration is computed from startDate/endDate, not stored — there is no `duration` field on ProjectItem
 - `checkedItemIds: string[]` stored in Zustand for multi-select
 - `stylePaneSection` in Zustand controls which accordion section is expanded (only one at a time)
 - Show/hide toggles are in TaskStyle (persisted per item), toggled via CollapsibleRow's toggle prop
+- `swimlaneSpacing` is a **global** property on `ProjectState` (not per-swimlane), clamped 0-40, default 5
+- `ApplyToAllBox` supports optional `excludeSwimlanes`/`setExcludeSwimlanes` AND `onlyInSwimlane`/`setOnlyInSwimlane` props (mutually exclusive modes)
+- **CRITICAL**: `buildVisibleTierCells()` is the single source of truth for timescale cell layout — used by both TimelineView and TierSettingsModal preview. Changes to one must be reflected in the other.
+- **CRITICAL**: The padded date range must be computed identically in TimelineView and TierSettingsModal. Both use: `startOfMonth(subDays(projectStart, 14))` for start, `addMonths` for end.
+- `ScaleSection` in StylePane is currently **all local state** — none of its controls write to the store. This needs wiring.
+- The `Toggle` component is defined locally inside StylePane.tsx (~line 350)
+- `CollapsibleRow` supports optional `toggle` prop for show/hide switch
+- TierSettingsModal `DEFAULT_3_TIERS`: tier 0 = month/green (#6b7f5c), tier 1 = week/slate (hidden), tier 2 = day/slate (hidden)
