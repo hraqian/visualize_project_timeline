@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useMemo } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
-import { parseISO, differenceInDays, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
+import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, buildVisibleTierCells, getProjectRange, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
@@ -102,8 +102,11 @@ export function TimelineView() {
   const { origin, totalDays } = useMemo(() => {
     const range = getProjectRange(items);
     const padStart = startOfMonth(subDays(parseISO(range.start), 14));
-    const padEnd = endOfMonth(addDays(parseISO(range.end), 30));
-    const total = differenceInDays(padEnd, padStart);
+    const rawEnd = addDays(parseISO(range.end), 30);
+    // Round up to a whole number of months from padStart
+    const monthsNeeded = differenceInCalendarMonths(rawEnd, padStart) + 1;
+    const padEnd = endOfMonth(addMonths(padStart, monthsNeeded - 1));
+    const total = differenceInDays(padEnd, padStart) + 1;
     return { origin: padStart.toISOString().split('T')[0], totalDays: total };
   }, [items]);
 

@@ -34,7 +34,7 @@ import {
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { parseISO, differenceInDays, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { generateTierLabels, buildVisibleTierCells, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -2159,8 +2159,11 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   const { origin, totalDays, startYear, endYear } = useMemo(() => {
     const range = getProjectRange(items);
     const padStart = startOfMonth(subDays(parseISO(range.start), 14));
-    const padEnd = endOfMonth(addDays(parseISO(range.end), 30));
-    const days = differenceInDays(padEnd, padStart);
+    const rawEnd = addDays(parseISO(range.end), 30);
+    // Round up to a whole number of months from padStart
+    const monthsNeeded = differenceInCalendarMonths(rawEnd, padStart) + 1;
+    const padEnd = endOfMonth(addMonths(padStart, monthsNeeded - 1));
+    const days = differenceInDays(padEnd, padStart) + 1;
     const sy = padStart.getFullYear();
     const ey = padEnd.getFullYear() + (padEnd.getMonth() > 0 || padEnd.getDate() > 1 ? 1 : 0);
     return { origin: padStart.toISOString().split('T')[0], totalDays: days, startYear: sy, endYear: ey };
