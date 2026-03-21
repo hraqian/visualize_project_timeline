@@ -123,7 +123,12 @@ export function TimelineView() {
     if (!containerRef.current || totalDays <= 0) return;
     const containerWidth = containerRef.current.clientWidth;
     if (containerWidth <= 0) return;
-    const idealZoom = Math.round(containerWidth / totalDays);
+    // Reserve space for end cap labels so the bar + caps fit without scrolling
+    let reserved = 0;
+    if (timescale.leftEndCap?.show) reserved += (timescale.leftEndCap.fontSize ?? 16) * 3 + 12;
+    if (timescale.rightEndCap?.show) reserved += (timescale.rightEndCap.fontSize ?? 16) * 3 + 12;
+    const available = Math.max(containerWidth - reserved, totalDays * 2);
+    const idealZoom = Math.floor(available / totalDays);
     setZoom(Math.max(2, Math.min(30, idealZoom)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
