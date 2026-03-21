@@ -157,7 +157,7 @@ interface ProjectActions {
   setTimelineTitle: (title: string) => void;
 
   // Items
-  addItem: (item: Partial<ProjectItem> & { name: string; type: ItemType; swimlaneId?: string | null }) => void;
+  addItem: (item: Partial<ProjectItem> & { name: string; type: ItemType; swimlaneId?: string | null }) => string;
   addItemRelative: (referenceId: string, position: 'above' | 'below') => void;
   duplicateItem: (id: string) => void;
   updateItem: (id: string, updates: Partial<ProjectItem>) => void;
@@ -353,6 +353,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       isCriticalPath: false,
     };
     set((state) => ({ items: [...state.items, newItem] }));
+    return newItem.id;
   },
 
   addItemRelative: (referenceId, position) => {

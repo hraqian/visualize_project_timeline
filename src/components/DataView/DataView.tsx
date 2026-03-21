@@ -139,6 +139,9 @@ export function DataView() {
   const [dragSwimId, setDragSwimId] = useState<string | null>(null);
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
 
+  // Auto-focus the name input of a newly added item
+  const [focusItemId, setFocusItemId] = useState<string | null>(null);
+
   // Global item drag state (lifted from per-group to support cross-group dragging)
   const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ swimlaneId: string | null; index: number } | null>(null);
@@ -226,21 +229,23 @@ export function DataView() {
 
   const handleAddItemToSwimlane = (swimlaneId: string, type: ItemType) => {
     const today = new Date().toISOString().split('T')[0];
-    addItem({
+    const id = addItem({
       name: type === 'task' ? 'New Task' : 'New Milestone',
       type,
       swimlaneId,
       startDate: today,
     });
+    setFocusItemId(id);
   };
 
   const handleAddIndependentItem = (type: ItemType) => {
     const today = new Date().toISOString().split('T')[0];
-    addItem({
+    const id = addItem({
       name: type === 'task' ? 'New Task' : 'New Milestone',
       type,
       startDate: today,
     });
+    setFocusItemId(id);
   };
 
   const handleAddSwimlane = () => {
@@ -326,6 +331,8 @@ export function DataView() {
               onAddItemRelative={addItemRelative}
               onDuplicateItem={duplicateItem}
               onToggleVisibility={toggleVisibility}
+              focusItemId={focusItemId}
+              onClearFocusItemId={() => setFocusItemId(null)}
               dragItemId={dragItemId}
               dropTarget={dropTarget}
               onItemDragStart={(id) => setDragItemId(id)}
@@ -381,6 +388,8 @@ export function DataView() {
                     deleteSwimlane(swimlane.id);
                   }}
                    onHideSwimlaneItems={() => hideSwimlaneItems(swimlane.id)}
+                   focusItemId={focusItemId}
+                   onClearFocusItemId={() => setFocusItemId(null)}
                    dragItemId={dragItemId}
                    dropTarget={dropTarget}
                    onItemDragStart={(id) => setDragItemId(id)}
@@ -694,6 +703,8 @@ interface IndependentItemsGroupProps {
   onAddItemRelative: (referenceId: string, position: 'above' | 'below') => void;
   onDuplicateItem: (id: string) => void;
   onToggleVisibility: (id: string) => void;
+  focusItemId: string | null;
+  onClearFocusItemId: () => void;
   // Global drag state
   dragItemId: string | null;
   dropTarget: { swimlaneId: string | null; index: number } | null;
@@ -723,6 +734,8 @@ function IndependentItemsGroup({
   onAddItemRelative,
   onDuplicateItem,
   onToggleVisibility,
+  focusItemId,
+  onClearFocusItemId,
   dragItemId,
   dropTarget,
   onItemDragStart,
@@ -769,6 +782,8 @@ function IndependentItemsGroup({
           onAddItemRelative={onAddItemRelative}
           onDuplicateItem={onDuplicateItem}
           onToggleVisibility={onToggleVisibility}
+          shouldFocus={focusItemId === item.id}
+          onClearFocus={onClearFocusItemId}
           isItemDragging={dragItemId === item.id}
           isItemDropTarget={dropTarget?.swimlaneId === null && dropTarget?.index === idx}
           onItemDragStart={() => onItemDragStart(item.id)}
@@ -831,6 +846,8 @@ interface SwimlaneGroupProps {
   onDuplicateSwimlane: () => void;
   onDeleteSwimlane: () => void;
   onHideSwimlaneItems: () => void;
+  focusItemId: string | null;
+  onClearFocusItemId: () => void;
   // Global item drag state
   dragItemId: string | null;
   dropTarget: { swimlaneId: string | null; index: number } | null;
@@ -875,6 +892,8 @@ function SwimlaneGroup({
   onDuplicateSwimlane,
   onDeleteSwimlane,
   onHideSwimlaneItems,
+  focusItemId,
+  onClearFocusItemId,
   dragItemId,
   dropTarget,
   onItemDragStart,
@@ -1009,6 +1028,8 @@ function SwimlaneGroup({
             onAddItemRelative={onAddItemRelative}
             onDuplicateItem={onDuplicateItem}
             onToggleVisibility={onToggleVisibility}
+            shouldFocus={focusItemId === item.id}
+            onClearFocus={onClearFocusItemId}
             isItemDragging={dragItemId === item.id}
             isItemDropTarget={dropTarget?.swimlaneId === swimlane.id && dropTarget?.index === idx}
             onItemDragStart={() => onItemDragStart(item.id)}
@@ -1055,6 +1076,8 @@ interface ItemRowProps {
   onAddItemRelative: (referenceId: string, position: 'above' | 'below') => void;
   onDuplicateItem: (id: string) => void;
   onToggleVisibility: (id: string) => void;
+  shouldFocus: boolean;
+  onClearFocus: () => void;
   isItemDragging: boolean;
   isItemDropTarget: boolean;
   onItemDragStart: () => void;
@@ -1082,6 +1105,8 @@ function ItemRow({
   onAddItemRelative,
   onDuplicateItem,
   onToggleVisibility,
+  shouldFocus,
+  onClearFocus,
   isItemDragging,
   isItemDropTarget,
   onItemDragStart,
@@ -1100,6 +1125,15 @@ function ItemRow({
 
   const startDateRef = useRef<HTMLInputElement>(null);
   const endDateRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (shouldFocus && nameRef.current) {
+      nameRef.current.focus();
+      nameRef.current.select();
+      onClearFocus();
+    }
+  }, [shouldFocus, onClearFocus]);
 
   return (
     <>
@@ -1146,6 +1180,7 @@ function ItemRow({
       {/* Title */}
       <td className="px-4 py-2">
         <input
+          ref={nameRef}
           className="w-full bg-transparent border-none outline-none text-xs text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-indigo-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
           value={item.name}
           onChange={(e) => onUpdateItem(item.id, { name: e.target.value })}
