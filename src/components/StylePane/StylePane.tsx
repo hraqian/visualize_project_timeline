@@ -33,6 +33,7 @@ import {
   type TimescaleBarShape,
   type TierFormat,
   type TodayMarkerPosition,
+  type ElapsedTimeThickness,
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -1899,9 +1900,9 @@ function TimescaleTabContent({
           label="Elapsed time"
           expanded={stylePaneSection === 'elapsedTime'}
           onToggleExpand={() => handleToggleExpand('elapsedTime')}
-          toggle={{ checked: true, onChange: () => {} }}
+          toggle={{ checked: timescale.showElapsedTime ?? false, onChange: (v) => updateTimescale({ showElapsedTime: v }) }}
         >
-          <p className="text-xs text-[var(--color-text-muted)]">Elapsed time controls coming soon.</p>
+          <ElapsedTimeSection />
         </CollapsibleRow>
 
         {/* Left end cap */}
@@ -1975,6 +1976,115 @@ function TodayMarkerSection() {
           {/* Above timescale */}
           <button
             onClick={() => updateTimescale({ todayPosition: 'above' })}
+            className={`flex items-center justify-center w-9 h-9 rounded border transition-colors ${
+              position === 'above'
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5'
+                : 'border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Above timescale"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="11" width="12" height="3" rx="0.5" fill={position === 'above' ? '#6366f1' : '#94a3b8'} opacity="0.5" />
+              <line x1="8" y1="11" x2="8" y2="2" stroke={position === 'above' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" />
+              <path d="M5.5 4.5L8 2L10.5 4.5" stroke={position === 'above' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {/* Auto-adjust button */}
+          <button
+            onClick={() => updateTimescale({ todayAutoAdjusted: true })}
+            disabled={autoAdjusted}
+            className={`ml-1 px-3 h-9 rounded border text-xs font-medium transition-colors ${
+              autoAdjusted
+                ? 'border-[var(--color-border)] text-[var(--color-text-muted)] bg-[var(--color-surface)]'
+                : 'border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+          >
+            {autoAdjusted ? 'Auto-adjusted' : 'Auto-adjust'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Elapsed Time Section ───────────────────────────────────────────────────
+
+const ELAPSED_THICKNESS_OPTIONS: { id: ElapsedTimeThickness; label: string }[] = [
+  { id: 'thin', label: 'Thin' },
+  { id: 'thick', label: 'Thick' },
+];
+
+function ElapsedTimeSection() {
+  const timescale = useProjectStore((s) => s.timescale);
+  const updateTimescale = useProjectStore((s) => s.updateTimescale);
+
+  const color = timescale.elapsedTimeColor ?? '#ef4444';
+  const thickness = timescale.elapsedTimeThickness ?? 'thin';
+  const position = timescale.todayPosition ?? 'below';
+  const autoAdjusted = timescale.todayAutoAdjusted ?? false;
+
+  const handlePositionChange = (pos: 'above' | 'below') => {
+    // Sync position with today marker
+    updateTimescale({ todayPosition: pos });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Row: Color + Thickness */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+            Color
+          </label>
+          <AdvancedColorPicker
+            value={color}
+            onChange={(elapsedTimeColor) => updateTimescale({ elapsedTimeColor })}
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+            Thickness
+          </label>
+          <div className="relative">
+            <select
+              value={thickness}
+              onChange={(e) => updateTimescale({ elapsedTimeThickness: e.target.value as ElapsedTimeThickness })}
+              className="w-full h-9 pl-3 pr-8 rounded border border-[var(--color-border)] bg-white text-sm text-[var(--color-text)] appearance-none cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
+            >
+              {ELAPSED_THICKNESS_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>{opt.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
+          </div>
+        </div>
+      </div>
+
+      {/* Position */}
+      <div>
+        <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+          Position
+        </label>
+        <div className="flex items-center gap-1">
+          {/* Below timescale */}
+          <button
+            onClick={() => handlePositionChange('below')}
+            className={`flex items-center justify-center w-9 h-9 rounded border transition-colors ${
+              position === 'below'
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5'
+                : 'border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Below timescale"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="2" width="12" height="3" rx="0.5" fill={position === 'below' ? '#6366f1' : '#94a3b8'} opacity="0.5" />
+              <line x1="8" y1="5" x2="8" y2="14" stroke={position === 'below' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" />
+              <path d="M5.5 11.5L8 14L10.5 11.5" stroke={position === 'below' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {/* Above timescale */}
+          <button
+            onClick={() => handlePositionChange('above')}
             className={`flex items-center justify-center w-9 h-9 rounded border transition-colors ${
               position === 'above'
                 ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/5'

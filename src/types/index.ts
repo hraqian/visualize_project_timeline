@@ -264,6 +264,8 @@ export type TimescaleBarShape = 'rectangle' | 'rounded' | 'leaf' | 'ellipse' | '
 
 export type TodayMarkerPosition = 'above' | 'below';
 
+export type ElapsedTimeThickness = 'thin' | 'thick';
+
 export interface TimescaleConfig {
   tiers: TimescaleTierConfig[];
   barShape: TimescaleBarShape;
@@ -272,6 +274,9 @@ export interface TimescaleConfig {
   todayColor: string;
   todayPosition: TodayMarkerPosition;
   todayAutoAdjusted: boolean; // true after user clicks Auto-adjust
+  showElapsedTime: boolean;
+  elapsedTimeColor: string;
+  elapsedTimeThickness: ElapsedTimeThickness;
 }
 
 // ─── App State ───────────────────────────────────────────────────────────────

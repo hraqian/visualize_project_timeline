@@ -467,7 +467,7 @@ export function TimelineView() {
 
            {/* Timescale Headers */}
            <div className="sticky top-0 z-10 relative" style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}>
-             <div className="border-b border-[var(--color-border)] overflow-hidden" style={getTimescaleBarShapeStyle(timescale.barShape)}>
+             <div className="border-b border-[var(--color-border)] overflow-hidden relative" style={getTimescaleBarShapeStyle(timescale.barShape)}>
               {tierLabels.map(({ tier, storeIndex, labels }, tierIdx) => {
                 const originDate = parseISO(origin);
                 const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
@@ -504,6 +504,19 @@ export function TimelineView() {
                   </div>
                 );
               })}
+
+              {/* Elapsed time bar — colored strip from left to today */}
+              {(timescale.showElapsedTime ?? false) && todayX > 0 && (
+                <div
+                  className="absolute left-0 pointer-events-none z-10"
+                  style={{
+                    width: Math.min(todayX, totalWidth),
+                    height: (timescale.elapsedTimeThickness ?? 'thin') === 'thick' ? 6 : 3,
+                    backgroundColor: timescale.elapsedTimeColor ?? '#ef4444',
+                    ...(todayPos === 'above' ? { bottom: 0 } : { top: 0 }),
+                  }}
+                />
+              )}
              </div>
 
               {/* Today label — positioned relative to timescale header */}

@@ -426,5 +426,8 @@ export function getDefaultTimescale(): TimescaleConfig {
     todayColor: '#ef4444',
     todayPosition: 'below',
     todayAutoAdjusted: false,
+    showElapsedTime: false,
+    elapsedTimeColor: '#ef4444',
+    elapsedTimeThickness: 'thin',
   };
 }
