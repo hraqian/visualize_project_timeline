@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 21, 2026 (session 12 — save/load, auto-focus, UX fixes)
+> **Last updated**: March 21, 2026 (session 13 — UX fixes, Apply to All swimlane-aware)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -51,16 +51,16 @@ src/
 ├── types/
 │   └── index.ts                         # All TypeScript types, interfaces, constants (projectId, lastModified, isDirty on ProjectState)
 ├── store/
-│   └── useProjectStore.ts               # Zustand store — all state + actions, wrapped set() for auto-dirty tracking, save/load/new project actions, addItem returns string
+│   └── useProjectStore.ts               # Zustand store — all state + actions, wrapped set() for auto-dirty tracking, save/load/new project actions, addItem/addSwimlane return string
 ├── utils/
 │   ├── index.ts                         # Utility functions: timescale generation, buildVisibleTierCells, resolveAutoUnit, critical path, project range
 │   └── storage.ts                       # localStorage save/load/delete/list utilities, ProjectIndexEntry type
 ├── components/
 │   ├── DataView/
-│   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups, focusItemId auto-focus
+│   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups, focusItemId + focusSwimlaneId auto-focus
 │   │   └── TypePicker.tsx               # Type column cell + popover (shape/color picker)
 │   ├── TimelineView/
-│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, timescale header, card container
+│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, timescale header, card container, auto-fit zoom
 │   ├── StylePane/
 │   │   └── StylePane.tsx                # Per-item style editor + TierSettingsModal
 │   └── common/
@@ -237,7 +237,7 @@ interface TimescaleConfig {
 ### Store Actions (`src/store/useProjectStore.ts`)
 - **Global**: `setActiveView`, `setSelectedItem`, `setSelectedSwimlane`, `setStylePaneSection`, `setZoom`, `setProjectName`, `setTimelineTitle`
 - **Items**: `addItem` (returns string ID), `addItemRelative`, `duplicateItem`, `updateItem`, `deleteItem`, `toggleVisibility`, `toggleItemType`, `moveItem`, `resizeItem`, `setItemRow`, `reorderItem`, `moveItemToSwimlane`, `moveItemToGroup`
-- **Swimlanes**: `addSwimlane`, `addSwimlaneRelative`, `duplicateSwimlane`, `hideSwimlaneItems`, `updateSwimlane`, `applySwimlaneStyleToAll`, `deleteSwimlane`, `reorderSwimlane`, `setSwimlaneSpacing`
+- **Swimlanes**: `addSwimlane` (returns string ID), `addSwimlaneRelative`, `duplicateSwimlane`, `hideSwimlaneItems`, `updateSwimlane`, `applySwimlaneStyleToAll`, `deleteSwimlane`, `reorderSwimlane`, `setSwimlaneSpacing`
 - **Dependencies**: `addDependency`, `removeDependency`
 - **Styles**: `updateTaskStyle`, `updateMilestoneStyle`, `applyStyleToAll`, `applyPartialStyleToAll`, `applyTaskBarStyleToAll`
 - **Status**: `addStatusLabel`, `updateStatusLabel`, `removeStatusLabel`
@@ -253,7 +253,7 @@ interface TimescaleConfig {
 - `createSampleData()` exists in store but is unused (dead code, kept for reference)
 - **Project Manager modal** shown on initial load (`showProjectManager: true`)
 - **Default view**: Data (not Timeline)
-- Default zoom: 8, default timescale: year (#1e293b) + month (#334155) via `getDefaultTimescale()`
+- Default zoom: 8, default timescale: single tier month (#334155) via `getDefaultTimescale()`
 
 ---
 
@@ -603,7 +603,7 @@ Contains:
 - **`resolveAutoUnit(totalDays)`**: <30d → day, 30-180 → week, 180-730 → month, 730-1825 → quarter, 1825+ → year
 - **`generateTierLabels()`**: accepts optional 5th `fmt?: TierFormat` parameter; uses `formatTierLabel()` helper
 - **`getFormatOptionsForUnit()`** and **`getDefaultFormatForUnit()`**: helpers for dropdown population
-- **`getDefaultTimescale()`**: returns 2 tiers (year #1e293b + month #334155)
+- **`getDefaultTimescale()`**: returns 1 tier (month #334155)
 - **Padded date range** (shared by TimelineView and modal):
   - Start: `startOfMonth(subDays(projectStart, 14))`
   - End: `addMonths(padStart, numMonths)` where numMonths = `differenceInCalendarMonths(endMonth, padStart) + 1`
@@ -662,11 +662,18 @@ Contains:
   - `focusItemId` state in DataView, threaded through IndependentItemsGroup/SwimlaneGroup to ItemRow
   - ItemRow uses `nameRef` + `useEffect` to focus and select text, then clears `focusItemId`
 
+### Phase 14 — UX Fixes + Apply to All Swimlane-Aware (session 13)
+- **Auto-focus swimlane name** (`75f7fe9`): `focusSwimlaneId` state in DataView, `shouldFocusName` prop on SwimlaneGroup triggers `editingName` state + `onFocus` selects text. `addSwimlane` now returns the new ID.
+- **Default timescale to single tier months** (`751a921`): `getDefaultTimescale()` changed from 2 tiers (year+month) to 1 tier (month only).
+- **Removed timeline title row** (`afc6b33`): Removed the "New Project" heading + Pencil edit from TimelineView. Cleaned up unused imports.
+- **Auto-fit zoom on mount** (`d4b3eaa` + `e8b2d36`): `useEffect` in TimelineView measures container width and sets `zoom = Math.round(containerWidth / totalDays)` clamped 2-30. Fixed missing `useEffect` import. Runs only on mount (`[]` deps).
+- **Apply to All: swimlane-aware for tasks** (`5320649`): All 6 task Apply components (TaskBarApplyToAll, TaskTitleApplyToAll, TaskDateApplyToAll, TaskDurationApplyToAll, TaskPctApplyToAll, ConnectorApplyToAll) now show "Only this swimlane" checkbox when the item is in a swimlane, and "Exclude swimlanes" when the item is independent. Matches existing milestone Apply to All pattern.
+
 ---
 
 ## Known Pre-existing Build Errors
 
-`npx tsc --noEmit` passes clean as of session 12.
+`npx tsc --noEmit` passes clean as of session 13.
 
 ---
 
@@ -721,6 +728,8 @@ All sections COMPLETED:
 - **Dirty tracking**: Store's `set()` is wrapped — any mutation of a key in `DIRTY_KEYS` automatically sets `isDirty: true`. No manual `isDirty: true` needed in actions.
 - **Save is manual only**: User clicks "Save" button; no auto-save. Banner shows unsaved/saved status.
 - **`addItem` returns `string`** (the new item's ID) — supports auto-focus after add
+- **`addSwimlane` returns `string`** (the new swimlane's ID) — supports auto-focus after add
+- **Apply to All swimlane-aware pattern**: Task Apply components check `isInSwimlane = item.swimlaneId !== null` and conditionally spread `{ onlyInSwimlane, setOnlyInSwimlane }` or `{ excludeSwimlanes, setExcludeSwimlanes }` to `ApplyToAllBox`. Same pattern used by milestone Apply components.
 - **CRITICAL**: `buildVisibleTierCells()` is the single source of truth for timescale cell layout — used by both TimelineView and TierSettingsModal preview. Changes to one must be reflected in the other.
 - **CRITICAL**: The padded date range must be computed identically in TimelineView and TierSettingsModal. Both use: `startOfMonth(subDays(projectStart, 14))` for start, `addMonths` for end.
 - `ScaleSection` in StylePane is **wired to the store** via `selectedTierIndex` — reads/writes selected tier's config
