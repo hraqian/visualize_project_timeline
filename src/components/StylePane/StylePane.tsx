@@ -34,6 +34,7 @@ import {
   type TierFormat,
   type TodayMarkerPosition,
   type ElapsedTimeThickness,
+  type EndCapConfig,
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -1910,9 +1911,9 @@ function TimescaleTabContent({
           label="Left end cap"
           expanded={stylePaneSection === 'leftEndCap'}
           onToggleExpand={() => handleToggleExpand('leftEndCap')}
-          toggle={{ checked: true, onChange: () => {} }}
+          toggle={{ checked: timescale.leftEndCap?.show ?? false, onChange: (v) => updateTimescale({ leftEndCap: { ...timescale.leftEndCap, show: v } }) }}
         >
-          <p className="text-xs text-[var(--color-text-muted)]">Left end cap controls coming soon.</p>
+          <EndCapSection side="left" />
         </CollapsibleRow>
 
         {/* Right end cap */}
@@ -1920,9 +1921,9 @@ function TimescaleTabContent({
           label="Right end cap"
           expanded={stylePaneSection === 'rightEndCap'}
           onToggleExpand={() => handleToggleExpand('rightEndCap')}
-          toggle={{ checked: true, onChange: () => {} }}
+          toggle={{ checked: timescale.rightEndCap?.show ?? false, onChange: (v) => updateTimescale({ rightEndCap: { ...timescale.rightEndCap, show: v } }) }}
         >
-          <p className="text-xs text-[var(--color-text-muted)]">Right end cap controls coming soon.</p>
+          <EndCapSection side="right" />
         </CollapsibleRow>
       </div>
     </div>
@@ -2111,6 +2112,95 @@ function ElapsedTimeSection() {
             {autoAdjusted ? 'Auto-adjusted' : 'Auto-adjust'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── End Cap Section (shared for left/right) ────────────────────────────────
+
+function EndCapSection({ side }: { side: 'left' | 'right' }) {
+  const timescale = useProjectStore((s) => s.timescale);
+  const updateTimescale = useProjectStore((s) => s.updateTimescale);
+
+  const cap = side === 'left' ? timescale.leftEndCap : timescale.rightEndCap;
+  const updateCap = (updates: Partial<EndCapConfig>) => {
+    if (side === 'left') {
+      updateTimescale({ leftEndCap: { ...timescale.leftEndCap, ...updates } });
+    } else {
+      updateTimescale({ rightEndCap: { ...timescale.rightEndCap, ...updates } });
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Row: Color + Font family + Font size */}
+      <div className="flex gap-3 items-end">
+        <div>
+          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+            Color
+          </label>
+          <AdvancedColorPicker
+            value={cap.fontColor}
+            onChange={(fontColor) => updateCap({ fontColor })}
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+            Text
+          </label>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <FontFamilyDropdown
+                value={cap.fontFamily}
+                onChange={(fontFamily) => updateCap({ fontFamily })}
+              />
+            </div>
+            <div className="w-16">
+              <FontSizeDropdown
+                value={cap.fontSize}
+                onChange={(fontSize) => updateCap({ fontSize })}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* B / I / U toggles */}
+      <div className="flex gap-1">
+        <button
+          onClick={() => updateCap({ fontWeight: cap.fontWeight >= 700 ? 400 : 700 })}
+          className={`w-8 h-8 flex items-center justify-center rounded text-sm font-bold transition-colors ${
+            cap.fontWeight >= 700
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+          }`}
+          title="Bold"
+        >
+          B
+        </button>
+        <button
+          onClick={() => updateCap({ fontStyle: cap.fontStyle === 'italic' ? 'normal' : 'italic' })}
+          className={`w-8 h-8 flex items-center justify-center rounded text-sm italic transition-colors ${
+            cap.fontStyle === 'italic'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+          }`}
+          title="Italic"
+        >
+          I
+        </button>
+        <button
+          onClick={() => updateCap({ textDecoration: cap.textDecoration === 'underline' ? 'none' : 'underline' })}
+          className={`w-8 h-8 flex items-center justify-center rounded text-sm underline transition-colors ${
+            cap.textDecoration === 'underline'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+          }`}
+          title="Underline"
+        >
+          U
+        </button>
       </div>
     </div>
   );

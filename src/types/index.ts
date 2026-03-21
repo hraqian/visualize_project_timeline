@@ -266,6 +266,16 @@ export type TodayMarkerPosition = 'above' | 'below';
 
 export type ElapsedTimeThickness = 'thin' | 'thick';
 
+export interface EndCapConfig {
+  show: boolean;
+  fontColor: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  fontStyle: 'normal' | 'italic';
+  textDecoration: 'none' | 'underline';
+}
+
 export interface TimescaleConfig {
   tiers: TimescaleTierConfig[];
   barShape: TimescaleBarShape;
@@ -277,6 +287,8 @@ export interface TimescaleConfig {
   showElapsedTime: boolean;
   elapsedTimeColor: string;
   elapsedTimeThickness: ElapsedTimeThickness;
+  leftEndCap: EndCapConfig;
+  rightEndCap: EndCapConfig;
 }
 
 // ─── App State ───────────────────────────────────────────────────────────────

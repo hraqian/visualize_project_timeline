@@ -429,5 +429,23 @@ export function getDefaultTimescale(): TimescaleConfig {
     showElapsedTime: false,
     elapsedTimeColor: '#ef4444',
     elapsedTimeThickness: 'thin',
+    leftEndCap: {
+      show: false,
+      fontColor: '#1e293b',
+      fontFamily: 'Arial',
+      fontSize: 16,
+      fontWeight: 700,
+      fontStyle: 'normal',
+      textDecoration: 'none',
+    },
+    rightEndCap: {
+      show: false,
+      fontColor: '#1e293b',
+      fontFamily: 'Arial',
+      fontSize: 16,
+      fontWeight: 700,
+      fontStyle: 'normal',
+      textDecoration: 'none',
+    },
   };
 }

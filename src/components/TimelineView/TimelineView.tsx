@@ -4,7 +4,7 @@ import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addD
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, buildVisibleTierCells, getProjectRange, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig } from '@/types';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -466,87 +466,123 @@ export function TimelineView() {
           )}
 
            {/* Timescale Headers */}
-           <div className="sticky top-0 z-10 relative" style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}>
-             <div className="border-b border-[var(--color-border)] overflow-hidden relative" style={getTimescaleBarShapeStyle(timescale.barShape)}>
-              {tierLabels.map(({ tier, storeIndex, labels }, tierIdx) => {
-                const originDate = parseISO(origin);
-                const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
-                const isSelected = selectedTierIndex === storeIndex;
-
-                return (
-                  <div
-                    key={tierIdx}
-                    className={`flex h-7 relative cursor-pointer transition-shadow ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
-                    style={{ backgroundColor: tier.backgroundColor }}
-                    onClick={() => { setSelectedTierIndex(storeIndex); setStylePaneSection('scale'); }}
-                  >
-                    {cells.map((cell, ci) => (
-                      <div
-                        key={ci}
-                        className={`flex items-center shrink-0 overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
-                        style={{
-                          position: 'absolute',
-                          left: cell.fraction * totalWidth,
-                          width: cell.widthFrac * totalWidth,
-                          height: 28,
-                          color: tier.fontColor,
-                          fontSize: tier.fontSize,
-                          fontFamily: tier.fontFamily,
-                          fontWeight: tier.fontWeight,
-                          fontStyle: tier.fontStyle,
-                          textDecoration: tier.textDecoration,
-                           justifyContent: 'flex-start',
-                        }}
-                      >
-                        <span className="truncate px-1">{cell.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-
-              {/* Elapsed time bar — colored strip from left to today */}
-              {(timescale.showElapsedTime ?? false) && todayX > 0 && (
+           <div className="sticky top-0 z-10 relative flex items-center" style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}>
+              {/* Left end cap */}
+              {timescale.leftEndCap?.show && (
                 <div
-                  className="absolute left-0 pointer-events-none z-10"
+                  className="shrink-0 pr-3 whitespace-nowrap"
                   style={{
-                    width: Math.min(todayX, totalWidth),
-                    height: (timescale.elapsedTimeThickness ?? 'thin') === 'thick' ? 6 : 3,
-                    backgroundColor: timescale.elapsedTimeColor ?? '#ef4444',
-                    ...(todayPos === 'above' ? { top: 0 } : { bottom: 0 }),
-                  }}
-                />
-              )}
-             </div>
-
-              {/* Today label — positioned relative to timescale header */}
-              {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
-                <div
-                  className="absolute pointer-events-none z-20"
-                  style={{
-                    left: todayX,
-                    transform: 'translateX(-50%)',
-                    ...(todayPos === 'above'
-                      ? { bottom: '100%' }
-                      : { top: '100%' }
-                    ),
+                    color: timescale.leftEndCap.fontColor,
+                    fontFamily: timescale.leftEndCap.fontFamily,
+                    fontSize: timescale.leftEndCap.fontSize,
+                    fontWeight: timescale.leftEndCap.fontWeight,
+                    fontStyle: timescale.leftEndCap.fontStyle,
+                    textDecoration: timescale.leftEndCap.textDecoration,
                   }}
                 >
-                  <div className="flex flex-col items-center">
-                    {todayPos === 'below' && (
-                      <svg width="10" height="6" viewBox="0 0 10 6">
-                        <path d="M5 0L0 6h10L5 0z" fill={timescale.todayColor} />
-                      </svg>
-                    )}
-                    <div className="border border-[var(--color-border)] bg-white rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text)] whitespace-nowrap leading-tight">
-                      Today
+                  {format(parseISO(origin), 'yyyy')}
+                </div>
+              )}
+
+              <div className="flex-1 relative">
+                <div className="border-b border-[var(--color-border)] overflow-hidden relative" style={getTimescaleBarShapeStyle(timescale.barShape)}>
+                  {tierLabels.map(({ tier, storeIndex, labels }, tierIdx) => {
+                    const originDate = parseISO(origin);
+                    const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
+                    const isSelected = selectedTierIndex === storeIndex;
+
+                    return (
+                      <div
+                        key={tierIdx}
+                        className={`flex h-7 relative cursor-pointer transition-shadow ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
+                        style={{ backgroundColor: tier.backgroundColor }}
+                        onClick={() => { setSelectedTierIndex(storeIndex); setStylePaneSection('scale'); }}
+                      >
+                        {cells.map((cell, ci) => (
+                          <div
+                            key={ci}
+                            className={`flex items-center shrink-0 overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
+                            style={{
+                              position: 'absolute',
+                              left: cell.fraction * totalWidth,
+                              width: cell.widthFrac * totalWidth,
+                              height: 28,
+                              color: tier.fontColor,
+                              fontSize: tier.fontSize,
+                              fontFamily: tier.fontFamily,
+                              fontWeight: tier.fontWeight,
+                              fontStyle: tier.fontStyle,
+                              textDecoration: tier.textDecoration,
+                              justifyContent: 'flex-start',
+                            }}
+                          >
+                            <span className="truncate px-1">{cell.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+
+                  {/* Elapsed time bar — colored strip from left to today */}
+                  {(timescale.showElapsedTime ?? false) && todayX > 0 && (
+                    <div
+                      className="absolute left-0 pointer-events-none z-10"
+                      style={{
+                        width: Math.min(todayX, totalWidth),
+                        height: (timescale.elapsedTimeThickness ?? 'thin') === 'thick' ? 6 : 3,
+                        backgroundColor: timescale.elapsedTimeColor ?? '#ef4444',
+                        ...(todayPos === 'above' ? { top: 0 } : { bottom: 0 }),
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Today label — positioned relative to timescale bar */}
+                {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
+                  <div
+                    className="absolute pointer-events-none z-20"
+                    style={{
+                      left: todayX,
+                      transform: 'translateX(-50%)',
+                      ...(todayPos === 'above'
+                        ? { bottom: '100%' }
+                        : { top: '100%' }
+                      ),
+                    }}
+                  >
+                    <div className="flex flex-col items-center">
+                      {todayPos === 'below' && (
+                        <svg width="10" height="6" viewBox="0 0 10 6">
+                          <path d="M5 0L0 6h10L5 0z" fill={timescale.todayColor} />
+                        </svg>
+                      )}
+                      <div className="border border-[var(--color-border)] bg-white rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text)] whitespace-nowrap leading-tight">
+                        Today
+                      </div>
+                      {todayPos === 'above' && (
+                        <svg width="10" height="6" viewBox="0 0 10 6">
+                          <path d="M5 6L0 0h10L5 6z" fill={timescale.todayColor} />
+                        </svg>
+                      )}
                     </div>
-                    {todayPos === 'above' && (
-                      <svg width="10" height="6" viewBox="0 0 10 6">
-                        <path d="M5 6L0 0h10L5 6z" fill={timescale.todayColor} />
-                      </svg>
-                    )}
                   </div>
+                )}
+              </div>
+
+              {/* Right end cap */}
+              {timescale.rightEndCap?.show && (
+                <div
+                  className="shrink-0 pl-3 whitespace-nowrap"
+                  style={{
+                    color: timescale.rightEndCap.fontColor,
+                    fontFamily: timescale.rightEndCap.fontFamily,
+                    fontSize: timescale.rightEndCap.fontSize,
+                    fontWeight: timescale.rightEndCap.fontWeight,
+                    fontStyle: timescale.rightEndCap.fontStyle,
+                    textDecoration: timescale.rightEndCap.textDecoration,
+                  }}
+                >
+                  {format(rangeEndDate, 'yyyy')}
                 </div>
               )}
            </div>
