@@ -15,6 +15,7 @@ import type {
   StatusLabel,
   OptionalColumn,
   StylePaneSection,
+  TaskLayout,
 } from '@/types';
 import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, shiftDependents } from '@/utils';
@@ -144,6 +145,7 @@ interface ProjectActions {
   setSelectedSwimlane: (id: string | null) => void;
   setStylePaneSection: (section: StylePaneSection | null) => void;
   setZoom: (zoom: number) => void;
+  setTaskLayout: (layout: TaskLayout) => void;
   setSwimlaneSpacing: (spacing: number) => void;
   setSelectedTierIndex: (index: number | null) => void;
 
@@ -233,7 +235,7 @@ type ProjectStore = ProjectState & ProjectActions;
 // Keys that represent saveable project data (changes to these mark the project dirty)
 const DIRTY_KEYS: Set<string> = new Set([
   'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies',
-  'statusLabels', 'columnVisibility', 'timescale', 'zoom', 'swimlaneSpacing', 'showCriticalPath',
+  'statusLabels', 'columnVisibility', 'timescale', 'zoom', 'swimlaneSpacing', 'showCriticalPath', 'taskLayout',
 ]);
 
 export const useProjectStore = create<ProjectStore>((_set, get) => {
@@ -270,6 +272,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   stylePaneSection: null,
   showCriticalPath: false,
   zoom: 8,
+  taskLayout: 'single-row',
   swimlaneSpacing: 5,
   selectedTierIndex: null,
 
@@ -279,6 +282,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   setSelectedSwimlane: (id) => set({ selectedSwimlaneId: id, selectedItemId: null, stylePaneSection: 'swimlaneTitle' }),
   setStylePaneSection: (section) => set({ stylePaneSection: section }),
   setZoom: (zoom) => set({ zoom: Math.max(2, Math.min(30, zoom)) }),
+  setTaskLayout: (layout) => set({ taskLayout: layout }),
   setSwimlaneSpacing: (spacing) => set({ swimlaneSpacing: Math.max(0, Math.min(40, spacing)) }),
   setSelectedTierIndex: (index) => set({ selectedTierIndex: index }),
 
@@ -323,6 +327,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       stylePaneSection: null,
       showCriticalPath: false,
       zoom: 8,
+      taskLayout: 'single-row',
       swimlaneSpacing: 5,
       selectedTierIndex: null,
     });

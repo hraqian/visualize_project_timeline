@@ -295,6 +295,8 @@ export interface TimescaleConfig {
 
 export type ActiveView = 'data' | 'timeline';
 
+export type TaskLayout = 'single-row' | 'packed' | 'one-per-row';
+
 export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector' | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector' | 'swimlaneTitle' | 'swimlaneBackground' | 'swimlaneSpacing' | 'scale' | 'todayMarker' | 'elapsedTime' | 'leftEndCap' | 'rightEndCap';
 
 export type OptionalColumn = 'percentComplete' | 'assignedTo' | 'status';
@@ -330,6 +332,7 @@ export interface ProjectState {
   stylePaneSection: StylePaneSection | null; // which collapsible section is expanded in StylePane
   showCriticalPath: boolean;
   zoom: number; // pixels per day
+  taskLayout: TaskLayout; // how tasks are arranged vertically in swimlanes
   swimlaneSpacing: number; // px gap between swimlane bands
   selectedTierIndex: number | null; // which tier row is selected for Scale section editing
 }

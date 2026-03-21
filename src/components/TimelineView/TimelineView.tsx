@@ -66,6 +66,7 @@ export function TimelineView() {
   const moveItemToSwimlane = useProjectStore((s) => s.moveItemToSwimlane);
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
   const swimlaneSpacing = useProjectStore((s) => s.swimlaneSpacing);
+  const taskLayout = useProjectStore((s) => s.taskLayout);
   const selectedTierIndex = useProjectStore((s) => s.selectedTierIndex);
   const setSelectedTierIndex = useProjectStore((s) => s.setSelectedTierIndex);
 
@@ -105,6 +106,51 @@ export function TimelineView() {
     ),
     [independentItems]
   );
+
+  // Compute layout rows based on taskLayout mode
+  const getRow = useMemo(() => {
+    if (taskLayout === 'single-row') {
+      return (item: ProjectItem) => item.row;
+    }
+    // Build row assignments for packed or one-per-row modes
+    const rowMap = new Map<string, number>();
+
+    const assignRows = (groupItems: ProjectItem[]) => {
+      const sorted = [...groupItems].sort((a, b) => a.row - b.row || a.startDate.localeCompare(b.startDate));
+      if (taskLayout === 'one-per-row') {
+        sorted.forEach((it, idx) => rowMap.set(it.id, idx));
+      } else {
+        // packed: assign to first row where item doesn't overlap
+        const rowEnds: number[] = []; // end day per row (exclusive)
+        for (const it of sorted) {
+          const start = parseISO(it.startDate).getTime();
+          const end = parseISO(it.endDate).getTime();
+          let placed = false;
+          for (let r = 0; r < rowEnds.length; r++) {
+            if (start >= rowEnds[r]) {
+              rowMap.set(it.id, r);
+              rowEnds[r] = end + 1; // +1 to avoid same-day overlap
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) {
+            rowMap.set(it.id, rowEnds.length);
+            rowEnds.push(end + 1);
+          }
+        }
+      }
+    };
+
+    // Assign rows per group: independent items, then each swimlane
+    assignRows(belowIndependentItems);
+    for (const sl of sortedSwimlanes) {
+      const slItems = swimlanedItems.filter((it) => it.swimlaneId === sl.id);
+      assignRows(slItems);
+    }
+
+    return (item: ProjectItem) => rowMap.get(item.id) ?? item.row;
+  }, [taskLayout, belowIndependentItems, swimlanedItems, sortedSwimlanes]);
 
   // Compute project range with padding
   const { origin, totalDays, rangeEndDate } = useMemo(() => {
@@ -168,9 +214,9 @@ export function TimelineView() {
   // Independent items section height (only "below" items — those in the canvas)
   const independentHeight = useMemo(() => {
     if (belowIndependentItems.length === 0) return 0;
-    const maxRow = Math.max(...belowIndependentItems.map((i) => i.row), 0);
+    const maxRow = Math.max(...belowIndependentItems.map((i) => getRow(i)), 0);
     return (maxRow + 1) * ROW_HEIGHT + INDEPENDENT_SECTION_PADDING * 2;
-  }, [belowIndependentItems]);
+  }, [belowIndependentItems, getRow]);
 
   // Swimlane layout: compute y offset for each swimlane
   const swimlaneLayout = useMemo(() => {
@@ -180,14 +226,14 @@ export function TimelineView() {
       const sl = sortedSwimlanes[i];
       if (i > 0) y += swimlaneSpacing; // gap between bands
       const slItems = swimlanedItems.filter((it) => it.swimlaneId === sl.id);
-      const maxRow = slItems.length > 0 ? Math.max(...slItems.map((it) => it.row)) : 0;
+      const maxRow = slItems.length > 0 ? Math.max(...slItems.map((it) => getRow(it))) : 0;
       const contentHeight = (maxRow + 1) * ROW_HEIGHT;
       const height = SWIMLANE_PADDING_TOP + contentHeight + SWIMLANE_PADDING_BOTTOM;
       layout.push({ swimlane: sl, y, height, contentY: y + SWIMLANE_PADDING_TOP });
       y += height;
     }
     return layout;
-  }, [sortedSwimlanes, swimlanedItems, independentHeight, swimlaneSpacing]);
+  }, [sortedSwimlanes, swimlanedItems, independentHeight, swimlaneSpacing, getRow]);
 
   const canvasHeight = (swimlaneLayout.length > 0
     ? swimlaneLayout[swimlaneLayout.length - 1].y + swimlaneLayout[swimlaneLayout.length - 1].height
@@ -226,11 +272,11 @@ export function TimelineView() {
             return 0;
           }
           if (!swimlaneIds.has(item.swimlaneId)) {
-            return INDEPENDENT_SECTION_PADDING + item.row * ROW_HEIGHT + ROW_HEIGHT / 2;
+            return INDEPENDENT_SECTION_PADDING + getRow(item) * ROW_HEIGHT + ROW_HEIGHT / 2;
           }
           const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
           if (!sl) return 0;
-          return sl.contentY + item.row * ROW_HEIGHT + ROW_HEIGHT / 2;
+          return sl.contentY + getRow(item) * ROW_HEIGHT + ROW_HEIGHT / 2;
         };
 
         const fromX = itemToX(from.endDate) + (from.type === 'milestone' ? from.milestoneStyle.size / 2 : 0);
@@ -246,7 +292,7 @@ export function TimelineView() {
         return { path, isCritical, key: `${dep.fromId}-${dep.toId}` };
       })
       .filter(Boolean);
-  }, [dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath]);
+  }, [dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRow]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
   const verticalConnectors = useMemo(() => {
@@ -254,11 +300,11 @@ export function TimelineView() {
 
     const getItemY = (item: ProjectItem) => {
       if (!swimlaneIds.has(item.swimlaneId)) {
-        return INDEPENDENT_SECTION_PADDING + item.row * ROW_HEIGHT;
+        return INDEPENDENT_SECTION_PADDING + getRow(item) * ROW_HEIGHT;
       }
       const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
       if (!sl) return 0;
-      return sl.contentY + item.row * ROW_HEIGHT;
+      return sl.contentY + getRow(item) * ROW_HEIGHT;
     };
 
     for (const item of visibleItems) {
@@ -294,7 +340,7 @@ export function TimelineView() {
     }
 
     return lines;
-  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, zoom]);
+  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, zoom, getRow]);
 
   // ─── Drag handlers ─────────────────────────────────────────────────
 
@@ -343,7 +389,7 @@ export function TimelineView() {
 
   const renderItem = (item: ProjectItem, yBase: number) => {
     const x = itemToX(item.startDate);
-    const y = yBase + item.row * ROW_HEIGHT;
+    const y = yBase + getRow(item) * ROW_HEIGHT;
     const isDragging = draggingId === item.id;
     const translateX = isDragging ? dragOffset : 0;
     const isSelected = selectedItemId === item.id;

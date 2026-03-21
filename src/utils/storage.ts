@@ -22,6 +22,7 @@ const SAVEABLE_KEYS: (keyof ProjectState)[] = [
   'columnVisibility',
   'timescale',
   'zoom',
+  'taskLayout',
   'swimlaneSpacing',
   'showCriticalPath',
 ];
