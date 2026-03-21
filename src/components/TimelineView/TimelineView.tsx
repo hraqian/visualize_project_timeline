@@ -401,7 +401,7 @@ export function TimelineView() {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        <div style={{ width: totalWidth, position: 'relative' }}>
+        <div style={{ width: totalWidth, position: 'relative', margin: '0 auto' }}>
           {/* ─── "Above" milestones row (before sticky timescale header) ─── */}
           {aboveHeight > 0 && (
             <div className="relative" style={{ height: aboveHeight }}>
