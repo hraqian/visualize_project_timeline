@@ -444,39 +444,60 @@ export function TimelineView() {
             </div>
           )}
 
-          {/* Timescale Headers */}
-          <div className="sticky top-0 z-10 border-b border-[var(--color-border)]">
-            {tierLabels.map(({ tier, labels }, tierIdx) => (
-              <div key={tierIdx} className="flex h-7 relative" style={{ backgroundColor: tier.backgroundColor }}>
-                {labels.map((label, i) => {
-                  const startX = differenceInDays(label.startDate, parseISO(origin)) * zoom;
-                  const endX = differenceInDays(label.endDate, parseISO(origin)) * zoom + zoom;
-                  const width = Math.max(endX - startX, 1);
-                  return (
-                    <div
-                      key={i}
-                      className={`flex items-center shrink-0 overflow-hidden ${tier.separators ? 'border-r border-white/20' : ''}`}
-                      style={{
-                        position: 'absolute',
-                        left: startX,
-                        width,
-                        height: 28,
-                        color: tier.fontColor,
-                        fontSize: tier.fontSize,
-                        fontFamily: tier.fontFamily,
-                        fontWeight: tier.fontWeight,
-                        fontStyle: tier.fontStyle,
-                        textDecoration: tier.textDecoration,
-                        justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
-                      }}
-                    >
-                      <span className="truncate px-1">{label.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+           {/* Timescale Headers */}
+           <div className="sticky top-0 z-10 border-b border-[var(--color-border)]">
+             {tierLabels.map(({ tier, labels }, tierIdx) => {
+               // Calculate label skip factor for readability
+               // Estimate typical cell width from first label
+               const minLabelWidth: Record<string, number> = { day: 28, week: 44, month: 36, quarter: 36, year: 40 };
+               const minW = minLabelWidth[tier.unit] ?? 36;
+               let skipFactor = 1;
+               if (labels.length > 1) {
+                 const firstStart = differenceInDays(labels[0].startDate, parseISO(origin)) * zoom;
+                 const firstEnd = differenceInDays(labels[0].endDate, parseISO(origin)) * zoom + zoom;
+                 const cellWidth = Math.max(firstEnd - firstStart, 1);
+                 if (cellWidth < minW) {
+                   skipFactor = Math.ceil(minW / cellWidth);
+                 }
+               }
+
+               return (
+                 <div key={tierIdx} className="flex h-7 relative" style={{ backgroundColor: tier.backgroundColor }}>
+                   {labels.map((label, i) => {
+                     const startX = differenceInDays(label.startDate, parseISO(origin)) * zoom;
+                     const endX = differenceInDays(label.endDate, parseISO(origin)) * zoom + zoom;
+                     const width = Math.max(endX - startX, 1);
+                     const showLabel = i % skipFactor === 0;
+                     // When skipping labels, span across the skipped cells for proper text centering
+                     const spanWidth = showLabel && skipFactor > 1
+                       ? Math.max(width * Math.min(skipFactor, labels.length - i), 1)
+                       : width;
+                     return (
+                       <div
+                         key={i}
+                         className={`flex items-center shrink-0 overflow-hidden ${tier.separators ? 'border-r border-white/20' : ''}`}
+                         style={{
+                           position: 'absolute',
+                           left: startX,
+                           width: showLabel ? spanWidth : width,
+                           height: 28,
+                           color: tier.fontColor,
+                           fontSize: tier.fontSize,
+                           fontFamily: tier.fontFamily,
+                           fontWeight: tier.fontWeight,
+                           fontStyle: tier.fontStyle,
+                           textDecoration: tier.textDecoration,
+                           justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
+                         }}
+                       >
+                         {showLabel && <span className="truncate px-1">{label.label}</span>}
+                       </div>
+                     );
+                   })}
+                 </div>
+               );
+             })}
+           </div>
 
           {/* ─── Canvas: grid, swimlane bands, items ─── */}
           <div className="relative" style={{ height: canvasHeight }}>
