@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 20, 2026 (session 7)
+> **Last updated**: March 20, 2026 (session 8)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -79,7 +79,8 @@ src/
 type ItemType = 'task' | 'milestone';
 type ActiveView = 'data' | 'timeline';
 type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector'
-  | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector';
+  | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector'
+  | 'swimlaneTitle' | 'swimlaneBackground' | 'swimlaneSpacing';
 
 type BarShape = 'rounded' | 'square' | 'flat' | 'capsule' | 'chevron' | 'double-chevron'
   | 'arrow-right' | 'pointed' | 'notched' | 'tab' | 'arrow-both' | 'trapezoid'; // 12 variants
@@ -100,6 +101,21 @@ type DurationFormat = 'd' | 'days' | 'w' | 'wks' | 'weeks' | 'mons' | 'months'
   | 'q' | 'qrts' | 'quarters' | 'y' | 'yrs' | 'years'; // 13 formats in 5 categories
 
 type ConnectorThickness = 'thin' | 'medium' | 'thick'; // maps to 1px, 2px, 3px
+type OutlineThickness = 'none' | 'thin' | 'medium' | 'thick'; // maps to 0, 1, 2, 3px
+
+interface Swimlane {
+  id: string; name: string; color: string; order: number; collapsed: boolean;
+  // Title styling
+  titleFontSize: number; titleFontColor: string; titleFontFamily: string;
+  titleFontWeight: number; titleFontStyle: 'normal' | 'italic';
+  titleTextDecoration: 'none' | 'underline';
+  // Background: Header
+  headerColor: string; headerTransparency: number; // 0-100
+  // Background: Body
+  bodyColor: string; bodyTransparency: number; // 0-100
+  // Background: Outline
+  outlineThickness: OutlineThickness; outlineColor: string;
+}
 
 interface TaskStyle {
   // Bar properties
@@ -176,15 +192,16 @@ interface ProjectState {
   timescale: TimescaleConfig;
   activeView: ActiveView;
   selectedItemId: string | null;
+  selectedSwimlaneId: string | null;  // mutual exclusion with selectedItemId
   stylePaneSection: StylePaneSection | null; // which section expanded in StylePane
   showCriticalPath: boolean; zoom: number;
 }
 ```
 
 ### Store Actions (`src/store/useProjectStore.ts`)
-- **Global**: `setActiveView`, `setSelectedItem`, `setStylePaneSection`, `setZoom`, `setProjectName`, `setTimelineTitle`
+- **Global**: `setActiveView`, `setSelectedItem`, `setSelectedSwimlane`, `setStylePaneSection`, `setZoom`, `setProjectName`, `setTimelineTitle`
 - **Items**: `addItem`, `addItemRelative`, `duplicateItem`, `updateItem`, `deleteItem`, `toggleVisibility`, `toggleItemType`, `moveItem`, `resizeItem`, `setItemRow`, `reorderItem`, `moveItemToSwimlane`, `moveItemToGroup`
-- **Swimlanes**: `addSwimlane`, `addSwimlaneRelative`, `duplicateSwimlane`, `hideSwimlaneItems`, `updateSwimlane`, `deleteSwimlane`, `reorderSwimlane`
+- **Swimlanes**: `addSwimlane`, `addSwimlaneRelative`, `duplicateSwimlane`, `hideSwimlaneItems`, `updateSwimlane`, `applySwimlaneStyleToAll`, `deleteSwimlane`, `reorderSwimlane`
 - **Dependencies**: `addDependency`, `removeDependency`
 - **Styles**: `updateTaskStyle`, `updateMilestoneStyle`, `applyStyleToAll`, `applyPartialStyleToAll`, `applyTaskBarStyleToAll`
 - **Status**: `addStatusLabel`, `updateStatusLabel`, `removeStatusLabel`
@@ -472,6 +489,45 @@ Contains:
   - Swimlane headers act as drop zones (drop onto header = insert at position 0)
   - Empty independent section shows "Drop here to remove from swimlane" zone during drag
 
+### Phase 10 — Milestone Title/Date + Swimlane Sections (sessions 7-8)
+- **Milestone Title section** (fully implemented):
+  - Color (fontColor AdvancedColorPicker) + Text (FontFamilyDropdown + FontSizeDropdown)
+  - B / I / U toggles
+  - Position (4-option picker: above/below/left/right using MilestonePositionIcon) — only for swimlaned milestones
+  - Apply to all milestones (Color, Text cards)
+- **Milestone Date section** (fully implemented):
+  - Color (dateFontColor) + Text (date-specific FontFamily + FontSize)
+  - B / I / U toggles
+  - Format (DateFormatDropdown)
+  - Position (4-option picker: above/below/left/right) — only for swimlaned milestones
+  - Apply to all milestones (Show, Color, Text, Format cards)
+- **Independent milestone vertical stack layout**: title/date/shape stack based on position above/below
+- **Swimlaned milestone same-side stacking**: title+date stack in container when on same side relative to shape
+- **Default dateFontColor**: changed to `#334155`
+- **Position controls**: only shown when `item.swimlaneId !== null` (swimlaned milestones)
+- **Swimlane selection**: `selectedSwimlaneId` in store, mutual exclusion with `selectedItemId`
+  - `setSelectedSwimlane` clears `selectedItemId`, sets `stylePaneSection: 'swimlaneTitle'`
+  - Click swimlane badge in TimelineView to select
+  - Auto-switch to swimlane sub-tab
+- **Swimlane section layout**: 3 collapsible rows (title, background, spacing)
+- **Swimlane Title section** (fully implemented):
+  - Color (titleFontColor AdvancedColorPicker) + Text (FontFamilyDropdown + FontSizeDropdown)
+  - B / I / U toggles
+  - Apply to all swimlanes (Color, Text cards)
+  - Title styles wired to badge rendering in TimelineView
+- **Swimlane Background section** (fully implemented):
+  - Swimlane type extended: `headerColor`, `headerTransparency`, `bodyColor`, `bodyTransparency`, `outlineThickness` (OutlineThickness type), `outlineColor`
+  - DEFAULT_SWIMLANE_STYLE updated with background defaults
+  - Header sub-group: Color picker + Transparency slider (0-100%)
+  - Body sub-group: Color picker + Transparency slider (0-100%)
+  - Outline sub-group: Thickness dropdown (None/Thin/Medium/Thick) + conditional Color picker (hidden when "None")
+  - Apply to all swimlanes (Header, Body, Outline cards)
+  - TimelineView wired: badge uses headerColor+headerTransparency (separate bg layer so text stays crisp), body band uses bodyColor+bodyTransparency, outline border wraps entire band
+  - `addSwimlane`/`addSwimlaneRelative` set `headerColor` from chosen color
+  - `duplicateSwimlane` copies all style properties from source
+- **OutlineThicknessDropdown**: select with None/Thin/Medium/Thick options
+- **OUTLINE_THICKNESS_MAP**: `{ none: 0, thin: 1, medium: 2, thick: 3 }`
+
 ---
 
 ## Known Pre-existing Build Errors
@@ -482,17 +538,14 @@ Contains:
 
 ## What's Next (TODO)
 
+### Swimlane Sections (remaining)
+1. Swimlane spacing section content (placeholder exists)
+
 ### Milestone Sections (remaining)
-1. Milestone title section content (placeholder exists)
-2. Milestone date section content (placeholder exists)
-3. Milestone connector section content (placeholder exists)
+1. Milestone connector section content (placeholder exists, parked/backlog)
 
-### TimelineView Milestone Rendering
-1. Render milestones using new style properties (position above/below, new icons, date labels, connectors)
-
-### Cleanup
-1. Replace old `ColorPicker` used in milestone/swimlane sections with `AdvancedColorPicker`
-2. Replace old `ApplyToAllSection` used in milestone section with new boxed pattern
+### Other Backlog
+1. Empty state illustrations (just text for now)
 
 ---
 
