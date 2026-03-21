@@ -30,6 +30,7 @@ import {
   type OutlineThickness,
   type Swimlane,
   type TimescaleTierConfig,
+  type TimescaleBarShape,
   type TierFormat,
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
@@ -1917,25 +1918,153 @@ function TimescaleTabContent({
   );
 }
 
+// ─── Timescale Bar Shape Dropdown ────────────────────────────────────────────
+
+const TIMESCALE_BAR_SHAPES: { id: TimescaleBarShape; label: string }[] = [
+  { id: 'rectangle', label: 'Rectangle' },
+  { id: 'rounded', label: 'Rounded rectangle' },
+  { id: 'leaf', label: 'Leaf' },
+  { id: 'ellipse', label: 'Ellipse' },
+  { id: 'modern', label: 'Modern' },
+];
+
+function TimescaleBarShapeIcon({ shape, size = 24, color = '#475569' }: { shape: TimescaleBarShape; size?: number; color?: string }) {
+  const w = size;
+  const h = size * 0.6;
+  switch (shape) {
+    case 'rectangle':
+      return (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+          <rect x={1} y={2} width={w - 2} height={h - 4} rx={0} fill={color} />
+        </svg>
+      );
+    case 'rounded':
+      return (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+          <rect x={1} y={2} width={w - 2} height={h - 4} rx={3} fill={color} />
+        </svg>
+      );
+    case 'leaf':
+      return (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+          <rect x={1} y={2} width={w - 2} height={h - 4} rx={0} fill={color} style={{ borderRadius: `0 ${h * 0.35}px ${h * 0.35}px 0` }} />
+          <path d={`M1,2 h${w - 2 - h * 0.35} q${h * 0.35},0 ${h * 0.35},${(h - 4) / 2} q0,${(h - 4) / 2} -${h * 0.35},${(h - 4) / 2} H1 V2 Z`} fill={color} />
+        </svg>
+      );
+    case 'ellipse':
+      return (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+          <rect x={1} y={2} width={w - 2} height={h - 4} rx={(h - 4) / 2} fill={color} />
+        </svg>
+      );
+    case 'modern':
+      return (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+          <path d={`M${3},${2} h${w - 8} l${2},${(h - 4) / 2} l-${2},${(h - 4) / 2} H${3} l${2},-${(h - 4) / 2} l-${2},-${(h - 4) / 2} Z`} fill={color} />
+        </svg>
+      );
+  }
+}
+
+function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarShape; onChange: (v: TimescaleBarShape) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = TIMESCALE_BAR_SHAPES.find((s) => s.id === value) ?? TIMESCALE_BAR_SHAPES[1];
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none hover:border-[var(--color-text-muted)] transition-colors"
+      >
+        <TimescaleBarShapeIcon shape={value} size={20} />
+        <span className="flex-1 text-left truncate">{selected.label}</span>
+        <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg z-50 p-2 flex gap-1">
+          {TIMESCALE_BAR_SHAPES.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => { onChange(s.id); setOpen(false); }}
+              className={`p-1.5 rounded transition-colors ${
+                value === s.id ? 'bg-[var(--color-bg-tertiary)]' : 'hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title={s.label}
+            >
+              <TimescaleBarShapeIcon shape={s.id} size={28} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Scale Section ───────────────────────────────────────────────────────────
 
 function ScaleSection() {
-  // Placeholder state for controls not yet wired to store
-  const [unitType, setUnitType] = useState('month');
-  const [format, setFormat] = useState('Jul, Aug, Sep');
-  const [separators, setSeparators] = useState(true);
-  const [color, setColor] = useState('#94a3b8');
-  const [fontFamily, setFontFamily] = useState('Arial');
-  const [fontSize, setFontSize] = useState(11);
-  const [fontWeight, setFontWeight] = useState(400);
-  const [fontStyle, setFontStyle] = useState<'normal' | 'italic'>('normal');
-  const [textDecoration, setTextDecoration] = useState<'none' | 'underline'>('none');
-  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
-  const [barColor, setBarColor] = useState('#6b7f5c');
-  const [barShape, setBarShape] = useState('leaf');
+  const timescale = useProjectStore((s) => s.timescale);
+  const updateTimescale = useProjectStore((s) => s.updateTimescale);
+  const updateTier = useProjectStore((s) => s.updateTier);
+  const selectedTierIndex = useProjectStore((s) => s.selectedTierIndex);
+
+  const visibleTiers = timescale.tiers.filter((t) => t.visible);
+  const visibleCount = visibleTiers.length;
+
+  // Determine which tier to edit: use selectedTierIndex if valid & visible, else first visible tier's store index
+  const activeTierStoreIndex = (() => {
+    if (selectedTierIndex !== null && selectedTierIndex < timescale.tiers.length && timescale.tiers[selectedTierIndex].visible) {
+      return selectedTierIndex;
+    }
+    // Fall back to first visible tier
+    return timescale.tiers.findIndex((t) => t.visible);
+  })();
+
+  const tier = activeTierStoreIndex >= 0 ? timescale.tiers[activeTierStoreIndex] : null;
+
+  // Tier label for multi-tier indicator
+  const TIER_NAMES = ['Top tier', 'Middle tier', 'Bottom tier'];
+  const activeTierName = activeTierStoreIndex >= 0 && activeTierStoreIndex < TIER_NAMES.length ? TIER_NAMES[activeTierStoreIndex] : '';
+
+  const formatOptions = tier ? getFormatOptionsForUnit(tier.unit) : [];
+
+  if (!tier) {
+    return (
+      <div className="text-xs text-[var(--color-text-muted)] py-2">
+        No visible tiers. Open Tier settings to enable tiers.
+      </div>
+    );
+  }
+
+  const handleUnitChange = (newUnit: string) => {
+    updateTier(activeTierStoreIndex, {
+      unit: newUnit as TimescaleTierConfig['unit'],
+      format: getDefaultFormatForUnit(newUnit as TimescaleTierConfig['unit']),
+    });
+  };
 
   return (
     <div className="space-y-4">
+      {/* Multi-tier indicator */}
+      {visibleCount > 1 && (
+        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md text-xs text-[var(--color-text-secondary)]">
+          <Info className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            Editing <span className="font-semibold text-[var(--color-text)]">{activeTierName}</span> — click a tier row on the timeline to switch
+          </span>
+        </div>
+      )}
+
       {/* Units */}
       <div>
         <label className="text-xs font-semibold text-[var(--color-text)] block mb-2">Units</label>
@@ -1946,8 +2075,8 @@ function ScaleSection() {
             </label>
             <select
               className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
-              value={unitType}
-              onChange={(e) => setUnitType(e.target.value)}
+              value={tier.unit}
+              onChange={(e) => handleUnitChange(e.target.value)}
             >
               <option value="auto">Auto</option>
               <option value="day">Days</option>
@@ -1963,13 +2092,12 @@ function ScaleSection() {
             </label>
             <select
               className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
+              value={tier.format}
+              onChange={(e) => updateTier(activeTierStoreIndex, { format: e.target.value as TierFormat })}
             >
-              <option value="Jul, Aug, Sep">Jul, Aug, Sep</option>
-              <option value="July, August, September">July, August, September</option>
-              <option value="J, A, S">J, A, S</option>
-              <option value="07, 08, 09">07, 08, 09</option>
+              {formatOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -1979,8 +2107,8 @@ function ScaleSection() {
       <label className="flex items-center gap-2 text-sm text-[var(--color-text)] cursor-pointer">
         <input
           type="checkbox"
-          checked={separators}
-          onChange={(e) => setSeparators(e.target.checked)}
+          checked={tier.separators}
+          onChange={(e) => updateTier(activeTierStoreIndex, { separators: e.target.checked })}
           className="accent-indigo-500 w-4 h-4"
         />
         <span className="font-medium">Separators</span>
@@ -1992,15 +2120,15 @@ function ScaleSection() {
           <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
             Color
           </label>
-          <AdvancedColorPicker value={color} onChange={setColor} />
+          <AdvancedColorPicker value={tier.fontColor} onChange={(c) => updateTier(activeTierStoreIndex, { fontColor: c })} />
         </div>
         <div className="flex-1">
           <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
             Text
           </label>
           <div className="flex gap-1.5">
-            <FontFamilyDropdown value={fontFamily} onChange={setFontFamily} fonts={FONT_FAMILIES} />
-            <FontSizeDropdown value={fontSize} onChange={setFontSize} />
+            <FontFamilyDropdown value={tier.fontFamily} onChange={(f) => updateTier(activeTierStoreIndex, { fontFamily: f })} fonts={FONT_FAMILIES} />
+            <FontSizeDropdown value={tier.fontSize} onChange={(s) => updateTier(activeTierStoreIndex, { fontSize: s })} />
           </div>
         </div>
       </div>
@@ -2008,9 +2136,9 @@ function ScaleSection() {
       {/* B / I / U + Alignment */}
       <div className="flex gap-1">
         <button
-          onClick={() => setFontWeight(fontWeight >= 700 ? 400 : 700)}
+          onClick={() => updateTier(activeTierStoreIndex, { fontWeight: tier.fontWeight >= 700 ? 400 : 700 })}
           className={`w-8 h-8 flex items-center justify-center rounded text-sm font-bold transition-colors ${
-            fontWeight >= 700
+            tier.fontWeight >= 700
               ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
               : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
           }`}
@@ -2019,9 +2147,9 @@ function ScaleSection() {
           B
         </button>
         <button
-          onClick={() => setFontStyle(fontStyle === 'italic' ? 'normal' : 'italic')}
+          onClick={() => updateTier(activeTierStoreIndex, { fontStyle: tier.fontStyle === 'italic' ? 'normal' : 'italic' })}
           className={`w-8 h-8 flex items-center justify-center rounded text-sm italic transition-colors ${
-            fontStyle === 'italic'
+            tier.fontStyle === 'italic'
               ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
               : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
           }`}
@@ -2030,9 +2158,9 @@ function ScaleSection() {
           I
         </button>
         <button
-          onClick={() => setTextDecoration(textDecoration === 'underline' ? 'none' : 'underline')}
+          onClick={() => updateTier(activeTierStoreIndex, { textDecoration: tier.textDecoration === 'underline' ? 'none' : 'underline' })}
           className={`w-8 h-8 flex items-center justify-center rounded text-sm underline transition-colors ${
-            textDecoration === 'underline'
+            tier.textDecoration === 'underline'
               ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
               : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
           }`}
@@ -2046,9 +2174,9 @@ function ScaleSection() {
 
         {/* Text align buttons */}
         <button
-          onClick={() => setTextAlign('left')}
+          onClick={() => updateTier(activeTierStoreIndex, { textAlign: 'left' })}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-            textAlign === 'left'
+            tier.textAlign === 'left'
               ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
               : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
           }`}
@@ -2062,9 +2190,9 @@ function ScaleSection() {
           </svg>
         </button>
         <button
-          onClick={() => setTextAlign('center')}
+          onClick={() => updateTier(activeTierStoreIndex, { textAlign: 'center' })}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-            textAlign === 'center'
+            tier.textAlign === 'center'
               ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
               : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
           }`}
@@ -2078,9 +2206,9 @@ function ScaleSection() {
           </svg>
         </button>
         <button
-          onClick={() => setTextAlign('right')}
+          onClick={() => updateTier(activeTierStoreIndex, { textAlign: 'right' })}
           className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-            textAlign === 'right'
+            tier.textAlign === 'right'
               ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
               : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
           }`}
@@ -2095,33 +2223,37 @@ function ScaleSection() {
         </button>
       </div>
 
-      {/* Bar style */}
-      <div>
-        <label className="text-xs font-semibold text-[var(--color-text)] block mb-2">Bar style</label>
-        <div className="flex gap-3">
-          <div>
-            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-              Color
-            </label>
-            <AdvancedColorPicker value={barColor} onChange={setBarColor} />
-          </div>
-          <div className="flex-1">
-            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-              Shape
-            </label>
-            <select
-              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
-              value={barShape}
-              onChange={(e) => setBarShape(e.target.value)}
-            >
-              <option value="leaf">Leaf</option>
-              <option value="pointed">Pointed</option>
-              <option value="rounded">Rounded</option>
-              <option value="flat">Flat</option>
-            </select>
+      {/* Bar style — only shown when single tier */}
+      {visibleCount === 1 && (
+        <div>
+          <label className="text-xs font-semibold text-[var(--color-text)] block mb-2">Bar style</label>
+          <div className="flex gap-3">
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Color
+              </label>
+              <AdvancedColorPicker value={tier.backgroundColor} onChange={(c) => updateTier(activeTierStoreIndex, { backgroundColor: c })} />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Shape
+              </label>
+              <TimescaleBarShapeDropdown
+                value={timescale.barShape}
+                onChange={(s) => updateTimescale({ barShape: s })}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Bar color — shown when multi-tier (shape hidden, but color still useful) */}
+      {visibleCount > 1 && (
+        <div>
+          <label className="text-xs font-semibold text-[var(--color-text)] block mb-2">Bar color</label>
+          <AdvancedColorPicker value={tier.backgroundColor} onChange={(c) => updateTier(activeTierStoreIndex, { backgroundColor: c })} />
+        </div>
+      )}
     </div>
   );
 }

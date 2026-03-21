@@ -4,7 +4,7 @@ import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addD
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, buildVisibleTierCells, getProjectRange, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape } from '@/types';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -15,6 +15,16 @@ const CONNECTOR_THICKNESS_MAP: Record<ConnectorThickness, number> = { thin: 1, m
 const OUTLINE_THICKNESS_MAP: Record<OutlineThickness, number> = { none: 0, thin: 1, medium: 2, thick: 3 };
 const SWIMLANE_PADDING_TOP = 10;
 const SWIMLANE_PADDING_BOTTOM = 10;
+
+function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
+  switch (shape) {
+    case 'rectangle': return {};
+    case 'rounded': return { borderRadius: '6px' };
+    case 'leaf': return { borderRadius: '0 9999px 9999px 0' };
+    case 'ellipse': return { borderRadius: '9999px' };
+    case 'modern': return { borderRadius: '4px 12px 4px 12px' };
+  }
+}
 
 // ─── Duration Formatting ─────────────────────────────────────────────────────
 
@@ -58,6 +68,8 @@ export function TimelineView() {
   const timelineTitle = useProjectStore((s) => s.timelineTitle);
   const setTimelineTitle = useProjectStore((s) => s.setTimelineTitle);
   const swimlaneSpacing = useProjectStore((s) => s.swimlaneSpacing);
+  const selectedTierIndex = useProjectStore((s) => s.selectedTierIndex);
+  const setSelectedTierIndex = useProjectStore((s) => s.setSelectedTierIndex);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -173,12 +185,14 @@ export function TimelineView() {
   const tierLabels = useMemo(() => {
     const rangeStart = parseISO(origin);
     return timescale.tiers
-      .filter((t) => t.visible)
-      .map((tier) => {
+      .map((tier, idx) => ({ tier, storeIndex: idx }))
+      .filter(({ tier }) => tier.visible)
+      .map(({ tier, storeIndex }) => {
         const resolvedUnit = tier.unit === 'auto' ? resolveAutoUnit(totalDays) : tier.unit;
         const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
         return {
           tier: { ...tier, unit: resolvedUnit },
+          storeIndex,
           labels: generateTierLabels(resolvedUnit, rangeStart, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat),
         };
       });
@@ -451,13 +465,19 @@ export function TimelineView() {
           )}
 
            {/* Timescale Headers */}
-           <div className="sticky top-0 z-10 border-b border-[var(--color-border)]">
-             {tierLabels.map(({ tier, labels }, tierIdx) => {
+           <div className="sticky top-0 z-10 border-b border-[var(--color-border)] overflow-hidden" style={getTimescaleBarShapeStyle(timescale.barShape)}>
+             {tierLabels.map(({ tier, storeIndex, labels }, tierIdx) => {
                const originDate = parseISO(origin);
                const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
+               const isSelected = selectedTierIndex === storeIndex;
 
                return (
-                 <div key={tierIdx} className="flex h-7 relative" style={{ backgroundColor: tier.backgroundColor }}>
+                 <div
+                   key={tierIdx}
+                   className={`flex h-7 relative cursor-pointer transition-shadow ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
+                   style={{ backgroundColor: tier.backgroundColor }}
+                   onClick={() => { setSelectedTierIndex(storeIndex); setStylePaneSection('scale'); }}
+                 >
                    {cells.map((cell, ci) => (
                      <div
                        key={ci}

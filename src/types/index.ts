@@ -260,8 +260,11 @@ export interface TimescaleTierConfig {
   separators: boolean;
 }
 
+export type TimescaleBarShape = 'rectangle' | 'rounded' | 'leaf' | 'ellipse' | 'modern';
+
 export interface TimescaleConfig {
   tiers: TimescaleTierConfig[];
+  barShape: TimescaleBarShape;
   fiscalYearStartMonth: number; // 1-12
   showToday: boolean;
   todayColor: string;
@@ -304,6 +307,7 @@ export interface ProjectState {
   showCriticalPath: boolean;
   zoom: number; // pixels per day
   swimlaneSpacing: number; // px gap between swimlane bands
+  selectedTierIndex: number | null; // which tier row is selected for Scale section editing
 }
 
 // ─── Default Styles ──────────────────────────────────────────────────────────

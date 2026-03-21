@@ -144,6 +144,7 @@ interface ProjectActions {
   setStylePaneSection: (section: StylePaneSection | null) => void;
   setZoom: (zoom: number) => void;
   setSwimlaneSpacing: (spacing: number) => void;
+  setSelectedTierIndex: (index: number | null) => void;
 
   // Project
   setProjectName: (name: string) => void;
@@ -243,6 +244,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   showCriticalPath: false,
   zoom: 8,
   swimlaneSpacing: 5,
+  selectedTierIndex: null,
 
   // ─── View ────────────────────────────────────────────────────────────
   setActiveView: (view) => set({ activeView: view }),
@@ -251,6 +253,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   setStylePaneSection: (section) => set({ stylePaneSection: section }),
   setZoom: (zoom) => set({ zoom: Math.max(2, Math.min(30, zoom)) }),
   setSwimlaneSpacing: (spacing) => set({ swimlaneSpacing: Math.max(0, Math.min(40, spacing)) }),
+  setSelectedTierIndex: (index) => set({ selectedTierIndex: index }),
 
   // ─── Project ─────────────────────────────────────────────────────────
   setProjectName: (name) => set({ projectName: name }),

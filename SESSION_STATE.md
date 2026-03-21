@@ -620,9 +620,10 @@ Contains:
 ## What's Next (TODO)
 
 ### Timescale Tab — Scale Section
-1. Wire Scale section controls to the store (currently all local `useState` placeholders)
-   - Units (unit type + format) — should read/write to which tier? Or is this a "global" scale override? **Needs spec clarification**
-   - Separators, Color + Text, B/I/U + alignment, Bar style (color + shape)
+1. ~~Wire Scale section controls to the store~~ **DONE** (session 10)
+2. Scale section now reads/writes selected tier's config via `selectedTierIndex` in store
+3. Multi-tier: info banner tells user to click tier on timeline to switch; Bar Shape hidden
+4. Single-tier: all controls + Bar Shape dropdown visible
 
 ### Timescale Tab — Remaining Sections
 1. Today marker section content (toggle wired, needs: color picker, line style controls)
@@ -638,6 +639,7 @@ Contains:
 
 ### Other Backlog
 1. Empty state illustrations (just text for now)
+2. **Shape library unification** — consolidate task bar shapes (`BarShape`) and timescale bar shapes (`TimescaleBarShape`) into a shared shape library to prevent duplicate/inconsistent shapes across modules
 
 ---
 
