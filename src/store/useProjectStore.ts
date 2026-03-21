@@ -230,8 +230,6 @@ interface ProjectActions {
 
 type ProjectStore = ProjectState & ProjectActions;
 
-const sample = createSampleData();
-
 // Keys that represent saveable project data (changes to these mark the project dirty)
 const DIRTY_KEYS: Set<string> = new Set([
   'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies',
@@ -253,15 +251,15 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   };
 
   return {
-  // ─── Initial State ───────────────────────────────────────────────────
+  // ─── Initial State (empty — user picks or creates a project via modal) ───
   projectId: uuid(),
   lastModified: null,
   isDirty: false,
-  projectName: 'Project Timeline',
-  timelineTitle: 'Project Timeline',
-  items: sample.items,
-  swimlanes: sample.swimlanes,
-  dependencies: sample.dependencies,
+  projectName: 'New Project',
+  timelineTitle: 'New Project',
+  items: [],
+  swimlanes: [],
+  dependencies: [],
   statusLabels: [...DEFAULT_STATUS_LABELS],
   columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
   checkedItemIds: [],
