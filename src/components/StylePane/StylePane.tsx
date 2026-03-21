@@ -34,8 +34,8 @@ import {
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { parseISO, differenceInDays, addDays, format } from 'date-fns';
-import { getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
+import { parseISO, differenceInDays, addDays, subDays, endOfMonth } from 'date-fns';
+import { generateTierLabels, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -2154,102 +2154,75 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     setTiers((prev) => prev.map((t, i) => (i === idx ? { ...t, ...updates } : t)));
   };
 
-  // Project range
-  const { rangeStart, rangeEnd, totalDays, startYear, endYear } = useMemo(() => {
+  // Project range — same padding as main TimelineView
+  const { origin, totalDays, startYear, endYear } = useMemo(() => {
     const range = getProjectRange(items);
-    const start = parseISO(range.start);
-    const end = parseISO(range.end);
-    const days = Math.max(1, differenceInDays(end, start));
-    return {
-      rangeStart: start,
-      rangeEnd: end,
-      totalDays: days,
-      startYear: start.getFullYear(),
-      endYear: end.getFullYear() + (end.getMonth() > 0 || end.getDate() > 1 ? 1 : 0),
-    };
+    const padStart = subDays(parseISO(range.start), 14);
+    const padEnd = endOfMonth(addDays(parseISO(range.end), 30));
+    const days = differenceInDays(padEnd, padStart);
+    const sy = padStart.getFullYear();
+    const ey = padEnd.getFullYear() + (padEnd.getMonth() > 0 || padEnd.getDate() > 1 ? 1 : 0);
+    return { origin: padStart.toISOString().split('T')[0], totalDays: days, startYear: sy, endYear: ey };
   }, [items]);
 
-  // Today position as fraction of project duration (0-1)
+  // Today position as fraction (0-1)
   const todayFraction = useMemo(() => {
     const today = new Date();
-    const frac = differenceInDays(today, rangeStart) / totalDays;
+    const frac = differenceInDays(today, parseISO(origin)) / totalDays;
     return Math.max(0, Math.min(1, frac));
-  }, [rangeStart, totalDays]);
+  }, [origin, totalDays]);
 
   const visibleTiers = useMemo(() => tiers.filter((t) => t.visible), [tiers]);
   const visibleCount = visibleTiers.length;
 
-  // Generate sampled preview labels for a tier
-  // Returns array of { label, fraction } where fraction is position 0-1 across bar
+  // Generate labels using same algorithm as main TimelineView
   const previewTierLabels = useMemo(() => {
-    const BAR_WIDTH_PX = 920; // approximate inner bar width
-    const MIN_LABEL_WIDTH: Record<string, number> = { year: 60, quarter: 50, month: 50, week: 45, day: 45 };
+    const originDate = parseISO(origin);
+    const rangeEnd = addDays(originDate, totalDays);
+    const BAR_WIDTH_PX = 920;
 
     return visibleTiers.map((tier) => {
-      const minW = MIN_LABEL_WIDTH[tier.unit] ?? 50;
-      const maxLabels = Math.floor(BAR_WIDTH_PX / minW);
-      const avgDaysPerUnit: Record<string, number> = { day: 1, week: 7, month: 30.44, quarter: 91.31, year: 365.25 };
-      const totalUnits = Math.max(1, Math.round(totalDays / (avgDaysPerUnit[tier.unit] ?? 1)));
-      // Pick N evenly-spaced labels
-      const labelCount = Math.max(2, Math.min(maxLabels, totalUnits));
-      const step = totalUnits / labelCount;
+      const labels = generateTierLabels(tier.unit, originDate, rangeEnd, timescale.fiscalYearStartMonth, tier.format);
 
-      const labels: { label: string; fraction: number }[] = [];
-      const isSequential = tier.unit === 'week' || tier.unit === 'day';
-
-      for (let i = 0; i < labelCount; i++) {
-        const unitIndex = Math.round(i * step);
-        const dayOffset = unitIndex * (avgDaysPerUnit[tier.unit] ?? 1);
-        const fraction = Math.min(dayOffset / totalDays, 1);
-        const date = addDays(rangeStart, Math.round(dayOffset));
-
-        let label: string;
-        if (isSequential) {
-          const seqNum = unitIndex + 1;
-          if (i === 0) {
-            label = tier.unit === 'week' ? `Week ${seqNum}` : `Day ${seqNum}`;
-          } else {
-            label = String(seqNum);
-          }
-        } else {
-          // Calendar-based label
-          label = formatPreviewLabel(date, tier.unit, tier.format);
-        }
-        labels.push({ label, fraction });
-      }
-
-      // For single-tier months/quarters, intersperse year markers
-      if (visibleCount === 1 && (tier.unit === 'month' || tier.unit === 'quarter')) {
-        const yearLabels: { label: string; fraction: number }[] = [];
-        for (let y = startYear + 1; y < endYear; y++) {
-          const yearStart = new Date(y, 0, 1);
-          const dayOff = differenceInDays(yearStart, rangeStart);
-          const frac = dayOff / totalDays;
-          if (frac > 0.05 && frac < 0.95) {
-            yearLabels.push({ label: String(y), fraction: frac });
-          }
-        }
-        // Merge year labels into the label array, replacing nearby month labels
-        for (const yl of yearLabels) {
-          // Find closest existing label and replace it if within threshold
-          let closestIdx = -1;
-          let closestDist = Infinity;
-          for (let j = 0; j < labels.length; j++) {
-            const dist = Math.abs(labels[j].fraction - yl.fraction);
-            if (dist < closestDist) {
-              closestDist = dist;
-              closestIdx = j;
-            }
-          }
-          if (closestIdx >= 0 && closestDist < 0.08) {
-            labels[closestIdx] = { label: yl.label, fraction: yl.fraction };
-          }
+      // Same skip-factor logic as TimelineView
+      const minLabelWidth: Record<string, number> = { day: 60, week: 70, month: 50, quarter: 50, year: 50 };
+      const minW = minLabelWidth[tier.unit] ?? 40;
+      let skipFactor = 1;
+      if (labels.length > 1) {
+        const firstStartFrac = differenceInDays(labels[0].startDate, originDate) / totalDays;
+        const firstEndFrac = (differenceInDays(labels[0].endDate, originDate) + 1) / totalDays;
+        const cellWidthPx = (firstEndFrac - firstStartFrac) * BAR_WIDTH_PX;
+        if (cellWidthPx < minW) {
+          skipFactor = Math.ceil(minW / cellWidthPx);
         }
       }
 
-      return { tier, labels };
+      // Build merged visible cells as fractions
+      const cells: { label: string; fraction: number; widthFrac: number }[] = [];
+      for (let i = 0; i < labels.length; i += skipFactor) {
+        const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
+        const endIdx = Math.min(i + skipFactor, labels.length) - 1;
+        const endFrac = (differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays;
+        if (startFrac < 1) {
+          cells.push({
+            label: labels[i].label,
+            fraction: startFrac,
+            widthFrac: Math.max(endFrac - startFrac, 0.001),
+          });
+        }
+      }
+      // Extend last cell to fill bar
+      if (cells.length > 0) {
+        const last = cells[cells.length - 1];
+        const lastEnd = last.fraction + last.widthFrac;
+        if (lastEnd < 1) {
+          last.widthFrac = 1 - last.fraction;
+        }
+      }
+
+      return { tier, cells };
     });
-  }, [visibleTiers, visibleCount, rangeStart, totalDays, startYear, endYear]);
+  }, [visibleTiers, origin, totalDays, timescale.fiscalYearStartMonth]);
 
   const handleSave = () => {
     updateTimescale({ tiers: tiers });
@@ -2272,7 +2245,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8">
-          {/* Timescale preview — fixed width, no scroll */}
+          {/* Timescale preview — same algorithm as main TimelineView */}
           {visibleCount > 0 && (
             <div className="flex items-center gap-3">
               {/* Left end cap */}
@@ -2282,36 +2255,31 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
               {/* Bar */}
               <div className="flex-1 rounded-lg overflow-hidden border border-[var(--color-border)] relative">
-                {previewTierLabels.map(({ tier, labels }, tierIdx) => (
+                {previewTierLabels.map(({ tier, cells }, tierIdx) => (
                   <div
                     key={tierIdx}
                     className="relative"
                     style={{ backgroundColor: tier.backgroundColor, height: 28 }}
                   >
-                    {labels.map((lbl, i) => {
-                      // Each label occupies a slot from its fraction to the next label's fraction (or 1.0)
-                      const nextFrac = i < labels.length - 1 ? labels[i + 1].fraction : 1;
-                      const width = nextFrac - lbl.fraction;
-                      return (
-                        <div
-                          key={i}
-                          className={`absolute top-0 h-full flex items-center overflow-hidden ${tier.separators && i > 0 ? 'border-l border-white/20' : ''}`}
-                          style={{
-                            left: `${lbl.fraction * 100}%`,
-                            width: `${width * 100}%`,
-                            color: tier.fontColor,
-                            fontSize: Math.min(tier.fontSize, 12),
-                            fontFamily: tier.fontFamily,
-                            fontWeight: tier.fontWeight,
-                            fontStyle: tier.fontStyle,
-                            textDecoration: tier.textDecoration,
-                            justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
-                          }}
-                        >
-                          <span className="truncate px-1">{lbl.label}</span>
-                        </div>
-                      );
-                    })}
+                    {cells.map((cell, ci) => (
+                      <div
+                        key={ci}
+                        className={`absolute top-0 h-full flex items-center overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
+                        style={{
+                          left: `${cell.fraction * 100}%`,
+                          width: `${cell.widthFrac * 100}%`,
+                          color: tier.fontColor,
+                          fontSize: Math.min(tier.fontSize, 12),
+                          fontFamily: tier.fontFamily,
+                          fontWeight: tier.fontWeight,
+                          fontStyle: tier.fontStyle,
+                          textDecoration: tier.textDecoration,
+                          justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
+                        }}
+                      >
+                        <span className="truncate px-1">{cell.label}</span>
+                      </div>
+                    ))}
                   </div>
                 ))}
                 {/* Today marker */}
@@ -2370,27 +2338,6 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     </div>,
     document.body
   );
-}
-
-// Format a date for the preview bar (calendar-based units)
-function formatPreviewLabel(date: Date, unit: string, fmt: TierFormat): string {
-  switch (unit) {
-    case 'year': return format(date, fmt === 'yy' ? 'yy' : 'yyyy');
-    case 'quarter': {
-      const q = Math.floor(date.getMonth() / 3) + 1;
-      return fmt === 'Qq' ? `Q${q}` : `Q${q} ${format(date, 'yyyy')}`;
-    }
-    case 'month': {
-      switch (fmt) {
-        case 'MMMM': return format(date, 'MMMM');
-        case 'M_letter': return format(date, 'MMMMM');
-        case 'MM': return format(date, 'MM');
-        case 'M_num': return String(date.getMonth() + 1);
-        default: return format(date, 'MMM');
-      }
-    }
-    default: return format(date, 'MMM');
-  }
 }
 
 // ─── Tier Column ─────────────────────────────────────────────────────────────

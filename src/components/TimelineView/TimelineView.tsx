@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useMemo } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
-import { parseISO, differenceInDays, addDays, subDays, format } from 'date-fns';
+import { parseISO, differenceInDays, addDays, subDays, endOfMonth, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, getProjectRange } from '@/utils';
 import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
@@ -102,7 +102,7 @@ export function TimelineView() {
   const { origin, totalDays } = useMemo(() => {
     const range = getProjectRange(items);
     const padStart = subDays(parseISO(range.start), 14);
-    const padEnd = addDays(parseISO(range.end), 30);
+    const padEnd = endOfMonth(addDays(parseISO(range.end), 30));
     const total = differenceInDays(padEnd, padStart);
     return { origin: padStart.toISOString().split('T')[0], totalDays: total };
   }, [items]);
@@ -448,7 +448,7 @@ export function TimelineView() {
            <div className="sticky top-0 z-10 border-b border-[var(--color-border)]">
              {tierLabels.map(({ tier, labels }, tierIdx) => {
                // Calculate label skip factor for readability
-               const minLabelWidth: Record<string, number> = { day: 32, week: 48, month: 40, quarter: 40, year: 44 };
+                const minLabelWidth: Record<string, number> = { day: 60, week: 70, month: 50, quarter: 50, year: 50 };
                const minW = minLabelWidth[tier.unit] ?? 40;
                let skipFactor = 1;
                if (labels.length > 1) {
@@ -461,18 +461,28 @@ export function TimelineView() {
                }
 
                // Build merged visible label cells
+               const originDate = parseISO(origin);
                const visibleCells: { label: string; startX: number; width: number; index: number }[] = [];
                for (let i = 0; i < labels.length; i += skipFactor) {
-                 const startX = differenceInDays(labels[i].startDate, parseISO(origin)) * zoom;
-                 // Span extends to the start of the next visible label (or end of last label)
+                 const startX = differenceInDays(labels[i].startDate, originDate) * zoom;
                  const endIdx = Math.min(i + skipFactor, labels.length) - 1;
-                 const endX = differenceInDays(labels[endIdx].endDate, parseISO(origin)) * zoom + zoom;
-                 visibleCells.push({
-                   label: labels[i].label,
-                   startX,
-                   width: Math.max(endX - startX, 1),
-                   index: i,
-                 });
+                 const endX = differenceInDays(labels[endIdx].endDate, originDate) * zoom + zoom;
+                 if (startX < totalWidth) {
+                   visibleCells.push({
+                     label: labels[i].label,
+                     startX,
+                     width: Math.max(endX - startX, 1),
+                     index: i,
+                   });
+                 }
+               }
+               // Extend last cell to fill any small trailing gap
+               if (visibleCells.length > 0) {
+                 const last = visibleCells[visibleCells.length - 1];
+                 const lastEnd = last.startX + last.width;
+                 if (lastEnd < totalWidth) {
+                   last.width = totalWidth - last.startX;
+                 }
                }
 
                return (
