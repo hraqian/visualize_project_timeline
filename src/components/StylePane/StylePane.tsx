@@ -30,11 +30,12 @@ import {
   type OutlineThickness,
   type Swimlane,
   type TimescaleTierConfig,
+  type TierFormat,
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, differenceInDays, addDays, subDays } from 'date-fns';
-import { generateTierLabels, getProjectRange } from '@/utils';
+import { generateTierLabels, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -2127,9 +2128,9 @@ function ScaleSection() {
 // ─── Tier Settings Modal ─────────────────────────────────────────────────────
 
 const DEFAULT_3_TIERS: TimescaleTierConfig[] = [
-  { unit: 'month', visible: true, backgroundColor: '#6b7f5c', fontColor: '#f8fafc', fontSize: 12 },
-  { unit: 'week', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11 },
-  { unit: 'day', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11 },
+  { unit: 'month', format: 'MMM', visible: true, backgroundColor: '#6b7f5c', fontColor: '#f8fafc', fontSize: 12, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
+  { unit: 'week', format: 'w_num', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
+  { unit: 'day', format: 'd_num', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
 ];
 
 const TIER_LABELS = ['Top tier', 'Middle tier', 'Bottom tier'];
@@ -2137,6 +2138,7 @@ const TIER_LABELS = ['Top tier', 'Middle tier', 'Bottom tier'];
 function TierSettingsModal({ onClose }: { onClose: () => void }) {
   const items = useProjectStore((s) => s.items);
   const timescale = useProjectStore((s) => s.timescale);
+  const updateTimescale = useProjectStore((s) => s.updateTimescale);
   // Local draft state — initialize from store tiers, padded to 3
   const [tiers, setTiers] = useState<TimescaleTierConfig[]>(() => {
     const stored = timescale.tiers;
@@ -2175,7 +2177,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
       .filter((t) => t.visible)
       .map((tier) => ({
         tier,
-        labels: generateTierLabels(tier.unit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth),
+        labels: generateTierLabels(tier.unit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth, tier.format),
       }));
   }, [origin, totalDays, tiers, timescale.fiscalYearStartMonth]);
 
@@ -2185,7 +2187,8 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   }, [origin, previewZoom]);
 
   const handleSave = () => {
-    // Will wire to store later
+    // Write visible tiers to store (filter out hidden tiers at the end, keep all if any visible)
+    updateTimescale({ tiers: tiers });
     onClose();
   };
 
@@ -2221,7 +2224,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                     return (
                       <div
                         key={i}
-                        className="border-r border-white/10 flex items-center justify-center shrink-0 overflow-hidden"
+                        className={`flex items-center shrink-0 overflow-hidden ${tier.separators ? 'border-r border-white/20' : ''}`}
                         style={{
                           position: 'absolute',
                           left: startX,
@@ -2229,6 +2232,11 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                           height: 28,
                           color: tier.fontColor,
                           fontSize: tier.fontSize,
+                          fontFamily: tier.fontFamily,
+                          fontWeight: tier.fontWeight,
+                          fontStyle: tier.fontStyle,
+                          textDecoration: tier.textDecoration,
+                          justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
                         }}
                       >
                         <span className="truncate px-1">{label.label}</span>
@@ -2303,13 +2311,7 @@ function TierColumn({
   tier: TimescaleTierConfig;
   updateTier: (updates: Partial<TimescaleTierConfig>) => void;
 }) {
-  // Local placeholder state for controls not yet on TimescaleTierConfig
-  const [separators, setSeparators] = useState(true);
-  const [fontFamily, setFontFamily] = useState('Arial');
-  const [fontWeight, setFontWeight] = useState(400);
-  const [fontStyle, setFontStyle] = useState<'normal' | 'italic'>('normal');
-  const [textDecoration, setTextDecoration] = useState<'none' | 'underline'>('none');
-  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+  const formatOptions = getFormatOptionsForUnit(tier.unit);
 
   return (
     <div
@@ -2338,7 +2340,10 @@ function TierColumn({
             <select
               className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-2 py-1.5 text-sm text-[var(--color-text)] outline-none"
               value={tier.unit}
-              onChange={(e) => updateTier({ unit: e.target.value as any })}
+              onChange={(e) => {
+                const newUnit = e.target.value as TimescaleTierConfig['unit'];
+                updateTier({ unit: newUnit, format: getDefaultFormatForUnit(newUnit) });
+              }}
             >
               <option value="year">Years</option>
               <option value="quarter">Quarters</option>
@@ -2348,12 +2353,14 @@ function TierColumn({
             </select>
             <select
               className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-2 py-1.5 text-sm text-[var(--color-text)] outline-none"
+              value={tier.format}
+              onChange={(e) => updateTier({ format: e.target.value as TierFormat })}
             >
-              <option>Jul, Aug, Sep</option>
-              <option>July, August, September</option>
-              <option>J, A, S</option>
-              <option>07, 08, 09</option>
-              <option>1, 2, 3</option>
+              {formatOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -2362,8 +2369,8 @@ function TierColumn({
         <label className="flex items-center gap-2 text-sm text-[var(--color-text)] cursor-pointer">
           <input
             type="checkbox"
-            checked={separators}
-            onChange={(e) => setSeparators(e.target.checked)}
+            checked={tier.separators}
+            onChange={(e) => updateTier({ separators: e.target.checked })}
             className="accent-indigo-500 w-4 h-4"
           />
           <span className="font-medium">Separators</span>
@@ -2382,7 +2389,7 @@ function TierColumn({
               Text
             </label>
             <div className="flex gap-1">
-              <FontFamilyDropdown value={fontFamily} onChange={setFontFamily} fonts={FONT_FAMILIES} />
+              <FontFamilyDropdown value={tier.fontFamily} onChange={(fontFamily) => updateTier({ fontFamily })} fonts={FONT_FAMILIES} />
               <FontSizeDropdown value={tier.fontSize} onChange={(fontSize) => updateTier({ fontSize })} />
             </div>
           </div>
@@ -2391,9 +2398,9 @@ function TierColumn({
         {/* B / I / U + Alignment */}
         <div className="flex gap-1">
           <button
-            onClick={() => setFontWeight(fontWeight >= 700 ? 400 : 700)}
+            onClick={() => updateTier({ fontWeight: tier.fontWeight >= 700 ? 400 : 700 })}
             className={`w-7 h-7 flex items-center justify-center rounded text-xs font-bold transition-colors ${
-              fontWeight >= 700
+              tier.fontWeight >= 700
                 ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
                 : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}
@@ -2402,9 +2409,9 @@ function TierColumn({
             B
           </button>
           <button
-            onClick={() => setFontStyle(fontStyle === 'italic' ? 'normal' : 'italic')}
+            onClick={() => updateTier({ fontStyle: tier.fontStyle === 'italic' ? 'normal' : 'italic' })}
             className={`w-7 h-7 flex items-center justify-center rounded text-xs italic transition-colors ${
-              fontStyle === 'italic'
+              tier.fontStyle === 'italic'
                 ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
                 : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}
@@ -2413,9 +2420,9 @@ function TierColumn({
             I
           </button>
           <button
-            onClick={() => setTextDecoration(textDecoration === 'underline' ? 'none' : 'underline')}
+            onClick={() => updateTier({ textDecoration: tier.textDecoration === 'underline' ? 'none' : 'underline' })}
             className={`w-7 h-7 flex items-center justify-center rounded text-xs underline transition-colors ${
-              textDecoration === 'underline'
+              tier.textDecoration === 'underline'
                 ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
                 : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}
@@ -2425,9 +2432,9 @@ function TierColumn({
           </button>
           <div className="w-px h-5 bg-[var(--color-border)] mx-0.5 self-center" />
           <button
-            onClick={() => setTextAlign('left')}
+            onClick={() => updateTier({ textAlign: 'left' })}
             className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
-              textAlign === 'left'
+              tier.textAlign === 'left'
                 ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
                 : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}
@@ -2441,9 +2448,9 @@ function TierColumn({
             </svg>
           </button>
           <button
-            onClick={() => setTextAlign('center')}
+            onClick={() => updateTier({ textAlign: 'center' })}
             className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
-              textAlign === 'center'
+              tier.textAlign === 'center'
                 ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
                 : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}
@@ -2457,9 +2464,9 @@ function TierColumn({
             </svg>
           </button>
           <button
-            onClick={() => setTextAlign('right')}
+            onClick={() => updateTier({ textAlign: 'right' })}
             className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
-              textAlign === 'right'
+              tier.textAlign === 'right'
                 ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
                 : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}

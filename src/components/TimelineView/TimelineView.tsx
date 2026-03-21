@@ -174,7 +174,7 @@ export function TimelineView() {
       .filter((t) => t.visible)
       .map((tier) => ({
         tier,
-        labels: generateTierLabels(tier.unit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth),
+        labels: generateTierLabels(tier.unit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth, tier.format),
       }));
   }, [origin, totalDays, timescale]);
 
@@ -455,7 +455,7 @@ export function TimelineView() {
                   return (
                     <div
                       key={i}
-                      className="border-r border-white/10 flex items-center justify-center shrink-0 overflow-hidden"
+                      className={`flex items-center shrink-0 overflow-hidden ${tier.separators ? 'border-r border-white/20' : ''}`}
                       style={{
                         position: 'absolute',
                         left: startX,
@@ -463,6 +463,11 @@ export function TimelineView() {
                         height: 28,
                         color: tier.fontColor,
                         fontSize: tier.fontSize,
+                        fontFamily: tier.fontFamily,
+                        fontWeight: tier.fontWeight,
+                        fontStyle: tier.fontStyle,
+                        textDecoration: tier.textDecoration,
+                        justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
                       }}
                     >
                       <span className="truncate px-1">{label.label}</span>

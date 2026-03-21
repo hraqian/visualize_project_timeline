@@ -236,12 +236,28 @@ export interface Dependency {
 
 export type TimescaleTier = 'year' | 'quarter' | 'month' | 'week' | 'day';
 
+// Format options per unit type
+export type YearFormat = 'yyyy' | 'yy';                                           // 2020 | 20
+export type QuarterFormat = 'Qq yyyy' | 'Qq';                                     // Q1 2020 | Q1
+export type MonthFormat = 'MMM' | 'MMMM' | 'M_letter' | 'MM' | 'M_num';         // Jul | July | J | 07 | 7
+export type WeekFormat = 'w_num' | 'Ww';                                          // 1 | Week 1
+export type DayFormat = 'd_num' | 'EEE' | 'EEEE' | 'dd' | 'MM/dd';              // 1 | Mon | Monday | 01 | 03/20
+
+export type TierFormat = YearFormat | QuarterFormat | MonthFormat | WeekFormat | DayFormat;
+
 export interface TimescaleTierConfig {
   unit: TimescaleTier;
+  format: TierFormat;
   visible: boolean;
   backgroundColor: string;
   fontColor: string;
   fontSize: number;
+  fontFamily: string;
+  fontWeight: number;                   // 400 | 700
+  fontStyle: 'normal' | 'italic';
+  textDecoration: 'none' | 'underline';
+  textAlign: 'left' | 'center' | 'right';
+  separators: boolean;
 }
 
 export interface TimescaleConfig {

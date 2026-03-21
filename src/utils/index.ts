@@ -8,6 +8,7 @@ import {
   endOfMonth,
   endOfYear,
   format,
+  getWeek,
   eachMonthOfInterval,
   eachYearOfInterval,
   eachWeekOfInterval,
@@ -19,6 +20,7 @@ import type {
   Dependency,
   TimescaleTier,
   TimescaleConfig,
+  TierFormat,
 } from '@/types';
 
 // ─── Date Helpers ────────────────────────────────────────────────────────────
@@ -55,12 +57,64 @@ export interface TimescaleLabel {
   isToday?: boolean;
 }
 
+// Map a date to a label string based on unit + format
+function formatTierLabel(date: Date, unit: TimescaleTier, fmt: TierFormat, fiscalYearStartMonth: number): string {
+  switch (unit) {
+    case 'year': {
+      if (fiscalYearStartMonth !== 1) {
+        const fyStart = new Date(date.getFullYear(), fiscalYearStartMonth - 1, 1);
+        const base = `FY${fyStart.getFullYear()}`;
+        return fmt === 'yy' ? `FY${String(fyStart.getFullYear()).slice(-2)}` : base;
+      }
+      return fmt === 'yy' ? format(date, 'yy') : format(date, 'yyyy');
+    }
+    case 'quarter': {
+      const q = Math.floor(date.getMonth() / 3) + 1;
+      if (fmt === 'Qq') return `Q${q}`;
+      return `Q${q} ${format(date, 'yyyy')}`;
+    }
+    case 'month': {
+      switch (fmt) {
+        case 'MMMM': return format(date, 'MMMM');     // July
+        case 'M_letter': return format(date, 'MMMMM'); // J (first letter)
+        case 'MM': return format(date, 'MM');           // 07
+        case 'M_num': return String(date.getMonth() + 1); // 7
+        default: return format(date, 'MMM');            // Jul
+      }
+    }
+    case 'week': {
+      const w = getWeek(date, { weekStartsOn: 1 });
+      if (fmt === 'Ww') return `Week ${w}`;
+      return String(w);                                 // 1
+    }
+    case 'day': {
+      switch (fmt) {
+        case 'EEE': return format(date, 'EEE');         // Mon
+        case 'EEEE': return format(date, 'EEEE');       // Monday
+        case 'dd': return format(date, 'dd');            // 01
+        case 'MM/dd': return format(date, 'MM/dd');      // 03/20
+        default: return String(date.getDate());          // 1
+      }
+    }
+  }
+}
+
 export function generateTierLabels(
   tier: TimescaleTier,
   rangeStart: Date,
   rangeEnd: Date,
-  fiscalYearStartMonth: number
+  fiscalYearStartMonth: number,
+  fmt?: TierFormat
 ): TimescaleLabel[] {
+  // Default format per unit when not specified
+  const effectiveFmt: TierFormat = fmt ?? ({
+    year: 'yyyy',
+    quarter: 'Qq yyyy',
+    month: 'MMM',
+    week: 'w_num',
+    day: 'd_num',
+  } as Record<TimescaleTier, TierFormat>)[tier];
+
   switch (tier) {
     case 'year': {
       const years = eachYearOfInterval({ start: startOfYear(rangeStart), end: rangeEnd });
@@ -68,10 +122,10 @@ export function generateTierLabels(
         const end = endOfYear(y);
         if (fiscalYearStartMonth !== 1) {
           const fyStart = new Date(y.getFullYear(), fiscalYearStartMonth - 1, 1);
-          const label = `FY${fyStart.getFullYear()}`;
-          return { label, startDate: fyStart, endDate: new Date(fyStart.getFullYear() + 1, fiscalYearStartMonth - 1, 0) };
+          const fyEnd = new Date(fyStart.getFullYear() + 1, fiscalYearStartMonth - 1, 0);
+          return { label: formatTierLabel(y, tier, effectiveFmt, fiscalYearStartMonth), startDate: fyStart, endDate: fyEnd };
         }
-        return { label: format(y, 'yyyy'), startDate: y, endDate: end };
+        return { label: formatTierLabel(y, tier, effectiveFmt, fiscalYearStartMonth), startDate: y, endDate: end };
       });
     }
     case 'quarter': {
@@ -84,7 +138,7 @@ export function generateTierLabels(
           currentQ = q;
           const qStart = new Date(m.getFullYear(), q * 3, 1);
           const qEnd = endOfMonth(new Date(m.getFullYear(), q * 3 + 2, 1));
-          quarters.push({ label: `Q${q + 1} ${format(m, 'yyyy')}`, startDate: qStart, endDate: qEnd });
+          quarters.push({ label: formatTierLabel(qStart, tier, effectiveFmt, fiscalYearStartMonth), startDate: qStart, endDate: qEnd });
         }
       }
       return quarters;
@@ -92,7 +146,7 @@ export function generateTierLabels(
     case 'month': {
       const months = eachMonthOfInterval({ start: startOfMonth(rangeStart), end: rangeEnd });
       return months.map((m) => ({
-        label: format(m, 'MMM yyyy'),
+        label: formatTierLabel(m, tier, effectiveFmt, fiscalYearStartMonth),
         startDate: m,
         endDate: endOfMonth(m),
       }));
@@ -100,7 +154,7 @@ export function generateTierLabels(
     case 'week': {
       const weeks = eachWeekOfInterval({ start: startOfWeek(rangeStart), end: rangeEnd }, { weekStartsOn: 1 });
       return weeks.map((w) => ({
-        label: format(w, "'W'w"),
+        label: formatTierLabel(w, tier, effectiveFmt, fiscalYearStartMonth),
         startDate: w,
         endDate: addDays(w, 6),
       }));
@@ -108,7 +162,7 @@ export function generateTierLabels(
     case 'day': {
       const days = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
       return days.map((d) => ({
-        label: format(d, 'd'),
+        label: formatTierLabel(d, tier, effectiveFmt, fiscalYearStartMonth),
         startDate: d,
         endDate: d,
         isToday: isToday(d),
@@ -230,11 +284,58 @@ export function shiftDependents(
 
 // ─── Timescale Defaults ──────────────────────────────────────────────────────
 
+export function getDefaultFormatForUnit(unit: TimescaleTier): TierFormat {
+  const map: Record<TimescaleTier, TierFormat> = {
+    year: 'yyyy',
+    quarter: 'Qq yyyy',
+    month: 'MMM',
+    week: 'w_num',
+    day: 'd_num',
+  };
+  return map[unit];
+}
+
+export function getFormatOptionsForUnit(unit: TimescaleTier): { value: TierFormat; label: string }[] {
+  switch (unit) {
+    case 'year':
+      return [
+        { value: 'yyyy', label: '2020, 2021' },
+        { value: 'yy', label: '20, 21' },
+      ];
+    case 'quarter':
+      return [
+        { value: 'Qq yyyy', label: 'Q1 2020' },
+        { value: 'Qq', label: 'Q1' },
+      ];
+    case 'month':
+      return [
+        { value: 'MMM', label: 'Jul, Aug, Sep' },
+        { value: 'MMMM', label: 'July, August' },
+        { value: 'M_letter', label: 'J, A, S' },
+        { value: 'MM', label: '07, 08, 09' },
+        { value: 'M_num', label: '1, 2, 3' },
+      ];
+    case 'week':
+      return [
+        { value: 'w_num', label: '1, 2, 3' },
+        { value: 'Ww', label: 'Week 1, Week 2' },
+      ];
+    case 'day':
+      return [
+        { value: 'd_num', label: '1, 2, 3' },
+        { value: 'EEE', label: 'Mon, Tue' },
+        { value: 'EEEE', label: 'Monday, Tuesday' },
+        { value: 'dd', label: '01, 02, 03' },
+        { value: 'MM/dd', label: '03/20' },
+      ];
+  }
+}
+
 export function getDefaultTimescale(): TimescaleConfig {
   return {
     tiers: [
-      { unit: 'year', visible: true, backgroundColor: '#1e293b', fontColor: '#f8fafc', fontSize: 13 },
-      { unit: 'month', visible: true, backgroundColor: '#334155', fontColor: '#e2e8f0', fontSize: 12 },
+      { unit: 'year', format: 'yyyy', visible: true, backgroundColor: '#1e293b', fontColor: '#f8fafc', fontSize: 13, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
+      { unit: 'month', format: 'MMM', visible: true, backgroundColor: '#334155', fontColor: '#e2e8f0', fontSize: 12, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
     ],
     fiscalYearStartMonth: 1,
     showToday: true,
