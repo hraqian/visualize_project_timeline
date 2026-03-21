@@ -44,16 +44,14 @@ function App() {
     const targetSwimlane = swimlanes.length > 0
       ? [...swimlanes].sort((a, b) => a.order - b.order)[0]
       : null;
-    if (!targetSwimlane) return;
-    addItem({ name: 'New Task', type: 'task', swimlaneId: targetSwimlane.id });
+    addItem({ name: 'New Task', type: 'task', swimlaneId: targetSwimlane?.id ?? null });
   }, [swimlanes, addItem]);
 
   const handleAddMilestone = useCallback(() => {
     const targetSwimlane = swimlanes.length > 0
       ? [...swimlanes].sort((a, b) => a.order - b.order)[0]
       : null;
-    if (!targetSwimlane) return;
-    addItem({ name: 'New Milestone', type: 'milestone', swimlaneId: targetSwimlane.id });
+    addItem({ name: 'New Milestone', type: 'milestone', swimlaneId: targetSwimlane?.id ?? null });
   }, [swimlanes, addItem]);
 
   const handleAddSwimlane = useCallback(() => {
@@ -114,16 +112,14 @@ function App() {
             <>
               <button
                 onClick={handleAddTask}
-                disabled={swimlanes.length === 0}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
               >
                 <Plus size={14} />
                 Task
               </button>
               <button
                 onClick={handleAddMilestone}
-                disabled={swimlanes.length === 0}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
               >
                 <Plus size={14} />
                 Milestone
