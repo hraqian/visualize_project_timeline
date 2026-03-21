@@ -194,18 +194,19 @@ export function buildVisibleTierCells(
   const minLabelWidth: Record<string, number> = { day: 60, week: 70, month: 50, quarter: 50, year: 50 };
   const minW = minLabelWidth[unit] ?? 40;
 
-  // Calculate skip factor
+  // Calculate skip factor using a full interior cell (not the first, which may be partial)
   let skipFactor = 1;
   if (labels.length > 1) {
-    const firstStartFrac = differenceInDays(labels[0].startDate, originDate) / totalDays;
-    const firstEndFrac = (differenceInDays(labels[0].endDate, originDate) + 1) / totalDays;
-    const cellWidthPx = (firstEndFrac - firstStartFrac) * barWidthPx;
+    const refIdx = Math.min(1, labels.length - 1);
+    const refStartFrac = differenceInDays(labels[refIdx].startDate, originDate) / totalDays;
+    const refEndFrac = (differenceInDays(labels[refIdx].endDate, originDate) + 1) / totalDays;
+    const cellWidthPx = (refEndFrac - refStartFrac) * barWidthPx;
     if (cellWidthPx < minW) {
       skipFactor = Math.ceil(minW / cellWidthPx);
     }
   }
 
-  // Build merged cells
+  // Build cells — first cell starts at the origin (fraction 0), rest use their natural positions
   const cells: TierCell[] = [];
   for (let i = 0; i < labels.length; i += skipFactor) {
     const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
@@ -217,17 +218,6 @@ export function buildVisibleTierCells(
         fraction: Math.max(startFrac, 0),
         widthFrac: Math.max(endFrac - Math.max(startFrac, 0), 0.001),
       });
-    }
-  }
-
-  // If the first cell is too narrow, merge into second
-  if (cells.length >= 2) {
-    const firstWidthPx = cells[0].widthFrac * barWidthPx;
-    const minFirstWidth = unit === 'week' || unit === 'day' ? 60 : minW;
-    if (firstWidthPx < minFirstWidth) {
-      cells[1].widthFrac = (cells[1].fraction + cells[1].widthFrac) - cells[0].fraction;
-      cells[1].fraction = cells[0].fraction;
-      cells.shift();
     }
   }
 
