@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 21, 2026 (session 11 — end caps committed)
+> **Last updated**: March 21, 2026 (session 12 — save/load, auto-focus, UX fixes)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -45,24 +45,26 @@
 ### File Structure
 ```
 src/
-├── App.tsx                              # Root layout: banner + toolbar + main content (202 lines)
+├── App.tsx                              # Root layout: banner + toolbar + main content, Save/Projects buttons, dirty state banner
 ├── index.css                            # CSS variables (light-only), Tailwind directives
 ├── main.tsx                             # Entry point
 ├── types/
-│   └── index.ts                         # All TypeScript types, interfaces, constants (434 lines)
+│   └── index.ts                         # All TypeScript types, interfaces, constants (projectId, lastModified, isDirty on ProjectState)
 ├── store/
-│   └── useProjectStore.ts               # Zustand store — all state + actions (811 lines)
+│   └── useProjectStore.ts               # Zustand store — all state + actions, wrapped set() for auto-dirty tracking, save/load/new project actions, addItem returns string
 ├── utils/
-│   └── index.ts                         # Utility functions: timescale generation, buildVisibleTierCells, resolveAutoUnit, critical path, project range (427 lines)
+│   ├── index.ts                         # Utility functions: timescale generation, buildVisibleTierCells, resolveAutoUnit, critical path, project range
+│   └── storage.ts                       # localStorage save/load/delete/list utilities, ProjectIndexEntry type
 ├── components/
 │   ├── DataView/
-│   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups (1509 lines)
+│   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups, focusItemId auto-focus
 │   │   └── TypePicker.tsx               # Type column cell + popover (shape/color picker)
 │   ├── TimelineView/
-│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, timescale header (1209 lines)
+│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, timescale header, card container
 │   ├── StylePane/
-│   │   └── StylePane.tsx                # Per-item style editor + TierSettingsModal (3496 lines)
+│   │   └── StylePane.tsx                # Per-item style editor + TierSettingsModal
 │   └── common/
+│       ├── ProjectManagerModal.tsx       # Modal listing saved projects with New/Open/Delete
 │       ├── MilestoneIconComponent.tsx   # Renders milestone icons using Lucide
 │       ├── AdvancedColorPicker.tsx      # Full Office-style color picker with theme/standard/recent colors
 │       ├── ShapeDropdown.tsx            # Clean trigger + 6-col icon grid; exports ShapePreview
@@ -234,7 +236,7 @@ interface TimescaleConfig {
 
 ### Store Actions (`src/store/useProjectStore.ts`)
 - **Global**: `setActiveView`, `setSelectedItem`, `setSelectedSwimlane`, `setStylePaneSection`, `setZoom`, `setProjectName`, `setTimelineTitle`
-- **Items**: `addItem`, `addItemRelative`, `duplicateItem`, `updateItem`, `deleteItem`, `toggleVisibility`, `toggleItemType`, `moveItem`, `resizeItem`, `setItemRow`, `reorderItem`, `moveItemToSwimlane`, `moveItemToGroup`
+- **Items**: `addItem` (returns string ID), `addItemRelative`, `duplicateItem`, `updateItem`, `deleteItem`, `toggleVisibility`, `toggleItemType`, `moveItem`, `resizeItem`, `setItemRow`, `reorderItem`, `moveItemToSwimlane`, `moveItemToGroup`
 - **Swimlanes**: `addSwimlane`, `addSwimlaneRelative`, `duplicateSwimlane`, `hideSwimlaneItems`, `updateSwimlane`, `applySwimlaneStyleToAll`, `deleteSwimlane`, `reorderSwimlane`, `setSwimlaneSpacing`
 - **Dependencies**: `addDependency`, `removeDependency`
 - **Styles**: `updateTaskStyle`, `updateMilestoneStyle`, `applyStyleToAll`, `applyPartialStyleToAll`, `applyTaskBarStyleToAll`
@@ -244,11 +246,13 @@ interface TimescaleConfig {
 - **Columns**: `toggleColumn`
 - **Multi-select**: `toggleCheckedItem`, `checkAllItems`, `uncheckAllItems`, `setCheckedItems`
 - **Bulk ops**: `duplicateCheckedItems`, `hideCheckedItems`, `deleteCheckedItems`, `setColorForCheckedItems`
+- **Project management**: `saveProject`, `loadProject`, `newProject`
 
-### Sample Data
-- **4 swimlanes**: Planning, Development, Testing, Deployment
-- **12 items** (i1-i12): mix of tasks and milestones with various status IDs
-- **12 dependencies**: forming a realistic project dependency chain
+### Initial State
+- **App starts empty** — no sample data loaded
+- `createSampleData()` exists in store but is unused (dead code, kept for reference)
+- **Project Manager modal** shown on initial load (`showProjectManager: true`)
+- **Default view**: Data (not Timeline)
 - Default zoom: 8, default timescale: year (#1e293b) + month (#334155) via `getDefaultTimescale()`
 
 ---
@@ -257,12 +261,13 @@ interface TimescaleConfig {
 
 ### Row 1 (top banner)
 - Colored bar: `#4f46e5` (indigo-600)
-- Project name centered with " - Saved" suffix, white text
+- Project name centered, white text
+- Shows "Unsaved changes" when dirty, "Saved" after manual save
 
 ### Row 2 (toolbar)
-- Left: view-specific add buttons
+- Left: view-specific add buttons (+ Task, + Milestone always enabled)
 - Center: `Data` / `Timeline` tabs
-- Right: `Download` + gear icon
+- Right: `Save` button + `Projects` button (FolderOpen icon) + `Download` + gear icon
 
 ### Main content
 - Data View or Timeline View fills remaining space
@@ -636,11 +641,32 @@ Contains:
 - **`TimescaleConfig` expanded**: `todayPosition`, `todayAutoAdjusted`, `showElapsedTime`, `elapsedTimeColor`, `elapsedTimeThickness`, `leftEndCap`, `rightEndCap`
 - **`getDefaultTimescale()`** updated with defaults for all new fields
 
+### Phase 13 — Save/Load + UX Improvements (session 12)
+- **Timeline canvas card container** (`554577d`): Wrapped timeline content in bordered card (white interior, light grey exterior, rounded corners, small margin)
+- **Reduced StylePane width** (`52e4e76`): 320px to 280px for more canvas space
+- **Save/load multiple projects** (`f70f23f`):
+  - Full localStorage persistence with manual save
+  - `storage.ts` utility: `saveProjectToStorage()`, `loadProjectFromStorage()`, `deleteProjectFromStorage()`, `listProjects()`
+  - localStorage keys: `pt_projects_index` for project list, `pt_project_{id}` for each project's data
+  - Store: `projectId`, `lastModified`, `isDirty` added to `ProjectState`; wrapped `set()` auto-marks `isDirty: true` via `DIRTY_KEYS` set
+  - Saveable keys: `projectName`, `timelineTitle`, `items`, `swimlanes`, `dependencies`, `statusLabels`, `columnVisibility`, `timescale`, `zoom`, `swimlaneSpacing`, `showCriticalPath`
+  - Transient UI state (NOT saved): `activeView`, `selectedItemId`, `selectedSwimlaneId`, `stylePaneSection`, `checkedItemIds`, `selectedTierIndex`, `isDirty`, `lastModified`
+  - Save button and "Projects" button (FolderOpen icon) in toolbar
+  - Banner shows "Unsaved changes" when dirty, "Saved" after save
+- **ProjectManagerModal** (`1a93403`): Modal dialog with New/Open/Delete, shown on initial load
+- **Default view to Data** (`5d132a0`): Initial load, new project, and load project all default to Data view; +Task/+Milestone always enabled (no swimlane required)
+- **Empty initial state** (`f46441b`): App starts with blank project, no sample data loaded
+- **Inline add simplified** (`31dec23`): "Add task or milestone" link in DataView directly adds a task on click (no dropdown)
+- **Auto-focus name input** (`628231d`): After adding a new item (inline add, +Task, +Milestone), name input auto-focuses with text selected
+  - `addItem` returns the new item's ID
+  - `focusItemId` state in DataView, threaded through IndependentItemsGroup/SwimlaneGroup to ItemRow
+  - ItemRow uses `nameRef` + `useEffect` to focus and select text, then clears `focusItemId`
+
 ---
 
 ## Known Pre-existing Build Errors
 
-`npx tsc --noEmit` passes clean as of session 11.
+`npx tsc --noEmit` passes clean as of session 12.
 
 ---
 
@@ -692,6 +718,9 @@ All sections COMPLETED:
 - Show/hide toggles are in TaskStyle (persisted per item), toggled via CollapsibleRow's toggle prop
 - `swimlaneSpacing` is a **global** property on `ProjectState` (not per-swimlane), clamped 0-40, default 5
 - `ApplyToAllBox` supports optional `excludeSwimlanes`/`setExcludeSwimlanes` AND `onlyInSwimlane`/`setOnlyInSwimlane` props (mutually exclusive modes)
+- **Dirty tracking**: Store's `set()` is wrapped — any mutation of a key in `DIRTY_KEYS` automatically sets `isDirty: true`. No manual `isDirty: true` needed in actions.
+- **Save is manual only**: User clicks "Save" button; no auto-save. Banner shows unsaved/saved status.
+- **`addItem` returns `string`** (the new item's ID) — supports auto-focus after add
 - **CRITICAL**: `buildVisibleTierCells()` is the single source of truth for timescale cell layout — used by both TimelineView and TierSettingsModal preview. Changes to one must be reflected in the other.
 - **CRITICAL**: The padded date range must be computed identically in TimelineView and TierSettingsModal. Both use: `startOfMonth(subDays(projectStart, 14))` for start, `addMonths` for end.
 - `ScaleSection` in StylePane is **wired to the store** via `selectedTierIndex` — reads/writes selected tier's config
