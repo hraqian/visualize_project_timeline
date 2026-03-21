@@ -530,7 +530,11 @@ export function TimelineView() {
                   style={{ backgroundColor: timescale.todayColor }}
                 />
                 <div
-                  className="absolute -top-0 -translate-x-1/2 px-1.5 py-0.5 rounded-b text-[10px] font-medium text-white"
+                  className={`absolute -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-medium text-white ${
+                    (timescale.todayPosition ?? 'below') === 'above'
+                      ? 'bottom-0 rounded-t'
+                      : 'top-0 rounded-b'
+                  }`}
                   style={{ backgroundColor: timescale.todayColor }}
                 >
                   Today

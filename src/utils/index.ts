@@ -424,5 +424,7 @@ export function getDefaultTimescale(): TimescaleConfig {
     fiscalYearStartMonth: 1,
     showToday: true,
     todayColor: '#ef4444',
+    todayPosition: 'below',
+    todayAutoAdjusted: false,
   };
 }

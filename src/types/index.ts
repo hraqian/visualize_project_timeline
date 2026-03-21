@@ -262,12 +262,16 @@ export interface TimescaleTierConfig {
 
 export type TimescaleBarShape = 'rectangle' | 'rounded' | 'leaf' | 'ellipse' | 'modern';
 
+export type TodayMarkerPosition = 'above' | 'below';
+
 export interface TimescaleConfig {
   tiers: TimescaleTierConfig[];
   barShape: TimescaleBarShape;
   fiscalYearStartMonth: number; // 1-12
   showToday: boolean;
   todayColor: string;
+  todayPosition: TodayMarkerPosition;
+  todayAutoAdjusted: boolean; // true after user clicks Auto-adjust
 }
 
 // ─── App State ───────────────────────────────────────────────────────────────

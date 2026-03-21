@@ -32,6 +32,7 @@ import {
   type TimescaleTierConfig,
   type TimescaleBarShape,
   type TierFormat,
+  type TodayMarkerPosition,
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
@@ -1890,7 +1891,7 @@ function TimescaleTabContent({
           onToggleExpand={() => handleToggleExpand('todayMarker')}
           toggle={{ checked: timescale.showToday, onChange: (v) => updateTimescale({ showToday: v }) }}
         >
-          <p className="text-xs text-[var(--color-text-muted)]">Today marker controls coming soon.</p>
+          <TodayMarkerSection />
         </CollapsibleRow>
 
         {/* Elapsed time */}
@@ -1922,6 +1923,84 @@ function TimescaleTabContent({
         >
           <p className="text-xs text-[var(--color-text-muted)]">Right end cap controls coming soon.</p>
         </CollapsibleRow>
+      </div>
+    </div>
+  );
+}
+
+// ─── Today Marker Section ───────────────────────────────────────────────────
+
+function TodayMarkerSection() {
+  const timescale = useProjectStore((s) => s.timescale);
+  const updateTimescale = useProjectStore((s) => s.updateTimescale);
+
+  const position = timescale.todayPosition ?? 'below';
+  const autoAdjusted = timescale.todayAutoAdjusted ?? false;
+
+  return (
+    <div className="space-y-4">
+      {/* Color */}
+      <div>
+        <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+          Color
+        </label>
+        <AdvancedColorPicker
+          value={timescale.todayColor}
+          onChange={(todayColor) => updateTimescale({ todayColor })}
+        />
+      </div>
+
+      {/* Position */}
+      <div>
+        <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+          Position
+        </label>
+        <div className="flex items-center gap-1">
+          {/* Below timescale */}
+          <button
+            onClick={() => updateTimescale({ todayPosition: 'below' })}
+            className={`flex items-center justify-center w-9 h-9 rounded border transition-colors ${
+              position === 'below'
+                ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                : 'border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Below timescale"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="2" width="12" height="3" rx="0.5" fill={position === 'below' ? 'var(--color-primary)' : '#94a3b8'} opacity="0.5" />
+              <line x1="8" y1="5" x2="8" y2="14" stroke={position === 'below' ? 'var(--color-primary)' : '#94a3b8'} strokeWidth="1.5" />
+              <path d="M5.5 11.5L8 14L10.5 11.5" stroke={position === 'below' ? 'var(--color-primary)' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {/* Above timescale */}
+          <button
+            onClick={() => updateTimescale({ todayPosition: 'above' })}
+            className={`flex items-center justify-center w-9 h-9 rounded border transition-colors ${
+              position === 'above'
+                ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5'
+                : 'border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Above timescale"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="11" width="12" height="3" rx="0.5" fill={position === 'above' ? 'var(--color-primary)' : '#94a3b8'} opacity="0.5" />
+              <line x1="8" y1="11" x2="8" y2="2" stroke={position === 'above' ? 'var(--color-primary)' : '#94a3b8'} strokeWidth="1.5" />
+              <path d="M5.5 4.5L8 2L10.5 4.5" stroke={position === 'above' ? 'var(--color-primary)' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {/* Auto-adjust button */}
+          <button
+            onClick={() => updateTimescale({ todayAutoAdjusted: true })}
+            disabled={autoAdjusted}
+            className={`ml-1 px-3 h-9 rounded border text-xs font-medium transition-colors ${
+              autoAdjusted
+                ? 'border-[var(--color-border)] text-[var(--color-text-muted)] bg-[var(--color-surface)]'
+                : 'border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+          >
+            {autoAdjusted ? 'Auto-adjusted' : 'Auto-adjust'}
+          </button>
+        </div>
       </div>
     </div>
   );
