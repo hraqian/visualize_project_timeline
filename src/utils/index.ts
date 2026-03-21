@@ -417,7 +417,6 @@ export function getFormatOptionsForUnit(unit: TimescaleTier): { value: TierForma
 export function getDefaultTimescale(): TimescaleConfig {
   return {
     tiers: [
-      { unit: 'year', format: 'yyyy', visible: true, backgroundColor: '#1e293b', fontColor: '#f8fafc', fontSize: 13, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
       { unit: 'month', format: 'MMM', visible: true, backgroundColor: '#334155', fontColor: '#e2e8f0', fontSize: 12, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
     ],
     barShape: 'rounded',
