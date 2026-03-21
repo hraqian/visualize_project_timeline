@@ -212,7 +212,7 @@ export function buildVisibleTierCells(
     }
   }
 
-  // Build cells with skip-factor grouping — drop partial cells at the end
+  // Build cells with skip-factor grouping — clamp last cell to bar edge
   const cells: TierCell[] = [];
   for (let i = 0; i < labels.length; i += skipFactor) {
     const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
@@ -220,11 +220,11 @@ export function buildVisibleTierCells(
     const endFrac = (differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays;
     if (endFrac <= 0) continue; // entirely before the visible range
     if (startFrac >= 1) break;  // past the visible range
-    if (endFrac > 1) break;     // partial period at the end — don't show
+    const clampedEnd = Math.min(endFrac, 1);
     cells.push({
       label: labels[i].label,
       fraction: Math.max(startFrac, 0),
-      widthFrac: Math.max(endFrac - Math.max(startFrac, 0), 0.001),
+      widthFrac: Math.max(clampedEnd - Math.max(startFrac, 0), 0.001),
     });
   }
 
