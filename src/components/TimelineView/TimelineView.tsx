@@ -118,6 +118,15 @@ export function TimelineView() {
     return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: subDays(padEnd, 1) };
   }, [items]);
 
+  // Auto-fit zoom to container width on mount
+  useEffect(() => {
+    if (!containerRef.current || totalDays <= 0) return;
+    const containerWidth = containerRef.current.clientWidth;
+    if (containerWidth <= 0) return;
+    const idealZoom = Math.round(containerWidth / totalDays);
+    setZoom(Math.max(2, Math.min(30, idealZoom)));
+  }, [totalDays, setZoom]);
+
   const totalWidth = totalDays * zoom;
 
   // Map item to x position
