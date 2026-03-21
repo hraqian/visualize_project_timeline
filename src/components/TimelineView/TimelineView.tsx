@@ -485,6 +485,12 @@ export function TimelineView() {
                  }
                }
 
+               // Prefix first visible label for sequential units (week/day)
+               if (visibleCells.length > 0 && (tier.unit === 'week' || tier.unit === 'day')) {
+                 const prefix = tier.unit === 'week' ? 'Week ' : 'Day ';
+                 visibleCells[0].label = prefix + visibleCells[0].label;
+               }
+
                return (
                  <div key={tierIdx} className="flex h-7 relative" style={{ backgroundColor: tier.backgroundColor }}>
                    {visibleCells.map((cell, ci) => (

@@ -2220,6 +2220,12 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
         }
       }
 
+      // Prefix first visible label for sequential units (week/day)
+      if (cells.length > 0 && (tier.unit === 'week' || tier.unit === 'day')) {
+        const prefix = tier.unit === 'week' ? 'Week ' : 'Day ';
+        cells[0].label = prefix + cells[0].label;
+      }
+
       return { tier, cells };
     });
   }, [visibleTiers, origin, totalDays, timescale.fiscalYearStartMonth]);
