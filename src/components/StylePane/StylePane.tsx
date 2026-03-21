@@ -2206,9 +2206,20 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
         if (startFrac < 1) {
           cells.push({
             label: labels[i].label,
-            fraction: startFrac,
-            widthFrac: Math.max(endFrac - startFrac, 0.001),
+            fraction: Math.max(startFrac, 0),
+            widthFrac: Math.max(endFrac - Math.max(startFrac, 0), 0.001),
           });
+        }
+      }
+      // If the first cell is too narrow for its label, merge it into the second cell
+      if (cells.length >= 2) {
+        const firstWidthPx = cells[0].widthFrac * BAR_WIDTH_PX;
+        const minFirstWidth = tier.unit === 'week' || tier.unit === 'day' ? 60 : minW;
+        if (firstWidthPx < minFirstWidth) {
+          // Extend second cell to start at 0, absorbing the first
+          cells[1].widthFrac = (cells[1].fraction + cells[1].widthFrac) - cells[0].fraction;
+          cells[1].fraction = cells[0].fraction;
+          cells.shift();
         }
       }
       // Extend last cell to fill bar

@@ -470,10 +470,19 @@ export function TimelineView() {
                  if (startX < totalWidth) {
                    visibleCells.push({
                      label: labels[i].label,
-                     startX,
-                     width: Math.max(endX - startX, 1),
+                     startX: Math.max(startX, 0),
+                     width: Math.max(endX - Math.max(startX, 0), 1),
                      index: i,
                    });
+                 }
+               }
+               // If the first cell is too narrow for its label, merge into the second
+               if (visibleCells.length >= 2) {
+                 const minFirstWidth = tier.unit === 'week' || tier.unit === 'day' ? 60 : minW;
+                 if (visibleCells[0].width < minFirstWidth) {
+                   visibleCells[1].width = (visibleCells[1].startX + visibleCells[1].width) - visibleCells[0].startX;
+                   visibleCells[1].startX = visibleCells[0].startX;
+                   visibleCells.shift();
                  }
                }
                // Extend last cell to fill any small trailing gap
