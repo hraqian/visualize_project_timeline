@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo } from 'react';
+import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
@@ -125,7 +125,8 @@ export function TimelineView() {
     if (containerWidth <= 0) return;
     const idealZoom = Math.round(containerWidth / totalDays);
     setZoom(Math.max(2, Math.min(30, idealZoom)));
-  }, [totalDays, setZoom]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalWidth = totalDays * zoom;
 
