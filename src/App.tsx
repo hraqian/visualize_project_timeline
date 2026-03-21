@@ -187,7 +187,7 @@ function App() {
           {activeView === 'data' ? <DataView /> : <TimelineView />}
         </div>
         {isTimeline && (
-          <div className="w-[320px] border-l border-[var(--color-border)] overflow-y-auto scrollbar-thin shrink-0">
+          <div className="w-[280px] border-l border-[var(--color-border)] overflow-y-auto scrollbar-thin shrink-0">
             <StylePane />
           </div>
         )}
