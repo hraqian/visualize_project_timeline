@@ -171,6 +171,84 @@ export function generateTierLabels(
   }
 }
 
+// ─── Visible Tier Cells ──────────────────────────────────────────────────────
+
+export interface TierCell {
+  label: string;
+  fraction: number;   // 0-1 position within bar
+  widthFrac: number;  // 0-1 width within bar
+}
+
+/**
+ * Build visible tier cells from raw labels.
+ * Shared by both the main TimelineView and the Tier Settings Modal preview.
+ * Works in fractional (0-1) coordinates; callers convert to px or % as needed.
+ */
+export function buildVisibleTierCells(
+  labels: TimescaleLabel[],
+  unit: TimescaleTier,
+  originDate: Date,
+  totalDays: number,
+  barWidthPx: number,
+): TierCell[] {
+  const minLabelWidth: Record<string, number> = { day: 60, week: 70, month: 50, quarter: 50, year: 50 };
+  const minW = minLabelWidth[unit] ?? 40;
+
+  // Calculate skip factor
+  let skipFactor = 1;
+  if (labels.length > 1) {
+    const firstStartFrac = differenceInDays(labels[0].startDate, originDate) / totalDays;
+    const firstEndFrac = (differenceInDays(labels[0].endDate, originDate) + 1) / totalDays;
+    const cellWidthPx = (firstEndFrac - firstStartFrac) * barWidthPx;
+    if (cellWidthPx < minW) {
+      skipFactor = Math.ceil(minW / cellWidthPx);
+    }
+  }
+
+  // Build merged cells
+  const cells: TierCell[] = [];
+  for (let i = 0; i < labels.length; i += skipFactor) {
+    const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
+    const endIdx = Math.min(i + skipFactor, labels.length) - 1;
+    const endFrac = (differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays;
+    if (startFrac < 1) {
+      cells.push({
+        label: labels[i].label,
+        fraction: Math.max(startFrac, 0),
+        widthFrac: Math.max(endFrac - Math.max(startFrac, 0), 0.001),
+      });
+    }
+  }
+
+  // If the first cell is too narrow, merge into second
+  if (cells.length >= 2) {
+    const firstWidthPx = cells[0].widthFrac * barWidthPx;
+    const minFirstWidth = unit === 'week' || unit === 'day' ? 60 : minW;
+    if (firstWidthPx < minFirstWidth) {
+      cells[1].widthFrac = (cells[1].fraction + cells[1].widthFrac) - cells[0].fraction;
+      cells[1].fraction = cells[0].fraction;
+      cells.shift();
+    }
+  }
+
+  // Extend last cell to fill bar
+  if (cells.length > 0) {
+    const last = cells[cells.length - 1];
+    const lastEnd = last.fraction + last.widthFrac;
+    if (lastEnd < 1) {
+      last.widthFrac = 1 - last.fraction;
+    }
+  }
+
+  // Prefix first visible label for sequential units
+  if (cells.length > 0 && (unit === 'week' || unit === 'day')) {
+    const prefix = unit === 'week' ? 'Week ' : 'Day ';
+    cells[0].label = prefix + cells[0].label;
+  }
+
+  return cells;
+}
+
 // ─── Critical Path ───────────────────────────────────────────────────────────
 
 export function computeCriticalPath(

@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useMemo } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, addDays, subDays, endOfMonth, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
-import { generateTierLabels, getProjectRange } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, getProjectRange } from '@/utils';
 import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness } from '@/types';
 
@@ -447,69 +447,19 @@ export function TimelineView() {
            {/* Timescale Headers */}
            <div className="sticky top-0 z-10 border-b border-[var(--color-border)]">
              {tierLabels.map(({ tier, labels }, tierIdx) => {
-               // Calculate label skip factor for readability
-                const minLabelWidth: Record<string, number> = { day: 60, week: 70, month: 50, quarter: 50, year: 50 };
-               const minW = minLabelWidth[tier.unit] ?? 40;
-               let skipFactor = 1;
-               if (labels.length > 1) {
-                 const firstStart = differenceInDays(labels[0].startDate, parseISO(origin)) * zoom;
-                 const firstEnd = differenceInDays(labels[0].endDate, parseISO(origin)) * zoom + zoom;
-                 const cellWidth = Math.max(firstEnd - firstStart, 1);
-                 if (cellWidth < minW) {
-                   skipFactor = Math.ceil(minW / cellWidth);
-                 }
-               }
-
-               // Build merged visible label cells
                const originDate = parseISO(origin);
-               const visibleCells: { label: string; startX: number; width: number; index: number }[] = [];
-               for (let i = 0; i < labels.length; i += skipFactor) {
-                 const startX = differenceInDays(labels[i].startDate, originDate) * zoom;
-                 const endIdx = Math.min(i + skipFactor, labels.length) - 1;
-                 const endX = differenceInDays(labels[endIdx].endDate, originDate) * zoom + zoom;
-                 if (startX < totalWidth) {
-                   visibleCells.push({
-                     label: labels[i].label,
-                     startX: Math.max(startX, 0),
-                     width: Math.max(endX - Math.max(startX, 0), 1),
-                     index: i,
-                   });
-                 }
-               }
-               // If the first cell is too narrow for its label, merge into the second
-               if (visibleCells.length >= 2) {
-                 const minFirstWidth = tier.unit === 'week' || tier.unit === 'day' ? 60 : minW;
-                 if (visibleCells[0].width < minFirstWidth) {
-                   visibleCells[1].width = (visibleCells[1].startX + visibleCells[1].width) - visibleCells[0].startX;
-                   visibleCells[1].startX = visibleCells[0].startX;
-                   visibleCells.shift();
-                 }
-               }
-               // Extend last cell to fill any small trailing gap
-               if (visibleCells.length > 0) {
-                 const last = visibleCells[visibleCells.length - 1];
-                 const lastEnd = last.startX + last.width;
-                 if (lastEnd < totalWidth) {
-                   last.width = totalWidth - last.startX;
-                 }
-               }
-
-               // Prefix first visible label for sequential units (week/day)
-               if (visibleCells.length > 0 && (tier.unit === 'week' || tier.unit === 'day')) {
-                 const prefix = tier.unit === 'week' ? 'Week ' : 'Day ';
-                 visibleCells[0].label = prefix + visibleCells[0].label;
-               }
+               const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
 
                return (
                  <div key={tierIdx} className="flex h-7 relative" style={{ backgroundColor: tier.backgroundColor }}>
-                   {visibleCells.map((cell, ci) => (
+                   {cells.map((cell, ci) => (
                      <div
-                       key={cell.index}
+                       key={ci}
                        className={`flex items-center shrink-0 overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
                        style={{
                          position: 'absolute',
-                         left: cell.startX,
-                         width: cell.width,
+                         left: cell.fraction * totalWidth,
+                         width: cell.widthFrac * totalWidth,
                          height: 28,
                          color: tier.fontColor,
                          fontSize: tier.fontSize,

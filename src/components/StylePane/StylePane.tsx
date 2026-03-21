@@ -35,7 +35,7 @@ import {
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, differenceInDays, addDays, subDays, endOfMonth } from 'date-fns';
-import { generateTierLabels, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -2175,7 +2175,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   const visibleTiers = useMemo(() => tiers.filter((t) => t.visible), [tiers]);
   const visibleCount = visibleTiers.length;
 
-  // Generate labels using same algorithm as main TimelineView
+  // Generate labels using shared buildVisibleTierCells utility
   const previewTierLabels = useMemo(() => {
     const originDate = parseISO(origin);
     const rangeEnd = addDays(originDate, totalDays);
@@ -2183,60 +2183,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
     return visibleTiers.map((tier) => {
       const labels = generateTierLabels(tier.unit, originDate, rangeEnd, timescale.fiscalYearStartMonth, tier.format);
-
-      // Same skip-factor logic as TimelineView
-      const minLabelWidth: Record<string, number> = { day: 60, week: 70, month: 50, quarter: 50, year: 50 };
-      const minW = minLabelWidth[tier.unit] ?? 40;
-      let skipFactor = 1;
-      if (labels.length > 1) {
-        const firstStartFrac = differenceInDays(labels[0].startDate, originDate) / totalDays;
-        const firstEndFrac = (differenceInDays(labels[0].endDate, originDate) + 1) / totalDays;
-        const cellWidthPx = (firstEndFrac - firstStartFrac) * BAR_WIDTH_PX;
-        if (cellWidthPx < minW) {
-          skipFactor = Math.ceil(minW / cellWidthPx);
-        }
-      }
-
-      // Build merged visible cells as fractions
-      const cells: { label: string; fraction: number; widthFrac: number }[] = [];
-      for (let i = 0; i < labels.length; i += skipFactor) {
-        const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
-        const endIdx = Math.min(i + skipFactor, labels.length) - 1;
-        const endFrac = (differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays;
-        if (startFrac < 1) {
-          cells.push({
-            label: labels[i].label,
-            fraction: Math.max(startFrac, 0),
-            widthFrac: Math.max(endFrac - Math.max(startFrac, 0), 0.001),
-          });
-        }
-      }
-      // If the first cell is too narrow for its label, merge it into the second cell
-      if (cells.length >= 2) {
-        const firstWidthPx = cells[0].widthFrac * BAR_WIDTH_PX;
-        const minFirstWidth = tier.unit === 'week' || tier.unit === 'day' ? 60 : minW;
-        if (firstWidthPx < minFirstWidth) {
-          // Extend second cell to start at 0, absorbing the first
-          cells[1].widthFrac = (cells[1].fraction + cells[1].widthFrac) - cells[0].fraction;
-          cells[1].fraction = cells[0].fraction;
-          cells.shift();
-        }
-      }
-      // Extend last cell to fill bar
-      if (cells.length > 0) {
-        const last = cells[cells.length - 1];
-        const lastEnd = last.fraction + last.widthFrac;
-        if (lastEnd < 1) {
-          last.widthFrac = 1 - last.fraction;
-        }
-      }
-
-      // Prefix first visible label for sequential units (week/day)
-      if (cells.length > 0 && (tier.unit === 'week' || tier.unit === 'day')) {
-        const prefix = tier.unit === 'week' ? 'Week ' : 'Day ';
-        cells[0].label = prefix + cells[0].label;
-      }
-
+      const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, BAR_WIDTH_PX);
       return { tier, cells };
     });
   }, [visibleTiers, origin, totalDays, timescale.fiscalYearStartMonth]);
