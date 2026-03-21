@@ -566,14 +566,6 @@ export function TimelineView() {
                 );
               })}
 
-            {/* Today Line (vertical line only — label is on the timescale header) */}
-            {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
-              <div
-                className="absolute top-0 bottom-0 z-10 pointer-events-none w-0.5"
-                style={{ left: todayX, backgroundColor: timescale.todayColor }}
-              />
-            )}
-
             {/* ─── Swimlane bands (bg + colored badge) ─── */}
             {swimlaneLayout.map(({ swimlane, y, height }) => {
               const outlinePx = OUTLINE_THICKNESS_MAP[swimlane.outlineThickness];
