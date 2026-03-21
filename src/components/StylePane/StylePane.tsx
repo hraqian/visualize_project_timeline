@@ -2159,10 +2159,10 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   const { origin, totalDays, rangeEndDate, startYear, endYear } = useMemo(() => {
     const range = getProjectRange(items);
     const padStart = startOfMonth(subDays(parseISO(range.start), 14));
-    const rawEnd = addDays(parseISO(range.end), 30);
-    // Round up to a whole number of months from padStart
-    const numMonths = differenceInCalendarMonths(rawEnd, padStart) + 1;
-    const padEnd = addMonths(padStart, numMonths); // start of the month AFTER the last visible month
+    // End at the end of the month containing the last item
+    const endMonth = startOfMonth(parseISO(range.end));
+    const numMonths = differenceInCalendarMonths(endMonth, padStart) + 1;
+    const padEnd = addMonths(padStart, numMonths);
     const days = differenceInDays(padEnd, padStart);
     const sy = padStart.getFullYear();
     const lastVisibleMonth = subDays(padEnd, 1);
