@@ -1684,42 +1684,13 @@ function StatusCell({
 // ─── Inline Add Row ──────────────────────────────────────────────────────────
 
 function InlineAddRow({ onAdd }: { onAdd: (type: ItemType) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
   return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-600 transition-colors py-0.5"
-      >
-        <Plus size={13} />
-        Add task or milestone
-      </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 min-w-[140px]">
-          <button
-            onClick={() => { onAdd('task'); setOpen(false); }}
-            className="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 transition-colors"
-          >
-            Add Task
-          </button>
-          <button
-            onClick={() => { onAdd('milestone'); setOpen(false); }}
-            className="w-full text-left px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50 transition-colors"
-          >
-            Add Milestone
-          </button>
-        </div>
-      )}
-    </div>
+    <button
+      onClick={() => onAdd('task')}
+      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-600 transition-colors py-0.5"
+    >
+      <Plus size={13} />
+      Add task or milestone
+    </button>
   );
 }
