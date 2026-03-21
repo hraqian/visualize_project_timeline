@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useMemo } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
-import { parseISO, differenceInDays, addDays, subDays, endOfMonth, format } from 'date-fns';
+import { parseISO, differenceInDays, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, buildVisibleTierCells, getProjectRange } from '@/utils';
 import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
@@ -101,7 +101,7 @@ export function TimelineView() {
   // Compute project range with padding
   const { origin, totalDays } = useMemo(() => {
     const range = getProjectRange(items);
-    const padStart = subDays(parseISO(range.start), 14);
+    const padStart = startOfMonth(subDays(parseISO(range.start), 14));
     const padEnd = endOfMonth(addDays(parseISO(range.end), 30));
     const total = differenceInDays(padEnd, padStart);
     return { origin: padStart.toISOString().split('T')[0], totalDays: total };

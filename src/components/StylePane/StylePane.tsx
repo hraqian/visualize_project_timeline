@@ -34,7 +34,7 @@ import {
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { parseISO, differenceInDays, addDays, subDays, endOfMonth } from 'date-fns';
+import { parseISO, differenceInDays, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { generateTierLabels, buildVisibleTierCells, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -2157,7 +2157,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   // Project range — same padding as main TimelineView
   const { origin, totalDays, startYear, endYear } = useMemo(() => {
     const range = getProjectRange(items);
-    const padStart = subDays(parseISO(range.start), 14);
+    const padStart = startOfMonth(subDays(parseISO(range.start), 14));
     const padEnd = endOfMonth(addDays(parseISO(range.end), 30));
     const days = differenceInDays(padEnd, padStart);
     const sy = padStart.getFullYear();

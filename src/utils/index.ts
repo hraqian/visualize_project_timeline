@@ -206,40 +206,19 @@ export function buildVisibleTierCells(
     }
   }
 
-  // Find the first label that starts at or after the origin (first full period)
-  let firstFullIdx = 0;
-  for (let i = 0; i < labels.length; i++) {
-    if (differenceInDays(labels[i].startDate, originDate) >= 0) {
-      firstFullIdx = i;
-      break;
-    }
-  }
-
-  // Build cells: partial first cell from origin, then skip-aligned groups from the first full period
+  // Build cells with skip-factor grouping
   const cells: TierCell[] = [];
-
-  // First cell: from origin (fraction 0) to the end of the label just before the first full period
-  if (firstFullIdx > 0) {
-    const endFrac = (differenceInDays(labels[firstFullIdx - 1].endDate, originDate) + 1) / totalDays;
-    cells.push({
-      label: labels[0].label,
-      fraction: 0,
-      widthFrac: Math.max(endFrac, 0.001),
-    });
-  }
-
-  // Remaining cells: skip-aligned starting from firstFullIdx
-  for (let i = firstFullIdx; i < labels.length; i += skipFactor) {
+  for (let i = 0; i < labels.length; i += skipFactor) {
     const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
     const endIdx = Math.min(i + skipFactor, labels.length) - 1;
     const endFrac = (differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays;
-    if (startFrac < 1) {
-      cells.push({
-        label: labels[i].label,
-        fraction: Math.max(startFrac, 0),
-        widthFrac: Math.max(endFrac - Math.max(startFrac, 0), 0.001),
-      });
-    }
+    if (endFrac <= 0) continue; // entirely before the visible range
+    if (startFrac >= 1) break;  // past the visible range
+    cells.push({
+      label: labels[i].label,
+      fraction: Math.max(startFrac, 0),
+      widthFrac: Math.max(endFrac - Math.max(startFrac, 0), 0.001),
+    });
   }
 
   // Extend last cell to fill bar
