@@ -31,7 +31,7 @@ function App() {
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(projectName);
-  const [showProjectManager, setShowProjectManager] = useState(false);
+  const [showProjectManager, setShowProjectManager] = useState(true);
 
   const commitName = useCallback(() => {
     const trimmed = nameValue.trim();
