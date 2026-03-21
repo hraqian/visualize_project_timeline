@@ -34,8 +34,8 @@ import {
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { parseISO, differenceInDays, addDays, subDays } from 'date-fns';
-import { generateTierLabels, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
+import { parseISO, differenceInDays, addDays, format } from 'date-fns';
+import { getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -2139,7 +2139,6 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   const items = useProjectStore((s) => s.items);
   const timescale = useProjectStore((s) => s.timescale);
   const updateTimescale = useProjectStore((s) => s.updateTimescale);
-  const previewRef = useRef<HTMLDivElement>(null);
 
   // Local draft state — initialize from store tiers, padded to 3
   const [tiers, setTiers] = useState<TimescaleTierConfig[]>(() => {
@@ -2155,56 +2154,102 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     setTiers((prev) => prev.map((t, i) => (i === idx ? { ...t, ...updates } : t)));
   };
 
-  // Timescale preview data
-  const { origin, totalDays } = useMemo(() => {
+  // Project range
+  const { rangeStart, rangeEnd, totalDays, startYear, endYear } = useMemo(() => {
     const range = getProjectRange(items);
-    const padStart = subDays(parseISO(range.start), 14);
-    const padEnd = addDays(parseISO(range.end), 30);
-    const total = differenceInDays(padEnd, padStart);
-    return { origin: padStart.toISOString().split('T')[0], totalDays: total };
+    const start = parseISO(range.start);
+    const end = parseISO(range.end);
+    const days = Math.max(1, differenceInDays(end, start));
+    return {
+      rangeStart: start,
+      rangeEnd: end,
+      totalDays: days,
+      startYear: start.getFullYear(),
+      endYear: end.getFullYear() + (end.getMonth() > 0 || end.getDate() > 1 ? 1 : 0),
+    };
   }, [items]);
 
-  // Compute a zoom that makes the finest visible tier readable
-  const previewZoom = useMemo(() => {
-    const visibleTiers = tiers.filter((t) => t.visible);
-    if (visibleTiers.length === 0) return 4;
-    // Find the finest (smallest) unit among visible tiers
-    const unitRank: Record<string, number> = { day: 0, week: 1, month: 2, quarter: 3, year: 4 };
-    const finest = visibleTiers.reduce((a, b) => (unitRank[a.unit] < unitRank[b.unit] ? a : b));
-    // Set zoom so labels of the finest tier are legible
-    const minPxPerUnit: Record<string, number> = { day: 38, week: 50, month: 80, quarter: 120, year: 180 };
-    const avgDaysPerUnit: Record<string, number> = { day: 1, week: 7, month: 30, quarter: 91, year: 365 };
-    const targetPx = minPxPerUnit[finest.unit] ?? 40;
-    const avgDays = avgDaysPerUnit[finest.unit] ?? 1;
-    return targetPx / avgDays;
-  }, [tiers]);
-
-  const totalWidth = totalDays * previewZoom;
-
-  const tierLabels = useMemo(() => {
-    const rangeStart = parseISO(origin);
-    const rangeEnd = addDays(rangeStart, totalDays);
-    return tiers
-      .filter((t) => t.visible)
-      .map((tier) => ({
-        tier,
-        labels: generateTierLabels(tier.unit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth, tier.format),
-      }));
-  }, [origin, totalDays, tiers, timescale.fiscalYearStartMonth]);
-
-  const todayX = useMemo(() => {
+  // Today position as fraction of project duration (0-1)
+  const todayFraction = useMemo(() => {
     const today = new Date();
-    return differenceInDays(today, parseISO(origin)) * previewZoom;
-  }, [origin, previewZoom]);
+    const frac = differenceInDays(today, rangeStart) / totalDays;
+    return Math.max(0, Math.min(1, frac));
+  }, [rangeStart, totalDays]);
 
-  // Scroll preview to center on today on mount
-  useEffect(() => {
-    const el = previewRef.current;
-    if (!el) return;
-    const containerWidth = el.clientWidth;
-    const scrollTo = Math.max(0, todayX - containerWidth / 2);
-    el.scrollLeft = scrollTo;
-  }, [todayX]);
+  const visibleTiers = useMemo(() => tiers.filter((t) => t.visible), [tiers]);
+  const visibleCount = visibleTiers.length;
+
+  // Generate sampled preview labels for a tier
+  // Returns array of { label, fraction } where fraction is position 0-1 across bar
+  const previewTierLabels = useMemo(() => {
+    const BAR_WIDTH_PX = 920; // approximate inner bar width
+    const MIN_LABEL_WIDTH: Record<string, number> = { year: 60, quarter: 50, month: 50, week: 45, day: 45 };
+
+    return visibleTiers.map((tier) => {
+      const minW = MIN_LABEL_WIDTH[tier.unit] ?? 50;
+      const maxLabels = Math.floor(BAR_WIDTH_PX / minW);
+      const avgDaysPerUnit: Record<string, number> = { day: 1, week: 7, month: 30.44, quarter: 91.31, year: 365.25 };
+      const totalUnits = Math.max(1, Math.round(totalDays / (avgDaysPerUnit[tier.unit] ?? 1)));
+      // Pick N evenly-spaced labels
+      const labelCount = Math.max(2, Math.min(maxLabels, totalUnits));
+      const step = totalUnits / labelCount;
+
+      const labels: { label: string; fraction: number }[] = [];
+      const isSequential = tier.unit === 'week' || tier.unit === 'day';
+
+      for (let i = 0; i < labelCount; i++) {
+        const unitIndex = Math.round(i * step);
+        const dayOffset = unitIndex * (avgDaysPerUnit[tier.unit] ?? 1);
+        const fraction = Math.min(dayOffset / totalDays, 1);
+        const date = addDays(rangeStart, Math.round(dayOffset));
+
+        let label: string;
+        if (isSequential) {
+          const seqNum = unitIndex + 1;
+          if (i === 0) {
+            label = tier.unit === 'week' ? `Week ${seqNum}` : `Day ${seqNum}`;
+          } else {
+            label = String(seqNum);
+          }
+        } else {
+          // Calendar-based label
+          label = formatPreviewLabel(date, tier.unit, tier.format);
+        }
+        labels.push({ label, fraction });
+      }
+
+      // For single-tier months/quarters, intersperse year markers
+      if (visibleCount === 1 && (tier.unit === 'month' || tier.unit === 'quarter')) {
+        const yearLabels: { label: string; fraction: number }[] = [];
+        for (let y = startYear + 1; y < endYear; y++) {
+          const yearStart = new Date(y, 0, 1);
+          const dayOff = differenceInDays(yearStart, rangeStart);
+          const frac = dayOff / totalDays;
+          if (frac > 0.05 && frac < 0.95) {
+            yearLabels.push({ label: String(y), fraction: frac });
+          }
+        }
+        // Merge year labels into the label array, replacing nearby month labels
+        for (const yl of yearLabels) {
+          // Find closest existing label and replace it if within threshold
+          let closestIdx = -1;
+          let closestDist = Infinity;
+          for (let j = 0; j < labels.length; j++) {
+            const dist = Math.abs(labels[j].fraction - yl.fraction);
+            if (dist < closestDist) {
+              closestDist = dist;
+              closestIdx = j;
+            }
+          }
+          if (closestIdx >= 0 && closestDist < 0.08) {
+            labels[closestIdx] = { label: yl.label, fraction: yl.fraction };
+          }
+        }
+      }
+
+      return { tier, labels };
+    });
+  }, [visibleTiers, visibleCount, rangeStart, totalDays, startYear, endYear]);
 
   const handleSave = () => {
     updateTimescale({ tiers: tiers });
@@ -2227,60 +2272,71 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8">
-          {/* Timescale preview */}
-          <div
-            ref={previewRef}
-            className="overflow-x-auto rounded-lg border border-[var(--color-border)]"
-          >
-            <div className="relative" style={{ width: totalWidth }}>
-              {tierLabels.map(({ tier, labels }, tierIdx) => (
-                <div
-                  key={tierIdx}
-                  className="flex relative"
-                  style={{ backgroundColor: tier.backgroundColor, height: 28 }}
-                >
-                  {labels.map((label, i) => {
-                    const startX = differenceInDays(label.startDate, parseISO(origin)) * previewZoom;
-                    const endX = differenceInDays(label.endDate, parseISO(origin)) * previewZoom + previewZoom;
-                    const width = Math.max(endX - startX, 1);
-                    return (
-                      <div
-                        key={i}
-                        className={`flex items-center shrink-0 overflow-hidden ${tier.separators ? 'border-r border-white/20' : ''}`}
-                        style={{
-                          position: 'absolute',
-                          left: startX,
-                          width,
-                          height: 28,
-                          color: tier.fontColor,
-                          fontSize: tier.fontSize,
-                          fontFamily: tier.fontFamily,
-                          fontWeight: tier.fontWeight,
-                          fontStyle: tier.fontStyle,
-                          textDecoration: tier.textDecoration,
-                          justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
-                        }}
-                      >
-                        <span className="truncate px-1">{label.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-              {/* Today marker */}
-              {todayX >= 0 && todayX <= totalWidth && (
-                <div
-                  className="absolute top-0 z-10 pointer-events-none"
-                  style={{ left: todayX, height: tierLabels.length * 28 }}
-                >
+          {/* Timescale preview — fixed width, no scroll */}
+          {visibleCount > 0 && (
+            <div className="flex items-center gap-3">
+              {/* Left end cap */}
+              <span className="text-xl font-bold text-[var(--color-text)] shrink-0 tabular-nums">
+                {startYear}
+              </span>
+
+              {/* Bar */}
+              <div className="flex-1 rounded-lg overflow-hidden border border-[var(--color-border)] relative">
+                {previewTierLabels.map(({ tier, labels }, tierIdx) => (
                   <div
-                    className="w-0.5 h-full"
-                    style={{ backgroundColor: timescale.todayColor }}
-                  />
-                </div>
-              )}
+                    key={tierIdx}
+                    className="relative"
+                    style={{ backgroundColor: tier.backgroundColor, height: 28 }}
+                  >
+                    {labels.map((lbl, i) => {
+                      // Each label occupies a slot from its fraction to the next label's fraction (or 1.0)
+                      const nextFrac = i < labels.length - 1 ? labels[i + 1].fraction : 1;
+                      const width = nextFrac - lbl.fraction;
+                      return (
+                        <div
+                          key={i}
+                          className={`absolute top-0 h-full flex items-center overflow-hidden ${tier.separators && i > 0 ? 'border-l border-white/20' : ''}`}
+                          style={{
+                            left: `${lbl.fraction * 100}%`,
+                            width: `${width * 100}%`,
+                            color: tier.fontColor,
+                            fontSize: Math.min(tier.fontSize, 12),
+                            fontFamily: tier.fontFamily,
+                            fontWeight: tier.fontWeight,
+                            fontStyle: tier.fontStyle,
+                            textDecoration: tier.textDecoration,
+                            justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
+                          }}
+                        >
+                          <span className="truncate px-1">{lbl.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+                {/* Today marker */}
+                {todayFraction > 0 && todayFraction < 1 && (
+                  <div
+                    className="absolute top-0 z-10 pointer-events-none"
+                    style={{ left: `${todayFraction * 100}%`, height: visibleCount * 28 }}
+                  >
+                    <div className="w-0.5 h-full" style={{ backgroundColor: timescale.todayColor }} />
+                    <div
+                      className="absolute top-full mt-0.5 -translate-x-1/2 text-[10px] font-medium"
+                      style={{ color: timescale.todayColor }}
+                    >
+                      Today
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right end cap */}
+              <span className="text-xl font-bold text-[var(--color-text)] shrink-0 tabular-nums">
+                {endYear}
+              </span>
             </div>
-          </div>
+          )}
 
           {/* 3 tier columns */}
           <div className="grid grid-cols-3 gap-6">
@@ -2314,6 +2370,27 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     </div>,
     document.body
   );
+}
+
+// Format a date for the preview bar (calendar-based units)
+function formatPreviewLabel(date: Date, unit: string, fmt: TierFormat): string {
+  switch (unit) {
+    case 'year': return format(date, fmt === 'yy' ? 'yy' : 'yyyy');
+    case 'quarter': {
+      const q = Math.floor(date.getMonth() / 3) + 1;
+      return fmt === 'Qq' ? `Q${q}` : `Q${q} ${format(date, 'yyyy')}`;
+    }
+    case 'month': {
+      switch (fmt) {
+        case 'MMMM': return format(date, 'MMMM');
+        case 'M_letter': return format(date, 'MMMMM');
+        case 'MM': return format(date, 'MM');
+        case 'M_num': return String(date.getMonth() + 1);
+        default: return format(date, 'MMM');
+      }
+    }
+    default: return format(date, 'MMM');
+  }
 }
 
 // ─── Tier Column ─────────────────────────────────────────────────────────────
