@@ -2770,23 +2770,19 @@ function SwimlaneBackgroundApplyToAll({ swimlane }: { swimlane: Swimlane }) {
 // ─── Swimlane Spacing Control ─────────────────────────────────────────────────
 
 const SWIMLANE_SPACING_PRESETS = [
-  { value: 2, gap: 1 },
-  { value: 5, gap: 3 },
-  { value: 10, gap: 5 },
+  { value: 2, gap: 1.5, label: 'Narrow' },
+  { value: 5, gap: 3, label: 'Medium' },
+  { value: 10, gap: 5, label: 'Wide' },
 ];
 
 function SwimlaneSpacingIcon({ gap, active }: { gap: number; active: boolean }) {
   const color = active ? '#6366f1' : 'currentColor';
-  const y0 = 4 - gap;
-  const y1 = 4 - gap / 2.5;
-  const y2 = 4 + gap / 2.5;
-  const y3 = 4 + gap;
+  const cy = 4; // vertical center
   return (
     <svg width={20} height={20} viewBox="-2 -2 12 12" fill="none">
-      <rect x={0} y={y0} width={8} height={1} rx={0.3} fill={color} />
-      <rect x={0} y={y1} width={8} height={1} rx={0.3} fill={color} />
-      <rect x={0} y={y2} width={8} height={1} rx={0.3} fill={color} />
-      <rect x={0} y={y3} width={8} height={1} rx={0.3} fill={color} />
+      <rect x={0} y={cy - gap} width={8} height={0.8} rx={0.3} fill={color} />
+      <rect x={0} y={cy - 0.4} width={8} height={0.8} rx={0.3} fill={color} />
+      <rect x={0} y={cy + gap} width={8} height={0.8} rx={0.3} fill={color} />
     </svg>
   );
 }
@@ -2807,7 +2803,7 @@ function SwimlaneSpacingSection() {
                 ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
                 : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]'
             } ${idx !== 0 ? 'border-l border-[var(--color-border)]' : ''}`}
-            title={`${preset.value}px`}
+            title={preset.label}
           >
             <SwimlaneSpacingIcon gap={preset.gap} active={swimlaneSpacing === preset.value} />
           </button>
