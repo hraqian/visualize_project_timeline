@@ -513,7 +513,7 @@ export function TimelineView() {
                     width: Math.min(todayX, totalWidth),
                     height: (timescale.elapsedTimeThickness ?? 'thin') === 'thick' ? 6 : 3,
                     backgroundColor: timescale.elapsedTimeColor ?? '#ef4444',
-                    ...(todayPos === 'above' ? { bottom: 0 } : { top: 0 }),
+                    ...(todayPos === 'above' ? { top: 0 } : { bottom: 0 }),
                   }}
                 />
               )}
