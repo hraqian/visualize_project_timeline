@@ -10,6 +10,7 @@ import {
   Layers,
   Info,
   Settings,
+  X,
 } from 'lucide-react';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { AdvancedColorPicker } from '@/components/common/AdvancedColorPicker';
@@ -28,9 +29,12 @@ import {
   type ConnectorThickness,
   type OutlineThickness,
   type Swimlane,
+  type TimescaleTierConfig,
 } from '@/types';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { parseISO, differenceInDays, addDays, subDays } from 'date-fns';
+import { generateTierLabels, getProjectRange } from '@/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1834,6 +1838,7 @@ function TimescaleTabContent({
 }) {
   const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
+  const [tierSettingsOpen, setTierSettingsOpen] = useState(false);
 
   const handleToggleExpand = (key: string) => {
     setStylePaneSection(stylePaneSection === key ? null : key as any);
@@ -1843,11 +1848,18 @@ function TimescaleTabContent({
     <div className="space-y-4">
       {/* Tier settings button */}
       <div className="px-4">
-        <button className="flex items-center justify-center gap-2 w-full border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-colors">
+        <button
+          onClick={() => setTierSettingsOpen(true)}
+          className="flex items-center justify-center gap-2 w-full border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-colors"
+        >
           <Settings size={14} className="text-[var(--color-text-muted)]" />
           Tier settings
         </button>
       </div>
+
+      {tierSettingsOpen && (
+        <TierSettingsModal onClose={() => setTierSettingsOpen(false)} />
+      )}
 
       {/* Collapsible rows */}
       <div className="-mx-4">
@@ -2106,6 +2118,369 @@ function ScaleSection() {
               <option value="flat">Flat</option>
             </select>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tier Settings Modal ─────────────────────────────────────────────────────
+
+const DEFAULT_3_TIERS: TimescaleTierConfig[] = [
+  { unit: 'month', visible: true, backgroundColor: '#6b7f5c', fontColor: '#f8fafc', fontSize: 12 },
+  { unit: 'week', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11 },
+  { unit: 'day', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11 },
+];
+
+const TIER_LABELS = ['Top tier', 'Middle tier', 'Bottom tier'];
+
+function TierSettingsModal({ onClose }: { onClose: () => void }) {
+  const items = useProjectStore((s) => s.items);
+  const timescale = useProjectStore((s) => s.timescale);
+  // Local draft state — initialize from store tiers, padded to 3
+  const [tiers, setTiers] = useState<TimescaleTierConfig[]>(() => {
+    const stored = timescale.tiers;
+    return [
+      stored[0] ?? DEFAULT_3_TIERS[0],
+      stored[1] ?? DEFAULT_3_TIERS[1],
+      stored[2] ?? DEFAULT_3_TIERS[2],
+    ];
+  });
+
+  const updateTierDraft = (idx: number, updates: Partial<TimescaleTierConfig>) => {
+    setTiers((prev) => prev.map((t, i) => (i === idx ? { ...t, ...updates } : t)));
+  };
+
+  // Timescale preview data
+  const { origin, totalDays } = useMemo(() => {
+    const range = getProjectRange(items);
+    const padStart = subDays(parseISO(range.start), 14);
+    const padEnd = addDays(parseISO(range.end), 30);
+    const total = differenceInDays(padEnd, padStart);
+    return { origin: padStart.toISOString().split('T')[0], totalDays: total };
+  }, [items]);
+
+  const previewZoom = useMemo(() => {
+    // Fit the preview into ~900px wide area
+    const targetWidth = 900;
+    return Math.max(1, targetWidth / totalDays);
+  }, [totalDays]);
+
+  const totalWidth = totalDays * previewZoom;
+
+  const tierLabels = useMemo(() => {
+    const rangeStart = parseISO(origin);
+    const rangeEnd = addDays(rangeStart, totalDays);
+    return tiers
+      .filter((t) => t.visible)
+      .map((tier) => ({
+        tier,
+        labels: generateTierLabels(tier.unit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth),
+      }));
+  }, [origin, totalDays, tiers, timescale.fiscalYearStartMonth]);
+
+  const todayX = useMemo(() => {
+    const today = new Date();
+    return differenceInDays(today, parseISO(origin)) * previewZoom;
+  }, [origin, previewZoom]);
+
+  const handleSave = () => {
+    // Will wire to store later
+    onClose();
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[1100px] mt-12 mx-4 flex flex-col max-h-[calc(100vh-6rem)]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-5 border-b border-[var(--color-border)]">
+          <h2 className="text-lg font-semibold text-[var(--color-text)]">Tier settings</h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors text-[var(--color-text-muted)]"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8">
+          {/* Timescale preview */}
+          <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
+            <div className="relative" style={{ width: totalWidth, minWidth: '100%' }}>
+              {tierLabels.map(({ tier, labels }, tierIdx) => (
+                <div
+                  key={tierIdx}
+                  className="flex relative"
+                  style={{ backgroundColor: tier.backgroundColor, height: 28 }}
+                >
+                  {labels.map((label, i) => {
+                    const startX = differenceInDays(label.startDate, parseISO(origin)) * previewZoom;
+                    const endX = differenceInDays(label.endDate, parseISO(origin)) * previewZoom + previewZoom;
+                    const width = Math.max(endX - startX, 1);
+                    return (
+                      <div
+                        key={i}
+                        className="border-r border-white/10 flex items-center justify-center shrink-0 overflow-hidden"
+                        style={{
+                          position: 'absolute',
+                          left: startX,
+                          width,
+                          height: 28,
+                          color: tier.fontColor,
+                          fontSize: tier.fontSize,
+                        }}
+                      >
+                        <span className="truncate px-1">{label.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+              {/* Today marker */}
+              {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
+                <div
+                  className="absolute top-0 z-10 pointer-events-none"
+                  style={{ left: todayX, height: tierLabels.length * 28 }}
+                >
+                  <div
+                    className="w-0.5 h-full"
+                    style={{ backgroundColor: timescale.todayColor }}
+                  />
+                  <div
+                    className="absolute top-full mt-0.5 -translate-x-1/2 text-[10px] font-medium"
+                    style={{ color: timescale.todayColor }}
+                  >
+                    Today
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 3 tier columns */}
+          <div className="grid grid-cols-3 gap-6">
+            {tiers.map((tier, idx) => (
+              <TierColumn
+                key={idx}
+                label={TIER_LABELS[idx]}
+                tier={tier}
+                updateTier={(updates) => updateTierDraft(idx, updates)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-8 py-4 border-t border-[var(--color-border)]">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 rounded-lg text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-6 py-2 rounded-lg text-sm font-medium text-white bg-green-500 hover:bg-green-600 transition-colors"
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ─── Tier Column ─────────────────────────────────────────────────────────────
+
+function TierColumn({
+  label,
+  tier,
+  updateTier,
+}: {
+  label: string;
+  tier: TimescaleTierConfig;
+  updateTier: (updates: Partial<TimescaleTierConfig>) => void;
+}) {
+  // Local placeholder state for controls not yet on TimescaleTierConfig
+  const [separators, setSeparators] = useState(true);
+  const [fontFamily, setFontFamily] = useState('Arial');
+  const [fontWeight, setFontWeight] = useState(400);
+  const [fontStyle, setFontStyle] = useState<'normal' | 'italic'>('normal');
+  const [textDecoration, setTextDecoration] = useState<'none' | 'underline'>('none');
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+
+  return (
+    <div
+      className={`space-y-4 rounded-lg border border-[var(--color-border)] p-4 ${
+        !tier.visible ? 'bg-[var(--color-bg-secondary)]' : ''
+      }`}
+    >
+      {/* Header: label + Show toggle */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-[var(--color-text)]">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--color-text-muted)]">Show</span>
+          <Toggle checked={tier.visible} onChange={(v) => updateTier({ visible: v })} />
+        </div>
+      </div>
+
+      {/* Controls — greyed out when toggle is off */}
+      <div
+        className="space-y-4"
+        style={!tier.visible ? { opacity: 0.4, pointerEvents: 'none' } : undefined}
+      >
+        {/* Units */}
+        <div>
+          <label className="text-xs font-medium text-[var(--color-text)] block mb-1.5">Units</label>
+          <div className="flex gap-1.5">
+            <select
+              className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-2 py-1.5 text-sm text-[var(--color-text)] outline-none"
+              value={tier.unit}
+              onChange={(e) => updateTier({ unit: e.target.value as any })}
+            >
+              <option value="year">Years</option>
+              <option value="quarter">Quarters</option>
+              <option value="month">Months</option>
+              <option value="week">Weeks</option>
+              <option value="day">Days</option>
+            </select>
+            <select
+              className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-2 py-1.5 text-sm text-[var(--color-text)] outline-none"
+            >
+              <option>Jul, Aug, Sep</option>
+              <option>July, August, September</option>
+              <option>J, A, S</option>
+              <option>07, 08, 09</option>
+              <option>1, 2, 3</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Separators */}
+        <label className="flex items-center gap-2 text-sm text-[var(--color-text)] cursor-pointer">
+          <input
+            type="checkbox"
+            checked={separators}
+            onChange={(e) => setSeparators(e.target.checked)}
+            className="accent-indigo-500 w-4 h-4"
+          />
+          <span className="font-medium">Separators</span>
+        </label>
+
+        {/* Color + Text */}
+        <div className="flex gap-2">
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Color
+            </label>
+            <AdvancedColorPicker value={tier.fontColor} onChange={(fontColor) => updateTier({ fontColor })} />
+          </div>
+          <div className="flex-1">
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Text
+            </label>
+            <div className="flex gap-1">
+              <FontFamilyDropdown value={fontFamily} onChange={setFontFamily} fonts={FONT_FAMILIES} />
+              <FontSizeDropdown value={tier.fontSize} onChange={(fontSize) => updateTier({ fontSize })} />
+            </div>
+          </div>
+        </div>
+
+        {/* B / I / U + Alignment */}
+        <div className="flex gap-1">
+          <button
+            onClick={() => setFontWeight(fontWeight >= 700 ? 400 : 700)}
+            className={`w-7 h-7 flex items-center justify-center rounded text-xs font-bold transition-colors ${
+              fontWeight >= 700
+                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Bold"
+          >
+            B
+          </button>
+          <button
+            onClick={() => setFontStyle(fontStyle === 'italic' ? 'normal' : 'italic')}
+            className={`w-7 h-7 flex items-center justify-center rounded text-xs italic transition-colors ${
+              fontStyle === 'italic'
+                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Italic"
+          >
+            I
+          </button>
+          <button
+            onClick={() => setTextDecoration(textDecoration === 'underline' ? 'none' : 'underline')}
+            className={`w-7 h-7 flex items-center justify-center rounded text-xs underline transition-colors ${
+              textDecoration === 'underline'
+                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Underline"
+          >
+            U
+          </button>
+          <div className="w-px h-5 bg-[var(--color-border)] mx-0.5 self-center" />
+          <button
+            onClick={() => setTextAlign('left')}
+            className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
+              textAlign === 'left'
+                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Align left"
+          >
+            <svg width={12} height={12} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+              <line x1={2} y1={3} x2={12} y2={3} />
+              <line x1={2} y1={6} x2={9} y2={6} />
+              <line x1={2} y1={9} x2={12} y2={9} />
+              <line x1={2} y1={12} x2={9} y2={12} />
+            </svg>
+          </button>
+          <button
+            onClick={() => setTextAlign('center')}
+            className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
+              textAlign === 'center'
+                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Align center"
+          >
+            <svg width={12} height={12} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+              <line x1={2} y1={3} x2={12} y2={3} />
+              <line x1={3.5} y1={6} x2={10.5} y2={6} />
+              <line x1={2} y1={9} x2={12} y2={9} />
+              <line x1={3.5} y1={12} x2={10.5} y2={12} />
+            </svg>
+          </button>
+          <button
+            onClick={() => setTextAlign('right')}
+            className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
+              textAlign === 'right'
+                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+            }`}
+            title="Align right"
+          >
+            <svg width={12} height={12} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+              <line x1={2} y1={3} x2={12} y2={3} />
+              <line x1={5} y1={6} x2={12} y2={6} />
+              <line x1={2} y1={9} x2={12} y2={9} />
+              <line x1={5} y1={12} x2={12} y2={12} />
+            </svg>
+          </button>
+        </div>
+
+        {/* Bar color */}
+        <div>
+          <label className="text-xs font-medium text-[var(--color-text)] block mb-1.5">Bar color</label>
+          <AdvancedColorPicker
+            value={tier.backgroundColor}
+            onChange={(backgroundColor) => updateTier({ backgroundColor })}
+          />
         </div>
       </div>
     </div>
