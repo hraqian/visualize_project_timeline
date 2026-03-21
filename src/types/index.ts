@@ -191,7 +191,23 @@ export interface Swimlane {
   color: string;
   order: number;
   collapsed: boolean;
+  // Title styling
+  titleFontSize: number;
+  titleFontColor: string;
+  titleFontFamily: string;
+  titleFontWeight: number;
+  titleFontStyle: 'normal' | 'italic';
+  titleTextDecoration: 'none' | 'underline';
 }
+
+export const DEFAULT_SWIMLANE_STYLE = {
+  titleFontSize: 12,
+  titleFontColor: '#ffffff',
+  titleFontFamily: 'Arial',
+  titleFontWeight: 600,
+  titleFontStyle: 'normal' as const,
+  titleTextDecoration: 'none' as const,
+};
 
 export interface Dependency {
   fromId: string;

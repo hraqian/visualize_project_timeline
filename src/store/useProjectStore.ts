@@ -16,17 +16,17 @@ import type {
   OptionalColumn,
   StylePaneSection,
 } from '@/types';
-import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY } from '@/types';
+import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, shiftDependents } from '@/utils';
 
 // ─── Sample Data ─────────────────────────────────────────────────────────────
 
 function createSampleData(): Pick<ProjectState, 'items' | 'swimlanes' | 'dependencies'> {
   const swimlanes: Swimlane[] = [
-    { id: 's1', name: 'Planning', color: '#6366f1', order: 0, collapsed: false },
-    { id: 's2', name: 'Design', color: '#8b5cf6', order: 1, collapsed: false },
-    { id: 's3', name: 'Development', color: '#3b82f6', order: 2, collapsed: false },
-    { id: 's4', name: 'Testing & Launch', color: '#22c55e', order: 3, collapsed: false },
+    { id: 's1', name: 'Planning', color: '#6366f1', order: 0, collapsed: false, ...DEFAULT_SWIMLANE_STYLE },
+    { id: 's2', name: 'Design', color: '#8b5cf6', order: 1, collapsed: false, ...DEFAULT_SWIMLANE_STYLE },
+    { id: 's3', name: 'Development', color: '#3b82f6', order: 2, collapsed: false, ...DEFAULT_SWIMLANE_STYLE },
+    { id: 's4', name: 'Testing & Launch', color: '#22c55e', order: 3, collapsed: false, ...DEFAULT_SWIMLANE_STYLE },
   ];
 
   const items: ProjectItem[] = [
@@ -169,6 +169,7 @@ interface ProjectActions {
   duplicateSwimlane: (id: string) => void;
   hideSwimlaneItems: (id: string) => void;
   updateSwimlane: (id: string, updates: Partial<Swimlane>) => void;
+  applySwimlaneStyleToAll: (id: string, keys: (keyof Swimlane)[]) => void;
   deleteSwimlane: (id: string) => void;
   reorderSwimlane: (id: string, newOrder: number) => void;
 
@@ -447,6 +448,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           color: colors[st.swimlanes.length % colors.length],
           order: maxOrder + 1,
           collapsed: false,
+          ...DEFAULT_SWIMLANE_STYLE,
         },
       ],
     }));
@@ -464,6 +466,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       color: colors[state.swimlanes.length % colors.length],
       order: 0,
       collapsed: false,
+      ...DEFAULT_SWIMLANE_STYLE,
     };
     const insertIndex = position === 'above' ? refIndex : refIndex + 1;
     sorted.splice(insertIndex, 0, newSwimlane);
@@ -510,6 +513,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set((state) => ({
       swimlanes: state.swimlanes.map((s) => (s.id === id ? { ...s, ...updates } : s)),
     })),
+
+  applySwimlaneStyleToAll: (id, keys) => {
+    const state = get();
+    const source = state.swimlanes.find((s) => s.id === id);
+    if (!source) return;
+    const partial: Record<string, unknown> = {};
+    for (const k of keys) {
+      partial[k] = source[k];
+    }
+    set((st) => ({
+      swimlanes: st.swimlanes.map((s) =>
+        s.id === id ? s : { ...s, ...partial }
+      ),
+    }));
+  },
 
   deleteSwimlane: (id) =>
     set((state) => ({

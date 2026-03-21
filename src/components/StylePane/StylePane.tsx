@@ -24,6 +24,7 @@ import {
   type LabelPosition,
   type MilestoneIcon,
   type ConnectorThickness,
+  type Swimlane,
 } from '@/types';
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -1627,7 +1628,76 @@ function SwimlaneStyleControls({
         expanded={stylePaneSection === 'swimlaneTitle'}
         onToggleExpand={() => handleToggleExpand('swimlaneTitle')}
       >
-        <div className="text-xs text-[var(--color-text-muted)]">Coming soon</div>
+        <div className="space-y-4">
+          {/* Row 1: Color + Text */}
+          <div className="flex gap-3">
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Color
+              </label>
+              <AdvancedColorPicker
+                value={swimlane.titleFontColor}
+                onChange={(titleFontColor) => updateSwimlane(swimlane.id, { titleFontColor })}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Text
+              </label>
+              <div className="flex gap-1.5">
+                <FontFamilyDropdown
+                  value={swimlane.titleFontFamily}
+                  onChange={(titleFontFamily) => updateSwimlane(swimlane.id, { titleFontFamily })}
+                  fonts={FONT_FAMILIES}
+                />
+                <FontSizeDropdown
+                  value={swimlane.titleFontSize}
+                  onChange={(titleFontSize) => updateSwimlane(swimlane.id, { titleFontSize })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: B / I / U toggles */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => updateSwimlane(swimlane.id, { titleFontWeight: swimlane.titleFontWeight >= 700 ? 400 : 700 })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm font-bold transition-colors ${
+                swimlane.titleFontWeight >= 700
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Bold"
+            >
+              B
+            </button>
+            <button
+              onClick={() => updateSwimlane(swimlane.id, { titleFontStyle: swimlane.titleFontStyle === 'italic' ? 'normal' : 'italic' })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm italic transition-colors ${
+                swimlane.titleFontStyle === 'italic'
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Italic"
+            >
+              I
+            </button>
+            <button
+              onClick={() => updateSwimlane(swimlane.id, { titleTextDecoration: swimlane.titleTextDecoration === 'underline' ? 'none' : 'underline' })}
+              className={`w-8 h-8 flex items-center justify-center rounded text-sm underline transition-colors ${
+                swimlane.titleTextDecoration === 'underline'
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Underline"
+            >
+              U
+            </button>
+          </div>
+
+          {/* Apply to all swimlanes */}
+          <SwimlaneTitleApplyToAll swimlane={swimlane} />
+        </div>
       </CollapsibleRow>
 
       <CollapsibleRow
@@ -1962,8 +2032,8 @@ function ApplyToAllBox({
 }: {
   children: React.ReactNode;
   onApply: () => void;
-  excludeSwimlanes: boolean;
-  setExcludeSwimlanes: (v: boolean) => void;
+  excludeSwimlanes?: boolean;
+  setExcludeSwimlanes?: (v: boolean) => void;
   applied: boolean;
   label?: string;
 }) {
@@ -2026,18 +2096,22 @@ function ApplyToAllBox({
           </div>
 
           <div className="flex items-center justify-between gap-4">
-            <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer whitespace-nowrap">
-              <input
-                type="checkbox"
-                checked={excludeSwimlanes}
-                onChange={(e) => setExcludeSwimlanes(e.target.checked)}
-                className="accent-indigo-500"
-              />
-              <span>Exclude swimlanes</span>
-              <span title="Exclude items placed inside swimlanes">
-                <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
-              </span>
-            </label>
+            {setExcludeSwimlanes != null ? (
+              <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)] cursor-pointer whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={excludeSwimlanes ?? false}
+                  onChange={(e) => setExcludeSwimlanes(e.target.checked)}
+                  className="accent-indigo-500"
+                />
+                <span>Exclude swimlanes</span>
+                <span title="Exclude items placed inside swimlanes">
+                  <Info size={12} className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]" />
+                </span>
+              </label>
+            ) : (
+              <div />
+            )}
 
             <button
               onClick={onApply}
@@ -2487,6 +2561,38 @@ function MilestoneDateApplyToAll({ item }: { item: ItemType }) {
       </PropertyCard>
       <PropertyCard label="Format" checked={applyProps.dateFormat} onChange={(v) => setApplyProps((p) => ({ ...p, dateFormat: v }))}>
         <FormatIcon />
+      </PropertyCard>
+    </ApplyToAllBox>
+  );
+}
+
+// ─── Swimlane Title Apply to All ──────────────────────────────────────────────
+
+function SwimlaneTitleApplyToAll({ swimlane }: { swimlane: Swimlane }) {
+  const applySwimlaneStyleToAll = useProjectStore((s) => s.applySwimlaneStyleToAll);
+  const [applied, setApplied] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    color: true,
+    text: true,
+  });
+
+  const handleApply = () => {
+    const keys: (keyof Swimlane)[] = [];
+    if (applyProps.color) keys.push('titleFontColor');
+    if (applyProps.text) keys.push('titleFontFamily', 'titleFontSize', 'titleFontWeight', 'titleFontStyle', 'titleTextDecoration');
+    if (keys.length === 0) return;
+    applySwimlaneStyleToAll(swimlane.id, keys);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
+
+  return (
+    <ApplyToAllBox onApply={handleApply} applied={applied} label="Apply to all swimlanes">
+      <PropertyCard label="Color" checked={applyProps.color} onChange={(v) => setApplyProps((p) => ({ ...p, color: v }))}>
+        <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: swimlane.titleFontColor }} />
+      </PropertyCard>
+      <PropertyCard label="Text" checked={applyProps.text} onChange={(v) => setApplyProps((p) => ({ ...p, text: v }))}>
+        <TextIcon />
       </PropertyCard>
     </ApplyToAllBox>
   );
