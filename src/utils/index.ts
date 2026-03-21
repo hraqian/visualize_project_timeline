@@ -206,9 +206,30 @@ export function buildVisibleTierCells(
     }
   }
 
-  // Build cells — first cell starts at the origin (fraction 0), rest use their natural positions
+  // Find the first label that starts at or after the origin (first full period)
+  let firstFullIdx = 0;
+  for (let i = 0; i < labels.length; i++) {
+    if (differenceInDays(labels[i].startDate, originDate) >= 0) {
+      firstFullIdx = i;
+      break;
+    }
+  }
+
+  // Build cells: partial first cell from origin, then skip-aligned groups from the first full period
   const cells: TierCell[] = [];
-  for (let i = 0; i < labels.length; i += skipFactor) {
+
+  // First cell: from origin (fraction 0) to the end of the label just before the first full period
+  if (firstFullIdx > 0) {
+    const endFrac = (differenceInDays(labels[firstFullIdx - 1].endDate, originDate) + 1) / totalDays;
+    cells.push({
+      label: labels[0].label,
+      fraction: 0,
+      widthFrac: Math.max(endFrac, 0.001),
+    });
+  }
+
+  // Remaining cells: skip-aligned starting from firstFullIdx
+  for (let i = firstFullIdx; i < labels.length; i += skipFactor) {
     const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
     const endIdx = Math.min(i + skipFactor, labels.length) - 1;
     const endFrac = (differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays;
