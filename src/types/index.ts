@@ -255,7 +255,7 @@ export interface TimescaleConfig {
 
 export type ActiveView = 'data' | 'timeline';
 
-export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector' | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector' | 'swimlaneTitle' | 'swimlaneBackground' | 'swimlaneSpacing';
+export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector' | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector' | 'swimlaneTitle' | 'swimlaneBackground' | 'swimlaneSpacing' | 'scale' | 'todayMarker' | 'elapsedTime' | 'leftEndCap' | 'rightEndCap';
 
 export type OptionalColumn = 'percentComplete' | 'assignedTo' | 'status';
 

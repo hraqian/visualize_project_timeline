@@ -9,6 +9,7 @@ import {
   Diamond,
   Layers,
   Info,
+  Settings,
 } from 'lucide-react';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { AdvancedColorPicker } from '@/components/common/AdvancedColorPicker';
@@ -1831,105 +1832,283 @@ function TimescaleTabContent({
   updateTimescale: ReturnType<typeof useProjectStore.getState>['updateTimescale'];
   updateTier: ReturnType<typeof useProjectStore.getState>['updateTier'];
 }) {
+  const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
+  const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
+
+  const handleToggleExpand = (key: string) => {
+    setStylePaneSection(stylePaneSection === key ? null : key as any);
+  };
+
   return (
-    <>
-      <Section title="Fiscal Year Start">
-        <select
-          className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
-          value={timescale.fiscalYearStartMonth}
-          onChange={(e) => updateTimescale({ fiscalYearStartMonth: parseInt(e.target.value) })}
+    <div className="space-y-4">
+      {/* Tier settings button */}
+      <div className="px-4">
+        <button className="flex items-center justify-center gap-2 w-full border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-colors">
+          <Settings size={14} className="text-[var(--color-text-muted)]" />
+          Tier settings
+        </button>
+      </div>
+
+      {/* Collapsible rows */}
+      <div className="-mx-4">
+        {/* Scale */}
+        <CollapsibleRow
+          label="Scale"
+          expanded={stylePaneSection === 'scale'}
+          onToggleExpand={() => handleToggleExpand('scale')}
         >
-          {[
-            'January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December',
-          ].map((m, i) => (
-            <option key={i} value={i + 1}>
-              {m}
-            </option>
-          ))}
-        </select>
-      </Section>
+          <ScaleSection />
+        </CollapsibleRow>
 
-      <Section title="Today Line">
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-            <input
-              type="checkbox"
-              checked={timescale.showToday}
-              onChange={(e) => updateTimescale({ showToday: e.target.checked })}
-              className="accent-indigo-500"
-            />
-            Show Today Marker
-          </label>
-          <input
-            type="color"
-            value={timescale.todayColor}
-            onChange={(e) => updateTimescale({ todayColor: e.target.value })}
-            className="w-6 h-6 rounded cursor-pointer border-none bg-transparent"
-          />
-        </div>
-      </Section>
+        {/* Today marker */}
+        <CollapsibleRow
+          label="Today marker"
+          expanded={stylePaneSection === 'todayMarker'}
+          onToggleExpand={() => handleToggleExpand('todayMarker')}
+          toggle={{ checked: timescale.showToday, onChange: (v) => updateTimescale({ showToday: v }) }}
+        >
+          <p className="text-xs text-[var(--color-text-muted)]">Today marker controls coming soon.</p>
+        </CollapsibleRow>
 
-      {timescale.tiers.map((tier, idx) => (
-        <Section key={idx} title={`Tier ${idx + 1}: ${tier.unit.charAt(0).toUpperCase() + tier.unit.slice(1)}`}>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
-                <input
-                  type="checkbox"
-                  checked={tier.visible}
-                  onChange={(e) => updateTier(idx, { visible: e.target.checked })}
-                  className="accent-indigo-500"
-                />
-                Visible
-              </label>
-              <select
-                className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none"
-                value={tier.unit}
-                onChange={(e) => updateTier(idx, { unit: e.target.value as any })}
-              >
-                <option value="year">Year</option>
-                <option value="quarter">Quarter</option>
-                <option value="month">Month</option>
-                <option value="week">Week</option>
-                <option value="day">Day</option>
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="text-[10px] text-[var(--color-text-muted)] block mb-1">Background</label>
-                <input
-                  type="color"
-                  value={tier.backgroundColor}
-                  onChange={(e) => updateTier(idx, { backgroundColor: e.target.value })}
-                  className="w-full h-7 rounded cursor-pointer border border-[var(--color-border)]"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-[10px] text-[var(--color-text-muted)] block mb-1">Font Color</label>
-                <input
-                  type="color"
-                  value={tier.fontColor}
-                  onChange={(e) => updateTier(idx, { fontColor: e.target.value })}
-                  className="w-full h-7 rounded cursor-pointer border border-[var(--color-border)]"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-[10px] text-[var(--color-text-muted)] block mb-1">Font Size</label>
-                <input
-                  type="number"
-                  min={9}
-                  max={18}
-                  value={tier.fontSize}
-                  onChange={(e) => updateTier(idx, { fontSize: parseInt(e.target.value) })}
-                  className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-xs text-[var(--color-text)] outline-none"
-                />
-              </div>
-            </div>
+        {/* Elapsed time */}
+        <CollapsibleRow
+          label="Elapsed time"
+          expanded={stylePaneSection === 'elapsedTime'}
+          onToggleExpand={() => handleToggleExpand('elapsedTime')}
+          toggle={{ checked: true, onChange: () => {} }}
+        >
+          <p className="text-xs text-[var(--color-text-muted)]">Elapsed time controls coming soon.</p>
+        </CollapsibleRow>
+
+        {/* Left end cap */}
+        <CollapsibleRow
+          label="Left end cap"
+          expanded={stylePaneSection === 'leftEndCap'}
+          onToggleExpand={() => handleToggleExpand('leftEndCap')}
+          toggle={{ checked: true, onChange: () => {} }}
+        >
+          <p className="text-xs text-[var(--color-text-muted)]">Left end cap controls coming soon.</p>
+        </CollapsibleRow>
+
+        {/* Right end cap */}
+        <CollapsibleRow
+          label="Right end cap"
+          expanded={stylePaneSection === 'rightEndCap'}
+          onToggleExpand={() => handleToggleExpand('rightEndCap')}
+          toggle={{ checked: true, onChange: () => {} }}
+        >
+          <p className="text-xs text-[var(--color-text-muted)]">Right end cap controls coming soon.</p>
+        </CollapsibleRow>
+      </div>
+    </div>
+  );
+}
+
+// ─── Scale Section ───────────────────────────────────────────────────────────
+
+function ScaleSection() {
+  // Placeholder state for controls not yet wired to store
+  const [unitType, setUnitType] = useState('month');
+  const [format, setFormat] = useState('Jul, Aug, Sep');
+  const [separators, setSeparators] = useState(true);
+  const [color, setColor] = useState('#94a3b8');
+  const [fontFamily, setFontFamily] = useState('Arial');
+  const [fontSize, setFontSize] = useState(11);
+  const [fontWeight, setFontWeight] = useState(400);
+  const [fontStyle, setFontStyle] = useState<'normal' | 'italic'>('normal');
+  const [textDecoration, setTextDecoration] = useState<'none' | 'underline'>('none');
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [barColor, setBarColor] = useState('#6b7f5c');
+  const [barShape, setBarShape] = useState('leaf');
+
+  return (
+    <div className="space-y-4">
+      {/* Units */}
+      <div>
+        <label className="text-xs font-semibold text-[var(--color-text)] block mb-2">Units</label>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Unit type
+            </label>
+            <select
+              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
+              value={unitType}
+              onChange={(e) => setUnitType(e.target.value)}
+            >
+              <option value="year">Years</option>
+              <option value="quarter">Quarters</option>
+              <option value="month">Months</option>
+              <option value="week">Weeks</option>
+              <option value="day">Days</option>
+            </select>
           </div>
-        </Section>
-      ))}
-    </>
+          <div className="flex-1">
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Format
+            </label>
+            <select
+              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
+              value={format}
+              onChange={(e) => setFormat(e.target.value)}
+            >
+              <option value="Jul, Aug, Sep">Jul, Aug, Sep</option>
+              <option value="July, August, September">July, August, September</option>
+              <option value="J, A, S">J, A, S</option>
+              <option value="07, 08, 09">07, 08, 09</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Separators checkbox */}
+      <label className="flex items-center gap-2 text-sm text-[var(--color-text)] cursor-pointer">
+        <input
+          type="checkbox"
+          checked={separators}
+          onChange={(e) => setSeparators(e.target.checked)}
+          className="accent-indigo-500 w-4 h-4"
+        />
+        <span className="font-medium">Separators</span>
+      </label>
+
+      {/* Color + Text (font family + font size) */}
+      <div className="flex gap-3">
+        <div>
+          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+            Color
+          </label>
+          <AdvancedColorPicker value={color} onChange={setColor} />
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+            Text
+          </label>
+          <div className="flex gap-1.5">
+            <FontFamilyDropdown value={fontFamily} onChange={setFontFamily} fonts={FONT_FAMILIES} />
+            <FontSizeDropdown value={fontSize} onChange={setFontSize} />
+          </div>
+        </div>
+      </div>
+
+      {/* B / I / U + Alignment */}
+      <div className="flex gap-1">
+        <button
+          onClick={() => setFontWeight(fontWeight >= 700 ? 400 : 700)}
+          className={`w-8 h-8 flex items-center justify-center rounded text-sm font-bold transition-colors ${
+            fontWeight >= 700
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+          }`}
+          title="Bold"
+        >
+          B
+        </button>
+        <button
+          onClick={() => setFontStyle(fontStyle === 'italic' ? 'normal' : 'italic')}
+          className={`w-8 h-8 flex items-center justify-center rounded text-sm italic transition-colors ${
+            fontStyle === 'italic'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+          }`}
+          title="Italic"
+        >
+          I
+        </button>
+        <button
+          onClick={() => setTextDecoration(textDecoration === 'underline' ? 'none' : 'underline')}
+          className={`w-8 h-8 flex items-center justify-center rounded text-sm underline transition-colors ${
+            textDecoration === 'underline'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+          }`}
+          title="Underline"
+        >
+          U
+        </button>
+
+        {/* Separator */}
+        <div className="w-px h-6 bg-[var(--color-border)] mx-1 self-center" />
+
+        {/* Text align buttons */}
+        <button
+          onClick={() => setTextAlign('left')}
+          className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+            textAlign === 'left'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+          }`}
+          title="Align left"
+        >
+          <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+            <line x1={2} y1={3} x2={12} y2={3} />
+            <line x1={2} y1={6} x2={9} y2={6} />
+            <line x1={2} y1={9} x2={12} y2={9} />
+            <line x1={2} y1={12} x2={9} y2={12} />
+          </svg>
+        </button>
+        <button
+          onClick={() => setTextAlign('center')}
+          className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+            textAlign === 'center'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+          }`}
+          title="Align center"
+        >
+          <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+            <line x1={2} y1={3} x2={12} y2={3} />
+            <line x1={3.5} y1={6} x2={10.5} y2={6} />
+            <line x1={2} y1={9} x2={12} y2={9} />
+            <line x1={3.5} y1={12} x2={10.5} y2={12} />
+          </svg>
+        </button>
+        <button
+          onClick={() => setTextAlign('right')}
+          className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+            textAlign === 'right'
+              ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+          }`}
+          title="Align right"
+        >
+          <svg width={14} height={14} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round">
+            <line x1={2} y1={3} x2={12} y2={3} />
+            <line x1={5} y1={6} x2={12} y2={6} />
+            <line x1={2} y1={9} x2={12} y2={9} />
+            <line x1={5} y1={12} x2={12} y2={12} />
+          </svg>
+        </button>
+      </div>
+
+      {/* Bar style */}
+      <div>
+        <label className="text-xs font-semibold text-[var(--color-text)] block mb-2">Bar style</label>
+        <div className="flex gap-3">
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Color
+            </label>
+            <AdvancedColorPicker value={barColor} onChange={setBarColor} />
+          </div>
+          <div className="flex-1">
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Shape
+            </label>
+            <select
+              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
+              value={barShape}
+              onChange={(e) => setBarShape(e.target.value)}
+            >
+              <option value="leaf">Leaf</option>
+              <option value="pointed">Pointed</option>
+              <option value="rounded">Rounded</option>
+              <option value="flat">Flat</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
