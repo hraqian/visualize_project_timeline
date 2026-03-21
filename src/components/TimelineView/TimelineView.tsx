@@ -99,7 +99,7 @@ export function TimelineView() {
   );
 
   // Compute project range with padding
-  const { origin, totalDays } = useMemo(() => {
+  const { origin, totalDays, rangeEndDate } = useMemo(() => {
     const range = getProjectRange(items);
     const padStart = startOfMonth(subDays(parseISO(range.start), 14));
     const rawEnd = addDays(parseISO(range.end), 30);
@@ -107,7 +107,7 @@ export function TimelineView() {
     const monthsNeeded = differenceInCalendarMonths(rawEnd, padStart) + 1;
     const padEnd = endOfMonth(addMonths(padStart, monthsNeeded - 1));
     const total = differenceInDays(padEnd, padStart) + 1;
-    return { origin: padStart.toISOString().split('T')[0], totalDays: total };
+    return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: padEnd };
   }, [items]);
 
   const totalWidth = totalDays * zoom;
@@ -172,7 +172,6 @@ export function TimelineView() {
   // Compute timescale tiers
   const tierLabels = useMemo(() => {
     const rangeStart = parseISO(origin);
-    const rangeEnd = addDays(rangeStart, totalDays);
     return timescale.tiers
       .filter((t) => t.visible)
       .map((tier) => {
@@ -180,10 +179,10 @@ export function TimelineView() {
         const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
         return {
           tier: { ...tier, unit: resolvedUnit },
-          labels: generateTierLabels(resolvedUnit, rangeStart, rangeEnd, timescale.fiscalYearStartMonth, resolvedFormat),
+          labels: generateTierLabels(resolvedUnit, rangeStart, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat),
         };
       });
-  }, [origin, totalDays, timescale]);
+  }, [origin, totalDays, rangeEndDate, timescale]);
 
   const timescaleHeight = tierLabels.length * 28;
 

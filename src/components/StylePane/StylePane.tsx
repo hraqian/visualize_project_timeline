@@ -2156,7 +2156,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   };
 
   // Project range — same padding as main TimelineView
-  const { origin, totalDays, startYear, endYear } = useMemo(() => {
+  const { origin, totalDays, rangeEndDate, startYear, endYear } = useMemo(() => {
     const range = getProjectRange(items);
     const padStart = startOfMonth(subDays(parseISO(range.start), 14));
     const rawEnd = addDays(parseISO(range.end), 30);
@@ -2166,7 +2166,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     const days = differenceInDays(padEnd, padStart) + 1;
     const sy = padStart.getFullYear();
     const ey = padEnd.getFullYear() + (padEnd.getMonth() > 0 || padEnd.getDate() > 1 ? 1 : 0);
-    return { origin: padStart.toISOString().split('T')[0], totalDays: days, startYear: sy, endYear: ey };
+    return { origin: padStart.toISOString().split('T')[0], totalDays: days, rangeEndDate: padEnd, startYear: sy, endYear: ey };
   }, [items]);
 
   // Today position as fraction (0-1)
@@ -2182,17 +2182,16 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   // Generate labels using shared buildVisibleTierCells utility
   const previewTierLabels = useMemo(() => {
     const originDate = parseISO(origin);
-    const rangeEnd = addDays(originDate, totalDays);
     const BAR_WIDTH_PX = 920;
 
     return visibleTiers.map((tier) => {
       const resolvedUnit = tier.unit === 'auto' ? resolveAutoUnit(totalDays) : tier.unit;
       const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
-      const labels = generateTierLabels(resolvedUnit, originDate, rangeEnd, timescale.fiscalYearStartMonth, resolvedFormat);
+      const labels = generateTierLabels(resolvedUnit, originDate, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat);
       const cells = buildVisibleTierCells(labels, resolvedUnit, originDate, totalDays, BAR_WIDTH_PX);
       return { tier: { ...tier, unit: resolvedUnit }, cells };
     });
-  }, [visibleTiers, origin, totalDays, timescale.fiscalYearStartMonth]);
+  }, [visibleTiers, origin, totalDays, rangeEndDate, timescale.fiscalYearStartMonth]);
 
   const handleSave = () => {
     updateTimescale({ tiers: tiers });
