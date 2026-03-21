@@ -126,11 +126,15 @@ export function StylePane() {
 
   const [mainTab, setMainTab] = useState<MainTab>('items');
 
-  // Auto-switch to timescale tab when a timescale section is activated (e.g. clicking tier row)
+  // Auto-switch tab when a section is activated (e.g. clicking tier row or task bar)
   const timescaleSections = ['scale', 'todayMarker', 'elapsedTime', 'leftEndCap', 'rightEndCap'];
   useEffect(() => {
-    if (stylePaneSection && timescaleSections.includes(stylePaneSection)) {
-      setMainTab('timescale');
+    if (stylePaneSection) {
+      if (timescaleSections.includes(stylePaneSection)) {
+        setMainTab('timescale');
+      } else {
+        setMainTab('items');
+      }
     }
   }, [stylePaneSection]);
 
