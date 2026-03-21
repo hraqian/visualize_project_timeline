@@ -467,7 +467,7 @@ export function TimelineView() {
                          fontWeight: tier.fontWeight,
                          fontStyle: tier.fontStyle,
                          textDecoration: tier.textDecoration,
-                         justifyContent: tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
+                          justifyContent: ci === 0 ? 'flex-start' : tier.textAlign === 'left' ? 'flex-start' : tier.textAlign === 'right' ? 'flex-end' : 'center',
                        }}
                      >
                        <span className="truncate px-1">{cell.label}</span>
