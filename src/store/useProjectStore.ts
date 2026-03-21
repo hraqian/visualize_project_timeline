@@ -172,7 +172,7 @@ interface ProjectActions {
   moveItemToGroup: (id: string, targetSwimlaneId: string | null, targetIndex: number) => void;
 
   // Swimlanes
-  addSwimlane: (name: string) => void;
+  addSwimlane: (name: string) => string;
   addSwimlaneRelative: (referenceId: string, position: 'above' | 'below') => void;
   duplicateSwimlane: (id: string) => void;
   hideSwimlaneItems: (id: string) => void;
@@ -520,11 +520,12 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     const maxOrder = Math.max(...state.swimlanes.map((s) => s.order), -1);
     const colors = ['#6366f1', '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
     const chosenColor = colors[state.swimlanes.length % colors.length];
+    const newId = uuid();
     set((st) => ({
       swimlanes: [
         ...st.swimlanes,
         {
-          id: uuid(),
+          id: newId,
           name,
           color: chosenColor,
           order: maxOrder + 1,
@@ -534,6 +535,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
         },
       ],
     }));
+    return newId;
   },
 
   addSwimlaneRelative: (referenceId, position) => {

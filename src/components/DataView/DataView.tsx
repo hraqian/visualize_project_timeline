@@ -142,6 +142,9 @@ export function DataView() {
   // Auto-focus the name input of a newly added item
   const [focusItemId, setFocusItemId] = useState<string | null>(null);
 
+  // Auto-focus the name of a newly added swimlane
+  const [focusSwimlaneId, setFocusSwimlaneId] = useState<string | null>(null);
+
   // Global item drag state (lifted from per-group to support cross-group dragging)
   const [dragItemId, setDragItemId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ swimlaneId: string | null; index: number } | null>(null);
@@ -249,7 +252,8 @@ export function DataView() {
   };
 
   const handleAddSwimlane = () => {
-    addSwimlane('New Swimlane');
+    const id = addSwimlane('New Swimlane');
+    setFocusSwimlaneId(id);
   };
 
   const handleHeaderCheckbox = () => {
@@ -390,6 +394,8 @@ export function DataView() {
                    onHideSwimlaneItems={() => hideSwimlaneItems(swimlane.id)}
                    focusItemId={focusItemId}
                    onClearFocusItemId={() => setFocusItemId(null)}
+                   shouldFocusName={focusSwimlaneId === swimlane.id}
+                   onClearFocusSwimlane={() => setFocusSwimlaneId(null)}
                    dragItemId={dragItemId}
                    dropTarget={dropTarget}
                    onItemDragStart={(id) => setDragItemId(id)}
@@ -848,6 +854,8 @@ interface SwimlaneGroupProps {
   onHideSwimlaneItems: () => void;
   focusItemId: string | null;
   onClearFocusItemId: () => void;
+  shouldFocusName: boolean;
+  onClearFocusSwimlane: () => void;
   // Global item drag state
   dragItemId: string | null;
   dropTarget: { swimlaneId: string | null; index: number } | null;
@@ -894,6 +902,8 @@ function SwimlaneGroup({
   onHideSwimlaneItems,
   focusItemId,
   onClearFocusItemId,
+  shouldFocusName,
+  onClearFocusSwimlane,
   dragItemId,
   dropTarget,
   onItemDragStart,
@@ -910,6 +920,14 @@ function SwimlaneGroup({
 }: SwimlaneGroupProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(swimlane.name);
+
+  useEffect(() => {
+    if (shouldFocusName) {
+      setEditingName(true);
+      setNameValue(swimlane.name);
+      onClearFocusSwimlane();
+    }
+  }, [shouldFocusName, swimlane.name, onClearFocusSwimlane]);
 
   return (
     <>
@@ -964,6 +982,7 @@ function SwimlaneGroup({
                 className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[13px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 onBlur={() => {
                   onUpdateSwimlane(swimlane.id, { name: nameValue });
                   setEditingName(false);
