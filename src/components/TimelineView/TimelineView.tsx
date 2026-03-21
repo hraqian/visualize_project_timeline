@@ -135,6 +135,7 @@ export function TimelineView() {
     const today = new Date();
     return differenceInDays(today, parseISO(origin)) * zoom;
   }, [origin, zoom]);
+  const todayPos = timescale.todayPosition ?? 'below';
 
   // ─── Layout computation ────────────────────────────────────────────
 
@@ -465,43 +466,76 @@ export function TimelineView() {
           )}
 
            {/* Timescale Headers */}
-           <div className="sticky top-0 z-10 border-b border-[var(--color-border)] overflow-hidden" style={getTimescaleBarShapeStyle(timescale.barShape)}>
-             {tierLabels.map(({ tier, storeIndex, labels }, tierIdx) => {
-               const originDate = parseISO(origin);
-               const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
-               const isSelected = selectedTierIndex === storeIndex;
+           <div className="sticky top-0 z-10 relative" style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}>
+             <div className="border-b border-[var(--color-border)] overflow-hidden" style={getTimescaleBarShapeStyle(timescale.barShape)}>
+              {tierLabels.map(({ tier, storeIndex, labels }, tierIdx) => {
+                const originDate = parseISO(origin);
+                const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
+                const isSelected = selectedTierIndex === storeIndex;
 
-               return (
-                 <div
-                   key={tierIdx}
-                   className={`flex h-7 relative cursor-pointer transition-shadow ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
-                   style={{ backgroundColor: tier.backgroundColor }}
-                   onClick={() => { setSelectedTierIndex(storeIndex); setStylePaneSection('scale'); }}
-                 >
-                   {cells.map((cell, ci) => (
-                     <div
-                       key={ci}
-                       className={`flex items-center shrink-0 overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
-                       style={{
-                         position: 'absolute',
-                         left: cell.fraction * totalWidth,
-                         width: cell.widthFrac * totalWidth,
-                         height: 28,
-                         color: tier.fontColor,
-                         fontSize: tier.fontSize,
-                         fontFamily: tier.fontFamily,
-                         fontWeight: tier.fontWeight,
-                         fontStyle: tier.fontStyle,
-                         textDecoration: tier.textDecoration,
-                          justifyContent: 'flex-start',
-                       }}
-                     >
-                       <span className="truncate px-1">{cell.label}</span>
-                     </div>
-                   ))}
-                 </div>
-               );
-             })}
+                return (
+                  <div
+                    key={tierIdx}
+                    className={`flex h-7 relative cursor-pointer transition-shadow ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
+                    style={{ backgroundColor: tier.backgroundColor }}
+                    onClick={() => { setSelectedTierIndex(storeIndex); setStylePaneSection('scale'); }}
+                  >
+                    {cells.map((cell, ci) => (
+                      <div
+                        key={ci}
+                        className={`flex items-center shrink-0 overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
+                        style={{
+                          position: 'absolute',
+                          left: cell.fraction * totalWidth,
+                          width: cell.widthFrac * totalWidth,
+                          height: 28,
+                          color: tier.fontColor,
+                          fontSize: tier.fontSize,
+                          fontFamily: tier.fontFamily,
+                          fontWeight: tier.fontWeight,
+                          fontStyle: tier.fontStyle,
+                          textDecoration: tier.textDecoration,
+                           justifyContent: 'flex-start',
+                        }}
+                      >
+                        <span className="truncate px-1">{cell.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+             </div>
+
+              {/* Today label — positioned relative to timescale header */}
+              {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
+                <div
+                  className="absolute pointer-events-none z-20"
+                  style={{
+                    left: todayX,
+                    transform: 'translateX(-50%)',
+                    ...(todayPos === 'above'
+                      ? { bottom: '100%' }
+                      : { top: '100%' }
+                    ),
+                  }}
+                >
+                  <div className="flex flex-col items-center">
+                    {todayPos === 'below' && (
+                      <svg width="10" height="6" viewBox="0 0 10 6">
+                        <path d="M5 0L0 6h10L5 0z" fill={timescale.todayColor} />
+                      </svg>
+                    )}
+                    <div className="border border-[var(--color-border)] bg-white rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text)] whitespace-nowrap leading-tight">
+                      Today
+                    </div>
+                    {todayPos === 'above' && (
+                      <svg width="10" height="6" viewBox="0 0 10 6">
+                        <path d="M5 6L0 0h10L5 6z" fill={timescale.todayColor} />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              )}
            </div>
 
           {/* ─── Canvas: grid, swimlane bands, items ─── */}
@@ -519,27 +553,12 @@ export function TimelineView() {
                 );
               })}
 
-            {/* Today Line */}
+            {/* Today Line (vertical line only — label is on the timescale header) */}
             {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
               <div
-                className="absolute top-0 bottom-0 z-10 pointer-events-none"
-                style={{ left: todayX }}
-              >
-                <div
-                  className="w-0.5 h-full"
-                  style={{ backgroundColor: timescale.todayColor }}
-                />
-                <div
-                  className={`absolute -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-medium text-white ${
-                    (timescale.todayPosition ?? 'below') === 'above'
-                      ? 'bottom-0 rounded-t'
-                      : 'top-0 rounded-b'
-                  }`}
-                  style={{ backgroundColor: timescale.todayColor }}
-                >
-                  Today
-                </div>
-              </div>
+                className="absolute top-0 bottom-0 z-10 pointer-events-none w-0.5"
+                style={{ left: todayX, backgroundColor: timescale.todayColor }}
+              />
             )}
 
             {/* ─── Swimlane bands (bg + colored badge) ─── */}
