@@ -3,7 +3,7 @@ import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, buildVisibleTierCells, getProjectRange, resolveAutoUnit } from '@/utils';
-import { ZoomIn, ZoomOut, Pencil } from 'lucide-react';
+import { ZoomIn, ZoomOut } from 'lucide-react';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig } from '@/types';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -65,8 +65,6 @@ export function TimelineView() {
   const moveItem = useProjectStore((s) => s.moveItem);
   const moveItemToSwimlane = useProjectStore((s) => s.moveItemToSwimlane);
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
-  const timelineTitle = useProjectStore((s) => s.timelineTitle);
-  const setTimelineTitle = useProjectStore((s) => s.setTimelineTitle);
   const swimlaneSpacing = useProjectStore((s) => s.swimlaneSpacing);
   const selectedTierIndex = useProjectStore((s) => s.selectedTierIndex);
   const setSelectedTierIndex = useProjectStore((s) => s.setSelectedTierIndex);
@@ -75,8 +73,6 @@ export function TimelineView() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragStartX, setDragStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleValue, setTitleValue] = useState(timelineTitle);
 
   const sortedSwimlanes = useMemo(
     () => [...swimlanes].sort((a, b) => a.order - b.order),
@@ -326,14 +322,6 @@ export function TimelineView() {
     [moveItemToSwimlane]
   );
 
-  // Title editing
-  const commitTitle = useCallback(() => {
-    const trimmed = titleValue.trim();
-    if (trimmed) setTimelineTitle(trimmed);
-    else setTitleValue(timelineTitle);
-    setEditingTitle(false);
-  }, [titleValue, timelineTitle, setTimelineTitle]);
-
   // ─── Render helpers ────────────────────────────────────────────────
 
   const belowMilestoneGap = 4; // px between timescale bar bottom edge and milestone top edge
@@ -388,40 +376,6 @@ export function TimelineView() {
 
   return (
     <div className="relative h-full flex flex-col overflow-hidden bg-[var(--color-bg)]">
-      {/* ─── Timeline graph title (large, centered) ─── */}
-      <div className="py-6 px-8 shrink-0 flex items-center justify-center">
-        {editingTitle ? (
-          <input
-            className="text-2xl font-bold text-[var(--color-text)] bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-4 py-2 outline-none focus:border-indigo-500 min-w-[300px] text-center"
-            value={titleValue}
-            onChange={(e) => setTitleValue(e.target.value)}
-            onBlur={commitTitle}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitTitle();
-              if (e.key === 'Escape') {
-                setTitleValue(timelineTitle);
-                setEditingTitle(false);
-              }
-            }}
-            autoFocus
-          />
-        ) : (
-          <button
-            onClick={() => {
-              setTitleValue(timelineTitle);
-              setEditingTitle(true);
-            }}
-            className="group flex items-center gap-3 text-2xl font-bold text-[var(--color-text)] hover:text-[var(--color-text-secondary)] transition-colors"
-          >
-            {timelineTitle}
-            <Pencil
-              size={16}
-              className="opacity-0 group-hover:opacity-40 transition-opacity"
-            />
-          </button>
-        )}
-      </div>
-
       {/* ─── Card container ─── */}
       <div className="flex-1 mx-3 mb-3 rounded border border-[var(--color-border)] bg-white overflow-hidden flex flex-col">
       {/* ─── Scrollable timeline content ─── */}
