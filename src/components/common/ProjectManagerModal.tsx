@@ -1,15 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Trash2, FolderOpen, HardDrive, FolderSearch } from 'lucide-react';
+import { X, Plus, Trash2, FolderOpen } from 'lucide-react';
 import { useProjectStore } from '@/store/useProjectStore';
-import {
-  listProjects,
-  deleteProjectFile,
-  getDirectoryHandle,
-  pickDirectory,
-  restoreDirectoryHandle,
-  isFileSystemSupported,
-} from '@/utils/fileStorage';
+import { listProjects, deleteProjectFile } from '@/utils/fileStorage';
 import type { FileProjectEntry } from '@/utils/fileStorage';
 
 interface Props {
@@ -24,17 +17,9 @@ export function ProjectManagerModal({ onClose }: Props) {
 
   const [projects, setProjects] = useState<FileProjectEntry[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [hasDirectory, setHasDirectory] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refreshProjects = useCallback(async () => {
-    if (!getDirectoryHandle()) {
-      setProjects([]);
-      setHasDirectory(false);
-      setLoading(false);
-      return;
-    }
-    setHasDirectory(true);
     setLoading(true);
     const entries = await listProjects();
     setProjects(entries);
@@ -42,21 +27,8 @@ export function ProjectManagerModal({ onClose }: Props) {
   }, []);
 
   useEffect(() => {
-    // Try to restore a previously chosen directory, then list projects
-    (async () => {
-      if (!getDirectoryHandle()) {
-        await restoreDirectoryHandle();
-      }
-      await refreshProjects();
-    })();
+    refreshProjects();
   }, [refreshProjects]);
-
-  const handlePickDirectory = async () => {
-    const picked = await pickDirectory();
-    if (picked) {
-      await refreshProjects();
-    }
-  };
 
   const handleNew = () => {
     if (isDirty) {
@@ -110,8 +82,6 @@ export function ProjectManagerModal({ onClose }: Props) {
     }
   };
 
-  const supported = isFileSystemSupported();
-
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center"
@@ -145,44 +115,17 @@ export function ProjectManagerModal({ onClose }: Props) {
             <Plus size={14} />
             New Project
           </button>
-          {supported && (
-            <button
-              onClick={handlePickDirectory}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
-            >
-              <FolderSearch size={14} />
-              {hasDirectory ? 'Change Folder' : 'Choose Folder'}
-            </button>
-          )}
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {!supported ? (
-            <div className="px-5 py-10 text-center text-sm text-[var(--color-text-muted)]">
-              <HardDrive size={24} className="mx-auto mb-2 text-[var(--color-text-muted)]" />
-              <p>File system access is not supported in this browser.</p>
-              <p className="mt-1 text-xs">Please use Chrome or Edge for file-based project storage.</p>
-            </div>
-          ) : !hasDirectory ? (
-            <div className="px-5 py-10 text-center text-sm text-[var(--color-text-muted)]">
-              <FolderOpen size={24} className="mx-auto mb-2 text-[var(--color-text-muted)]" />
-              <p>Choose a folder to store your project files.</p>
-              <p className="mt-1 text-xs">Projects are saved as .json files in the folder you select.</p>
-              <button
-                onClick={handlePickDirectory}
-                className="mt-4 px-4 py-2 rounded-md text-sm font-medium text-white bg-[#4f46e5] hover:bg-[#4338ca] transition-colors"
-              >
-                Choose Folder
-              </button>
-            </div>
-          ) : loading ? (
+          {loading ? (
             <div className="px-5 py-10 text-center text-sm text-[var(--color-text-muted)]">
               Loading projects...
             </div>
           ) : projects.length === 0 ? (
             <div className="px-5 py-10 text-center text-sm text-[var(--color-text-muted)]">
-              No saved projects in this folder. Save your current project or create a new one.
+              No saved projects yet. Save your current project or create a new one.
             </div>
           ) : (
             <div className="divide-y divide-[var(--color-border)]">
@@ -241,9 +184,7 @@ export function ProjectManagerModal({ onClose }: Props) {
 
         {/* Footer hint */}
         <div className="px-5 py-3 border-t border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
-          {hasDirectory
-            ? 'Projects are saved as .json files in your chosen folder.'
-            : 'Choose a folder to enable file-based project storage.'}
+          Projects are saved as .json files in the data/projects folder.
         </div>
       </div>
     </div>,
