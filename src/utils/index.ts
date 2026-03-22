@@ -384,9 +384,14 @@ function computeConstraint(
 /**
  * Schedule dependents after an item has been moved/resized or dependencies changed.
  *
- * For each successor, computes the exact constraint date from ALL its predecessors.
- * If the successor's current dates don't match the constraint:
+ * For each successor, computes the constraint date from ALL its predecessors.
+ * A "violation" means successor starts before the constraint (too early).
+ * "Slack" means successor starts after the constraint (too late).
  *
+ * In flexible mode (strictSnap=false): only violations trigger action. Slack is OK.
+ * In strict mode (strictSnap=true): any mismatch triggers action (no slack allowed).
+ *
+ * When a violation (or strict mismatch) is detected:
  * - dont-allow: Auto-snap the successor to the constraint date. Cascade.
  * - allow-exception: Leave item in place. Adjust each dependency's lag so
  *     the link reflects the actual gap. Record as conflict. Cascade.
@@ -398,7 +403,8 @@ export function scheduleDependents(
   changedItemIds: string[],
   items: ProjectItem[],
   dependencies: Dependency[],
-  conflictMode: DependencyConflictMode = 'dont-allow'
+  conflictMode: DependencyConflictMode = 'dont-allow',
+  strictSnap: boolean = false
 ): { items: ProjectItem[]; conflicts: SchedulingConflict[]; lagAdjustments: DependencyLagAdjustment[] } {
   const updated = items.map((i) => ({ ...i }));
   const itemMap = new Map(updated.map((i) => [i.id, i]));
@@ -463,23 +469,37 @@ export function scheduleDependents(
     // Compute what the successor's dates should be per the constraints
     let reqStart = succStart;
     let reqEnd = succEnd;
+    let hasViolation = false;
 
     if (latestRequiredStart) {
-      reqStart = latestRequiredStart;
-      reqEnd = addDays(reqStart, duration);
+      if (latestRequiredStart > succStart) {
+        // Violation: successor starts before constraint
+        reqStart = latestRequiredStart;
+        reqEnd = addDays(reqStart, duration);
+        hasViolation = true;
+      } else if (strictSnap && latestRequiredStart < succStart) {
+        // Strict mode: slack is not allowed, snap back
+        reqStart = latestRequiredStart;
+        reqEnd = addDays(reqStart, duration);
+        hasViolation = true;
+      }
     }
 
-    if (latestRequiredEnd && latestRequiredEnd > reqEnd) {
-      reqEnd = latestRequiredEnd;
-      reqStart = addDays(reqEnd, -duration);
+    if (latestRequiredEnd) {
+      if (latestRequiredEnd > reqEnd) {
+        // Violation: end constraint pushes further
+        reqEnd = latestRequiredEnd;
+        reqStart = addDays(reqEnd, -duration);
+        hasViolation = true;
+      } else if (strictSnap && latestRequiredEnd < reqEnd && !hasViolation) {
+        // Strict mode: snap back
+        reqEnd = latestRequiredEnd;
+        reqStart = addDays(reqEnd, -duration);
+        hasViolation = true;
+      }
     }
 
-    // Check if there's any mismatch (either direction)
-    const hasMismatch =
-      reqStart.getTime() !== succStart.getTime() ||
-      reqEnd.getTime() !== succEnd.getTime();
-
-    if (!hasMismatch) return false;
+    if (!hasViolation) return false;
 
     const reqStartISO = reqStart.toISOString().split('T')[0];
     const reqEndISO = reqEnd.toISOString().split('T')[0];

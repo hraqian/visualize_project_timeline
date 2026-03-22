@@ -524,11 +524,11 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     // If dates changed and we're in automatic scheduling mode, cascade to dependents
     const datesChanged = updates.startDate !== undefined || updates.endDate !== undefined;
     if (datesChanged && state.dependencySettings.schedulingMode !== 'manual') {
-      const effectiveMode: DependencyConflictMode =
-        state.dependencySettings.schedulingMode === 'automatic-strict'
-          ? 'dont-allow'
-          : state.dependencySettings.conflictMode;
-      const result = scheduleDependents([id], newItems, newDeps, effectiveMode);
+      const isStrict = state.dependencySettings.schedulingMode === 'automatic-strict';
+      const effectiveMode: DependencyConflictMode = isStrict
+        ? 'dont-allow'
+        : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([id], newItems, newDeps, effectiveMode, isStrict);
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
@@ -580,11 +580,11 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
     // Auto-schedule dependents (only in automatic modes)
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      const effectiveMode: DependencyConflictMode =
-        state.dependencySettings.schedulingMode === 'automatic-strict'
-          ? 'dont-allow'
-          : state.dependencySettings.conflictMode;
-      const result = scheduleDependents([id], newItems, newDeps, effectiveMode);
+      const isStrict = state.dependencySettings.schedulingMode === 'automatic-strict';
+      const effectiveMode: DependencyConflictMode = isStrict
+        ? 'dont-allow'
+        : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([id], newItems, newDeps, effectiveMode, isStrict);
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
@@ -605,11 +605,11 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
     // Auto-schedule dependents (only in automatic modes)
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      const effectiveMode: DependencyConflictMode =
-        state.dependencySettings.schedulingMode === 'automatic-strict'
-          ? 'dont-allow'
-          : state.dependencySettings.conflictMode;
-      const result = scheduleDependents([id], newItems, newDeps, effectiveMode);
+      const isStrict = state.dependencySettings.schedulingMode === 'automatic-strict';
+      const effectiveMode: DependencyConflictMode = isStrict
+        ? 'dont-allow'
+        : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([id], newItems, newDeps, effectiveMode, isStrict);
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
@@ -802,11 +802,11 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     }];
     let newItems = state.items;
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      const effectiveMode: DependencyConflictMode =
-        state.dependencySettings.schedulingMode === 'automatic-strict'
-          ? 'dont-allow'
-          : state.dependencySettings.conflictMode;
-      const result = scheduleDependents([toId], newItems, newDeps, effectiveMode);
+      const isStrict = state.dependencySettings.schedulingMode === 'automatic-strict';
+      const effectiveMode: DependencyConflictMode = isStrict
+        ? 'dont-allow'
+        : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([toId], newItems, newDeps, effectiveMode, isStrict);
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
@@ -829,11 +829,11 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     );
     let newItems = state.items;
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      const effectiveMode: DependencyConflictMode =
-        state.dependencySettings.schedulingMode === 'automatic-strict'
-          ? 'dont-allow'
-          : state.dependencySettings.conflictMode;
-      const result = scheduleDependents([toId], newItems, newDeps, effectiveMode);
+      const isStrict = state.dependencySettings.schedulingMode === 'automatic-strict';
+      const effectiveMode: DependencyConflictMode = isStrict
+        ? 'dont-allow'
+        : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([toId], newItems, newDeps, effectiveMode, isStrict);
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
@@ -859,11 +859,11 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     ];
     let newItems = state.items;
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      const effectiveMode: DependencyConflictMode =
-        state.dependencySettings.schedulingMode === 'automatic-strict'
-          ? 'dont-allow'
-          : state.dependencySettings.conflictMode;
-      const result = scheduleDependents([itemId], newItems, newDeps, effectiveMode);
+      const isStrict = state.dependencySettings.schedulingMode === 'automatic-strict';
+      const effectiveMode: DependencyConflictMode = isStrict
+        ? 'dont-allow'
+        : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([itemId], newItems, newDeps, effectiveMode, isStrict);
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
@@ -1086,9 +1086,9 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     let newDeps = state.dependencies;
     if (keptIds.size > 0) {
       // Run scheduleDependents in allow-exception mode just for the kept items
-      // to compute the lag adjustments needed
+      // to compute the lag adjustments needed (flexible context — no strict snap)
       const keptResult = scheduleDependents(
-        [...keptIds], newItems, newDeps, 'allow-exception'
+        [...keptIds], newItems, newDeps, 'allow-exception', false
       );
       newDeps = applyLagAdjustments(newDeps, keptResult.lagAdjustments);
     }
@@ -1100,7 +1100,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
     let finalItems = newItems;
     if (rescheduledIds.length > 0 && state.dependencySettings.schedulingMode !== 'manual') {
-      const result = scheduleDependents(rescheduledIds, newItems, newDeps, 'dont-allow');
+      const isStrict = state.dependencySettings.schedulingMode === 'automatic-strict';
+      const result = scheduleDependents(rescheduledIds, newItems, newDeps, 'dont-allow', isStrict);
       finalItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
     }
