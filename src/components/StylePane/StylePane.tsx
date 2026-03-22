@@ -62,16 +62,16 @@ function TaskIcon({ size = 16 }: { size?: number }) {
 function MilestoneIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <rect x="8" y="1.34" width="9" height="9" rx="1" transform="rotate(45 8 1.34)" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="8" y="1.34" width="9" height="9" rx="1" transform="rotate(45 8 1.34)" stroke="currentColor" strokeWidth="1" />
     </svg>
   );
 }
 
 function SwimlaneIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 18 16" fill="none">
-      <rect x="1" y="4" width="3.5" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="7" y="4" width="10" height="8" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="4" width="3.5" height="8" rx="1" stroke="currentColor" strokeWidth="1" />
+      <rect x="6.5" y="4" width="8.5" height="8" rx="1" stroke="currentColor" strokeWidth="1" />
     </svg>
   );
 }
@@ -81,7 +81,7 @@ function DependencyIcon({ size = 16 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <rect x="1" y="2" width="5" height="5" rx="1" fill="currentColor" />
       <rect x="10" y="9" width="5" height="5" rx="1" fill="currentColor" />
-      <path d="M6 4.5H8V11.5H10" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6 4.5H8V11.5H10" stroke="currentColor" strokeWidth="1" />
     </svg>
   );
 }
@@ -274,7 +274,7 @@ export function StylePane() {
               }`}
               title="Task"
             >
-              <TaskIcon size={22} />
+              <TaskIcon size={26} />
             </button>
             <button
               onClick={() => handleSubTabClick('milestone')}
@@ -285,7 +285,7 @@ export function StylePane() {
               }`}
               title="Milestone"
             >
-              <MilestoneIcon size={22} />
+              <MilestoneIcon size={26} />
             </button>
             <button
               onClick={() => handleSubTabClick('swimlane')}
@@ -296,7 +296,7 @@ export function StylePane() {
               }`}
               title="Swimlane"
             >
-              <SwimlaneIcon size={22} />
+              <SwimlaneIcon size={26} />
             </button>
             <button
               onClick={() => handleSubTabClick('dependency')}
@@ -307,7 +307,7 @@ export function StylePane() {
               }`}
               title="Dependency Link"
             >
-              <DependencyIcon size={22} />
+              <DependencyIcon size={26} />
             </button>
           </div>
         )}
