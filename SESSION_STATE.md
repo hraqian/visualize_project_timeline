@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 21, 2026 (session 17 — Drag guide ghost + vertical guidelines)
+> **Last updated**: March 21, 2026 (session 18 — TierSettingsModal preview end cap fix)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -729,11 +729,14 @@ Contains:
   - **Vertical guidelines**: Dashed vertical lines (`1px dashed #94a3b8`) extending full canvas height at snap position. Tasks get two lines (start + end), milestones get one line (center). Helps align with timescale dates.
   - All elements use inline styles only (no Tailwind classes)
 
+### Phase 18 — TierSettingsModal Preview End Cap Fix (session 18)
+- **Fixed TierSettingsModal preview end caps** (`c2f319b`): End caps in the tier settings modal preview were flex siblings consuming bar width. Changed to absolute positioning (`right: 100%` / `left: 100%`) matching the fix applied to TimelineView in session 17. Added `mx-16` to the relative container to prevent clipping by parent overflow.
+
 ---
 
 ## Known Pre-existing Build Errors
 
-`npx tsc --noEmit` passes clean as of session 17.
+`npx tsc --noEmit` passes clean as of session 18.
 
 ---
 
