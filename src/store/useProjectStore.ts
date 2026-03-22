@@ -24,7 +24,8 @@ import type {
 } from '@/types';
 import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY, DEFAULT_DEPENDENCY_SETTINGS } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, scheduleDependents } from '@/utils';
-import { saveProject as saveProjectToStorage, loadProject as loadProjectFromStorage, getGlobalSettings } from '@/utils/storage';
+import { getGlobalSettings } from '@/utils/storage';
+import { saveProjectToFile, loadProjectFromFile, getDirectoryHandle, pickDirectory } from '@/utils/fileStorage';
 
 /** Apply lag adjustments (from allow-exception mode) to a dependencies array. */
 function applyLagAdjustments(deps: Dependency[], adjustments: DependencyLagAdjustment[]): Dependency[] {
@@ -170,8 +171,8 @@ interface ProjectActions {
   setSelectedTierIndex: (index: number | null) => void;
 
   // Project persistence
-  saveProject: () => void;
-  loadProject: (id: string) => void;
+  saveProject: () => Promise<void>;
+  loadProject: (id: string) => Promise<void>;
   newProject: () => void;
 
   // Project
@@ -354,13 +355,18 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   setSelectedTierIndex: (index) => set({ selectedTierIndex: index }),
 
   // ─── Project Persistence ─────────────────────────────────────────────
-  saveProject: () => {
+  saveProject: async () => {
     const state = get();
-    const now = saveProjectToStorage(state as ProjectState);
+    // If no directory is selected yet, prompt the user to pick one
+    if (!getDirectoryHandle()) {
+      const picked = await pickDirectory();
+      if (!picked) return; // User cancelled
+    }
+    const now = await saveProjectToFile(state as ProjectState);
     set({ lastModified: now, isDirty: false });
   },
-  loadProject: (id) => {
-    const data = loadProjectFromStorage(id);
+  loadProject: async (id) => {
+    const data = await loadProjectFromFile(id);
     if (!data) return;
     undoStack = [];
     redoStack = [];

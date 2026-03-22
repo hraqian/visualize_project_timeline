@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Trash2, FolderOpen } from 'lucide-react';
+import { X, Plus, Trash2, FolderOpen, HardDrive, FolderSearch } from 'lucide-react';
 import { useProjectStore } from '@/store/useProjectStore';
-import { getProjectIndex, deleteProject as deleteProjectFromStorage } from '@/utils/storage';
-import type { ProjectIndexEntry } from '@/utils/storage';
+import {
+  listProjects,
+  deleteProjectFile,
+  getDirectoryHandle,
+  pickDirectory,
+  restoreDirectoryHandle,
+  isFileSystemSupported,
+} from '@/utils/fileStorage';
+import type { FileProjectEntry } from '@/utils/fileStorage';
 
 interface Props {
   onClose: () => void;
@@ -12,19 +19,43 @@ interface Props {
 export function ProjectManagerModal({ onClose }: Props) {
   const loadProject = useProjectStore((s) => s.loadProject);
   const newProject = useProjectStore((s) => s.newProject);
-  const saveProject = useProjectStore((s) => s.saveProject);
   const isDirty = useProjectStore((s) => s.isDirty);
   const currentProjectId = useProjectStore((s) => s.projectId);
 
-  const [projects, setProjects] = useState<ProjectIndexEntry[]>([]);
+  const [projects, setProjects] = useState<FileProjectEntry[]>([]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [hasDirectory, setHasDirectory] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setProjects(getProjectIndex());
+  const refreshProjects = useCallback(async () => {
+    if (!getDirectoryHandle()) {
+      setProjects([]);
+      setHasDirectory(false);
+      setLoading(false);
+      return;
+    }
+    setHasDirectory(true);
+    setLoading(true);
+    const entries = await listProjects();
+    setProjects(entries);
+    setLoading(false);
   }, []);
 
-  const refreshIndex = () => {
-    setProjects(getProjectIndex());
+  useEffect(() => {
+    // Try to restore a previously chosen directory, then list projects
+    (async () => {
+      if (!getDirectoryHandle()) {
+        await restoreDirectoryHandle();
+      }
+      await refreshProjects();
+    })();
+  }, [refreshProjects]);
+
+  const handlePickDirectory = async () => {
+    const picked = await pickDirectory();
+    if (picked) {
+      await refreshProjects();
+    }
   };
 
   const handleNew = () => {
@@ -36,7 +67,7 @@ export function ProjectManagerModal({ onClose }: Props) {
     onClose();
   };
 
-  const handleLoad = (id: string) => {
+  const handleLoad = async (id: string) => {
     if (id === currentProjectId) {
       onClose();
       return;
@@ -45,15 +76,15 @@ export function ProjectManagerModal({ onClose }: Props) {
       const discard = window.confirm('You have unsaved changes. Discard them and load this project?');
       if (!discard) return;
     }
-    loadProject(id);
+    await loadProject(id);
     onClose();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirmDeleteId === id) {
-      deleteProjectFromStorage(id);
+      await deleteProjectFile(id);
       setConfirmDeleteId(null);
-      refreshIndex();
+      await refreshProjects();
       // If we deleted the current project, create a new one
       if (id === currentProjectId) {
         newProject();
@@ -78,6 +109,8 @@ export function ProjectManagerModal({ onClose }: Props) {
       return iso;
     }
   };
+
+  const supported = isFileSystemSupported();
 
   return createPortal(
     <div
@@ -112,13 +145,44 @@ export function ProjectManagerModal({ onClose }: Props) {
             <Plus size={14} />
             New Project
           </button>
+          {supported && (
+            <button
+              onClick={handlePickDirectory}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
+            >
+              <FolderSearch size={14} />
+              {hasDirectory ? 'Change Folder' : 'Choose Folder'}
+            </button>
+          )}
         </div>
 
-        {/* Project list */}
+        {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {projects.length === 0 ? (
+          {!supported ? (
             <div className="px-5 py-10 text-center text-sm text-[var(--color-text-muted)]">
-              No saved projects yet. Save your current project or create a new one.
+              <HardDrive size={24} className="mx-auto mb-2 text-[var(--color-text-muted)]" />
+              <p>File system access is not supported in this browser.</p>
+              <p className="mt-1 text-xs">Please use Chrome or Edge for file-based project storage.</p>
+            </div>
+          ) : !hasDirectory ? (
+            <div className="px-5 py-10 text-center text-sm text-[var(--color-text-muted)]">
+              <FolderOpen size={24} className="mx-auto mb-2 text-[var(--color-text-muted)]" />
+              <p>Choose a folder to store your project files.</p>
+              <p className="mt-1 text-xs">Projects are saved as .json files in the folder you select.</p>
+              <button
+                onClick={handlePickDirectory}
+                className="mt-4 px-4 py-2 rounded-md text-sm font-medium text-white bg-[#4f46e5] hover:bg-[#4338ca] transition-colors"
+              >
+                Choose Folder
+              </button>
+            </div>
+          ) : loading ? (
+            <div className="px-5 py-10 text-center text-sm text-[var(--color-text-muted)]">
+              Loading projects...
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="px-5 py-10 text-center text-sm text-[var(--color-text-muted)]">
+              No saved projects in this folder. Save your current project or create a new one.
             </div>
           ) : (
             <div className="divide-y divide-[var(--color-border)]">
@@ -177,7 +241,9 @@ export function ProjectManagerModal({ onClose }: Props) {
 
         {/* Footer hint */}
         <div className="px-5 py-3 border-t border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
-          Projects are stored in your browser's local storage.
+          {hasDirectory
+            ? 'Projects are saved as .json files in your chosen folder.'
+            : 'Choose a folder to enable file-based project storage.'}
         </div>
       </div>
     </div>,

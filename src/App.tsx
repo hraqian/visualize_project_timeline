@@ -9,6 +9,7 @@ import { SettingsModal } from '@/components/common/SettingsModal';
 import { ConflictResolutionDialog } from '@/components/common/ConflictResolutionDialog';
 import { toPng } from 'html-to-image';
 import { exportNativePptx } from '@/utils/exportPptx';
+import { restoreDirectoryHandle } from '@/utils/fileStorage';
 import {
   Pencil,
   Plus,
@@ -61,6 +62,11 @@ function App() {
     else setNameValue(projectName);
     setEditingName(false);
   }, [nameValue, projectName, setProjectName]);
+
+  // On mount, restore the file system directory handle from IndexedDB
+  useEffect(() => {
+    restoreDirectoryHandle();
+  }, []);
 
   // Keyboard shortcuts: Cmd+Z undo, Cmd+Shift+Z redo, Cmd+S save
   useEffect(() => {
