@@ -183,7 +183,8 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     if (timescale.rightEndCap?.show) reserved += (timescale.rightEndCap.fontSize ?? 16) * 3 + 12;
     const available = Math.max(containerWidth - reserved, totalDays * 2);
     const idealZoom = Math.floor(available / totalDays);
-    setZoom(Math.max(2, Math.min(30, idealZoom)));
+    const clamped = Math.max(2, Math.min(30, idealZoom));
+    if (clamped !== zoom) setZoom(clamped);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
