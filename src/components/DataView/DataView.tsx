@@ -24,7 +24,7 @@ import {
 import { TypePickerCell } from './TypePicker';
 import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn, ProjectItem, ColumnVisibility, Dependency } from '@/types';
 import { PRESET_COLORS } from '@/types';
-import { buildRowNumberMap, formatItemDependencies, parseDependencyShorthand, shorthandToDependencies } from '@/utils';
+import { buildRowNumberMap, formatItemDependencies, parseDependencyShorthand, shorthandToDependencies, validateDependencyShorthand } from '@/utils';
 import { DependencyEditorModal } from '@/components/common/DependencyEditorModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1244,6 +1244,12 @@ function ItemRow({
     [item.id, dependencies, rowNumberMap]
   );
 
+  // Live validation warnings while editing
+  const predecessorsWarnings = useMemo(
+    () => editingPredecessors ? validateDependencyShorthand(predecessorsValue, item.id, rowNumberMap) : [],
+    [editingPredecessors, predecessorsValue, item.id, rowNumberMap]
+  );
+
   const startDateRef = useRef<HTMLInputElement>(null);
   const endDateRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -1535,31 +1541,53 @@ function ItemRow({
         <td className="px-3 py-2">
           <div className="flex items-center gap-1 max-w-[160px]">
             {editingPredecessors ? (
-              <input
-                type="text"
-                className="w-full text-xs px-1.5 py-0.5 border border-indigo-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-400 text-slate-700 font-mono"
-                value={predecessorsValue}
-                onChange={(e) => setPredecessorsValue(e.target.value)}
-                onBlur={() => {
-                  setEditingPredecessors(false);
-                  if (predecessorsValue !== predecessorsShorthand) {
-                    onDependencyChange(item.id, predecessorsValue);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  className={`w-full text-xs px-1.5 py-0.5 border rounded bg-white outline-none focus:ring-1 text-slate-700 font-mono ${
+                    predecessorsWarnings.length > 0
+                      ? 'border-amber-400 focus:ring-amber-300'
+                      : 'border-indigo-300 focus:ring-indigo-400'
+                  }`}
+                  value={predecessorsValue}
+                  onChange={(e) => setPredecessorsValue(e.target.value)}
+                  onBlur={() => {
+                    if (predecessorsWarnings.length > 0) {
+                      // Don't commit if there are warnings — revert
+                      setEditingPredecessors(false);
+                      setPredecessorsValue(predecessorsShorthand);
+                      return;
+                    }
                     setEditingPredecessors(false);
                     if (predecessorsValue !== predecessorsShorthand) {
                       onDependencyChange(item.id, predecessorsValue);
                     }
-                  } else if (e.key === 'Escape') {
-                    setEditingPredecessors(false);
-                    setPredecessorsValue(predecessorsShorthand);
-                  }
-                }}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-              />
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      if (predecessorsWarnings.length > 0) return; // block commit
+                      setEditingPredecessors(false);
+                      if (predecessorsValue !== predecessorsShorthand) {
+                        onDependencyChange(item.id, predecessorsValue);
+                      }
+                    } else if (e.key === 'Escape') {
+                      setEditingPredecessors(false);
+                      setPredecessorsValue(predecessorsShorthand);
+                    }
+                  }}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {predecessorsWarnings.length > 0 && (
+                  <div className="absolute left-0 top-full mt-1 z-20 bg-amber-50 border border-amber-200 rounded px-2 py-1 shadow-md max-w-[220px]">
+                    {predecessorsWarnings.map((w, i) => (
+                      <p key={i} className="text-[10px] text-amber-700 leading-tight">
+                        {w}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <span

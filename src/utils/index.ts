@@ -555,6 +555,44 @@ export function parseDependencyShorthand(input: string): ParsedDependency[] {
 }
 
 /**
+ * Validate a shorthand string and return warning messages for bad tokens.
+ * Returns an empty array if everything is valid.
+ */
+export function validateDependencyShorthand(
+  input: string,
+  targetItemId: string,
+  rowMap: Map<string, number>
+): string[] {
+  if (!input.trim()) return [];
+  const warnings: string[] = [];
+  const targetRowNum = rowMap.get(targetItemId);
+  const tokens = input.split(',');
+
+  for (const token of tokens) {
+    const trimmed = token.trim();
+    if (!trimmed) continue;
+
+    const parsed = parseSingleShorthand(trimmed);
+    if (!parsed) {
+      warnings.push(`"${trimmed}" is not valid`);
+      continue;
+    }
+
+    if (targetRowNum != null && parsed.rowNum === targetRowNum) {
+      warnings.push(`Row ${parsed.rowNum} is this item`);
+      continue;
+    }
+
+    const fromId = rowNumberToId(parsed.rowNum, rowMap);
+    if (!fromId) {
+      warnings.push(`Row ${parsed.rowNum} does not exist`);
+    }
+  }
+
+  return warnings;
+}
+
+/**
  * Format a single dependency as shorthand like "7FS+7d".
  * Omits type suffix if FS (default). Omits lag if 0.
  */
