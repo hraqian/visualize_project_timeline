@@ -274,7 +274,7 @@ export function StylePane() {
               }`}
               title="Task"
             >
-              <TaskIcon size={15} />
+              <TaskIcon size={22} />
             </button>
             <button
               onClick={() => handleSubTabClick('milestone')}
@@ -285,7 +285,7 @@ export function StylePane() {
               }`}
               title="Milestone"
             >
-              <MilestoneIcon size={15} />
+              <MilestoneIcon size={22} />
             </button>
             <button
               onClick={() => handleSubTabClick('swimlane')}
@@ -296,7 +296,7 @@ export function StylePane() {
               }`}
               title="Swimlane"
             >
-              <SwimlaneIcon size={15} />
+              <SwimlaneIcon size={22} />
             </button>
             <button
               onClick={() => handleSubTabClick('dependency')}
@@ -307,7 +307,7 @@ export function StylePane() {
               }`}
               title="Dependency Link"
             >
-              <DependencyIcon size={15} />
+              <DependencyIcon size={22} />
             </button>
           </div>
         )}
