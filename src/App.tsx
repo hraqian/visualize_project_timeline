@@ -6,7 +6,7 @@ import type { TimelineViewHandle } from '@/components/TimelineView/TimelineView'
 import { StylePane } from '@/components/StylePane/StylePane';
 import { ProjectManagerModal } from '@/components/common/ProjectManagerModal';
 import { toPng } from 'html-to-image';
-import PptxGenJS from 'pptxgenjs';
+import { exportNativePptx } from '@/utils/exportPptx';
 import {
   Pencil,
   Plus,
@@ -70,7 +70,11 @@ function App() {
     const el = timelineRef.current?.getExportElement();
     if (!el) return null;
     try {
-      return await toPng(el, { backgroundColor: '#ffffff', pixelRatio: 2 });
+      return await toPng(el, {
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        skipFonts: true,
+      });
     } catch (err) {
       console.error('Export failed:', err);
       return null;
@@ -87,30 +91,18 @@ function App() {
   }, [captureTimeline, projectName]);
 
   const exportPPTX = useCallback(async () => {
-    const dataUrl = await captureTimeline();
-    if (!dataUrl) return;
-    // Load image to get dimensions for aspect ratio
-    const img = new window.Image();
-    img.src = dataUrl;
-    await new Promise((resolve) => { img.onload = resolve; });
-    const pptx = new PptxGenJS();
-    pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
-    pptx.layout = 'WIDE';
-    const slide = pptx.addSlide();
-    const imgAspect = img.width / img.height;
-    const slideW = 12.5;
-    const slideH = 6.8;
-    let w = slideW;
-    let h = w / imgAspect;
-    if (h > slideH) {
-      h = slideH;
-      w = h * imgAspect;
-    }
-    const x = (13.333 - w) / 2;
-    const y = (7.5 - h) / 2;
-    slide.addImage({ data: dataUrl, x, y, w, h });
-    await pptx.writeFile({ fileName: `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx` });
-  }, [captureTimeline, projectName]);
+    const store = useProjectStore.getState();
+    await exportNativePptx(
+      store.projectName,
+      store.items,
+      store.swimlanes,
+      store.dependencies,
+      store.timescale,
+      store.zoom,
+      store.taskLayout,
+      store.swimlaneSpacing,
+    );
+  }, []);
 
   const viewTabs: { id: ActiveView; label: string; icon: typeof List }[] = [
     { id: 'data', label: 'Data', icon: List },
