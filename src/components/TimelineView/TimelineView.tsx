@@ -480,15 +480,16 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
       return (
         <div
           key="drag-guide"
-          className="absolute pointer-events-none z-20"
+          className="absolute pointer-events-none z-40"
           style={{ left: cx - iconSize / 2, top: cy, width: iconSize, height: iconSize }}
         >
           <div
-            className="w-full h-full border-2 border-dashed border-slate-400 rotate-45"
+            className="w-full h-full rotate-45"
+            style={{ border: '2px dashed #6366f1' }}
           />
           <div
-            className="absolute left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap px-2 py-1 rounded text-xs font-medium text-white bg-slate-700 shadow-lg"
-            style={{ top: '100%' }}
+            className="absolute left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap px-2 py-1 rounded text-xs font-medium text-white shadow-lg"
+            style={{ top: '100%', backgroundColor: '#334155' }}
           >
             {format(newStart, 'EEE, MMM d, yyyy')}
           </div>
@@ -502,28 +503,30 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     const w = Math.max(width, 8);
 
     return (
-      <div key="drag-guide" className="absolute pointer-events-none z-20">
+      <div key="drag-guide" className="absolute pointer-events-none z-40">
         {/* Dashed outline at snapped position */}
         <div
-          className="absolute border-2 border-dashed border-slate-400 rounded"
+          className="absolute rounded"
           style={{
             left: x + snappedOffsetPx,
             top: barY,
             width: w,
             height: barHeight,
+            border: `2px dashed ${item.taskStyle.color}`,
           }}
         />
         {/* Date tooltip */}
         <div
-          className="absolute whitespace-nowrap px-2.5 py-1.5 rounded text-xs font-medium text-white bg-slate-700 shadow-lg"
+          className="absolute whitespace-nowrap px-2.5 py-1.5 rounded text-xs font-medium text-white shadow-lg"
           style={{
             left: x + snappedOffsetPx + w / 2,
             top: barY + barHeight + 6,
             transform: 'translateX(-50%)',
+            backgroundColor: '#334155',
           }}
         >
           {format(newStart, 'EEE, MMM d, yyyy')}
-          <span className="mx-1.5 text-white/50">&mdash;</span>
+          <span style={{ margin: '0 6px', opacity: 0.5 }}>&mdash;</span>
           {format(newEnd, 'EEE, MMM d, yyyy')}
         </div>
       </div>
@@ -956,7 +959,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
 
   return (
     <div
-      className={`absolute cursor-grab select-none group ${isDragging ? 'cursor-grabbing z-30 opacity-50' : 'z-10'}`}
+      className={`absolute cursor-grab select-none group ${isDragging ? 'cursor-grabbing z-30' : 'z-10'}`}
       style={{
         left: x,
         top: barY,
@@ -1248,7 +1251,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
 
     return (
       <div
-        className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30 opacity-50' : 'z-10'}`}
+        className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30' : 'z-10'}`}
         style={{
           left: x - style.size / 2,
           top: iconTop,
@@ -1301,7 +1304,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
 
   return (
     <div
-      className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30 opacity-50' : 'z-10'}`}
+      className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30' : 'z-10'}`}
       style={{
         left: x - style.size / 2,
         top: iconTop,
