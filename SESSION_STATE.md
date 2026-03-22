@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 21, 2026 (session 15 — Export functionality, click-to-deselect)
+> **Last updated**: March 21, 2026 (session 17 — Drag guide ghost + vertical guidelines)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -47,13 +47,13 @@
 ### File Structure
 ```
 src/
-├── App.tsx                              # Root layout: banner + toolbar + main content, Save/Projects/Export buttons, dirty state banner, ExportButton component with PNG/PPTX dropdown
+├── App.tsx                              # Root layout: banner (Save+Undo/Redo left, project name center) + toolbar (Projects/Export/Settings) + main content, ExportButton component with PNG/PPTX dropdown, Cmd+Z/Cmd+Shift+Z/Cmd+S keyboard shortcuts
 ├── index.css                            # CSS variables (light-only), Tailwind directives
 ├── main.tsx                             # Entry point
 ├── types/
-│   └── index.ts                         # All TypeScript types, interfaces, constants (projectId, lastModified, isDirty on ProjectState)
+│   └── index.ts                         # All TypeScript types, interfaces, constants (projectId, lastModified, isDirty, canUndo, canRedo on ProjectState)
 ├── store/
-│   └── useProjectStore.ts               # Zustand store — all state + actions, wrapped set() for auto-dirty tracking, save/load/new project actions, addItem/addSwimlane return string
+│   └── useProjectStore.ts               # Zustand store — all state + actions, wrapped set() for auto-dirty tracking, save/load/new project actions, addItem/addSwimlane return string, undo/redo stacks (module-level), takeSnapshot/applySnapshot, isUndoRedoing guard
 ├── utils/
 │   ├── index.ts                         # Utility functions: timescale generation, buildVisibleTierCells, resolveAutoUnit, critical path, project range
 │   ├── storage.ts                       # localStorage save/load/delete/list utilities, ProjectIndexEntry type
@@ -63,7 +63,7 @@ src/
 │   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups, focusItemId + focusSwimlaneId auto-focus
 │   │   └── TypePicker.tsx               # Type column cell + popover (shape/color picker)
 │   ├── TimelineView/
-│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, timescale header, card container, auto-fit zoom, forwardRef + useImperativeHandle for export
+│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop (useRef + window events), dependency lines, timescale header, card container, auto-fit zoom, forwardRef + useImperativeHandle for export, drag guide (ghost bar + dashed outline + vertical guidelines + date tooltip, all inline styles)
 │   ├── StylePane/
 │   │   └── StylePane.tsx                # Per-item style editor + TierSettingsModal, 3 tabs (Items/Timescale/Design)
 │   └── common/
@@ -264,13 +264,14 @@ interface TimescaleConfig {
 
 ### Row 1 (top banner)
 - Colored bar: `#4f46e5` (indigo-600)
-- Project name centered, white text
-- Shows "Unsaved changes" when dirty, "Saved" after manual save
+- Left: Save icon (floppy disk) + divider + Undo/Redo icons (grey out when stack empty)
+- Center: Project name + status ("Unsaved changes" / "Saved")
+- Right: empty spacer
 
 ### Row 2 (toolbar)
 - Left: view-specific add buttons (+ Task, + Milestone always enabled)
 - Center: `Data` / `Timeline` tabs
-- Right: `Save` button + `Projects` button (FolderOpen icon) + `Export` dropdown (PNG/PPTX, disabled when not on Timeline) + gear icon
+- Right: `Projects` button (FolderOpen icon) + `Export` dropdown (PNG/PPTX, disabled when not on Timeline) + gear icon
 
 ### Main content
 - Data View or Timeline View fills remaining space
@@ -703,11 +704,36 @@ Contains:
   - Milestone shapes always `'diamond'` regardless of `milestoneStyle.icon` (simplification — 23 lucide variants can't map to PPTX shapes)
   - Dependency lines drawn as straight lines (pptxgenjs doesn't support Bezier curves natively)
 
+### Phase 17 — Undo/Redo + Drag UX Improvements (sessions 16-17)
+- **Fixed false dirty flag on view switch** (`a1abe58`): Auto-fit zoom `useEffect` was calling `setZoom()` unconditionally on mount, touching `zoom` (a dirty key). Fixed by only calling `setZoom` when computed value differs from current.
+- **Moved Save to banner + added Undo/Redo** (`601e647`):
+  - Banner (row 1) now has: Left = Save icon (floppy disk) + divider + Undo/Redo icons; Center = project name + status; Right = empty spacer
+  - Save button removed from toolbar (row 2), which now has: Projects, Export, Settings
+  - Undo/Redo system: snapshots saveable state (`DIRTY_KEYS`) before each dirty mutation, max 50 levels, stacks reset on load/new project
+  - `canUndo`/`canRedo` booleans added to `ProjectState` type and store
+  - Keyboard shortcuts: Cmd+Z (undo), Cmd+Shift+Z (redo), Cmd+S (save)
+  - Undo/Redo buttons grey out (`text-white/25`) when stack is empty
+  - Stacks kept outside Zustand store (plain arrays) to avoid triggering re-renders
+  - `isUndoRedoing` guard prevents snapshotting during undo/redo
+- **Fixed timeline drag-and-drop** (`e0b4d45`): Complete rewrite of drag handling:
+  - Uses `useRef` for drag start tracking (not `useState` which caused stale closures)
+  - Attaches `mousemove`/`mouseup` to `window` via `useEffect` (not React event handlers on container div)
+  - Removed `draggable` and `onDragStart` attributes from TaskBar/MilestoneItem
+- **Added drag guide** (`57b3f4e`, `5409ef4`, `463605b`, `6090ce2`): Visual feedback during item drag:
+  - Dashed outline at snapped grid position (uses task's own color, `2px dashed`)
+  - Date tooltip below outline showing new start-end dates (dark `#334155` background, white text)
+  - Milestone variant with diamond outline + single date
+  - All rendering uses pure inline `style` objects (Tailwind v4 classes don't work for dynamic overlay elements)
+- **Added ghost bar + vertical guidelines** (`d4b2816`): Two additional drag guide elements:
+  - **Ghost bar/diamond at original position**: Faded copy (opacity 0.2-0.25) of task bar or milestone diamond at original location, showing where the item was before dragging
+  - **Vertical guidelines**: Dashed vertical lines (`1px dashed #94a3b8`) extending full canvas height at snap position. Tasks get two lines (start + end), milestones get one line (center). Helps align with timescale dates.
+  - All elements use inline styles only (no Tailwind classes)
+
 ---
 
 ## Known Pre-existing Build Errors
 
-`npx tsc --noEmit` passes clean as of session 15.
+`npx tsc --noEmit` passes clean as of session 17.
 
 ---
 
@@ -788,3 +814,7 @@ All sections COMPLETED:
 - **Timescale cell widths** are proportional to calendar days. `buildVisibleTierCells()` computes fractional positions. The `+1` on `endFrac` converts inclusive end dates to exclusive boundaries.
 - **Auto-fit zoom reserves space for end caps**: estimates `fontSize * 3 + 12` per visible end cap, subtracts from container width before computing zoom. Uses `Math.floor` (not `Math.round`) to prevent overflow.
 - **`taskLayout`** added to `DIRTY_KEYS` — persisted to localStorage along with other saveable keys.
+- **Undo/Redo system**: Stacks (`undoStack`, `redoStack`) kept as module-level plain arrays outside Zustand store to avoid triggering re-renders. `takeSnapshot()` captures all `DIRTY_KEYS` values before mutations. `applySnapshot()` restores them. `isUndoRedoing` flag prevents snapshotting during undo/redo operations. Max 50 undo levels. Stacks cleared on `loadProject`/`newProject`. `canUndo`/`canRedo` booleans on store updated after each push/pop for UI binding.
+- **Keyboard shortcuts** (in App.tsx `useEffect`): Cmd+Z = undo, Cmd+Shift+Z = redo, Cmd+S = save. All use `e.preventDefault()` to block browser defaults.
+- **Drag guide rendering**: All drag feedback elements use pure inline `style` objects. Tailwind v4 classes are unreliable for dynamically rendered overlay elements. The IIFE `{dragGuide && (() => { ... })()}` pattern renders fragments containing: ghost bar (opacity 0.2), vertical guidelines (1px dashed #94a3b8 full canvas height), dashed outline (2px dashed in item color), and date tooltip (#334155 bg, white text).
+- **Timeline drag uses `useRef` + window events**: `dragRef.current` stores `{ id, startX }`. `mousemove`/`mouseup` attached to `window` via `useEffect` cleanup pattern. Avoids stale closure bugs from `useState` + `useCallback`.

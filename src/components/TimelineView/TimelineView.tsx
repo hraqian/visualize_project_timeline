@@ -79,8 +79,9 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
   useImperativeHandle(ref, () => ({
     getExportElement: () => exportRef.current,
   }));
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState(0);
+  const [dragState, setDragState] = useState<{ id: string; offset: number } | null>(null);
+  const draggingId = dragState?.id ?? null;
+  const dragOffset = dragState?.offset ?? 0;
   const dragRef = useRef<{ id: string; startX: number } | null>(null);
 
   const sortedSwimlanes = useMemo(
@@ -358,8 +359,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
       e.stopPropagation();
       e.preventDefault();
       dragRef.current = { id: itemId, startX: e.clientX };
-      setDraggingId(itemId);
-      setDragOffset(0);
+      setDragState({ id: itemId, offset: 0 });
     },
     []
   );
@@ -369,18 +369,22 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     if (!draggingId) return;
     const onMove = (e: MouseEvent) => {
       if (!dragRef.current) return;
-      setDragOffset(e.clientX - dragRef.current.startX);
+      setDragState({ id: dragRef.current.id, offset: e.clientX - dragRef.current.startX });
     };
     const onUp = (e: MouseEvent) => {
       if (!dragRef.current) return;
       const offset = e.clientX - dragRef.current.startX;
       const daysDelta = Math.round(offset / zoom);
-      if (daysDelta !== 0) {
-        moveItem(dragRef.current.id, daysDelta);
-      }
+      const itemId = dragRef.current.id;
       dragRef.current = null;
-      setDraggingId(null);
-      setDragOffset(0);
+      // Clear drag state synchronously BEFORE moveItem.
+      // This works because the CSS transition on translateX has been removed,
+      // so the bar won't animate back. Zustand + React batch in the same tick:
+      // bar goes from (oldX + snappedOffset) to (newX + 0) = same pixel position.
+      setDragState(null);
+      if (daysDelta !== 0) {
+        moveItem(itemId, daysDelta);
+      }
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -422,7 +426,8 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     const x = itemToX(item.startDate);
     const y = yBase + getRow(item) * ROW_HEIGHT;
     const isDragging = draggingId === item.id;
-    const translateX = isDragging ? dragOffset : 0;
+    // Snap to day grid during drag so the bar doesn't jump on drop
+    const translateX = isDragging ? Math.round(dragOffset / zoom) * zoom : 0;
     const isSelected = selectedItemId === item.id;
 
     if (item.type === 'milestone') {
@@ -494,7 +499,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                 if (s.showDate) stackH += Math.ceil(s.dateFontSize * 1.25) + 1;
                 const ay = aboveHeight - stackH - aboveRowGap;
                 const isDraggingItem = draggingId === item.id;
-                const txl = isDraggingItem ? dragOffset : 0;
+                const txl = isDraggingItem ? Math.round(dragOffset / zoom) * zoom : 0;
                 const isSel = selectedItemId === item.id;
                 return (
                   <MilestoneItem
@@ -1061,7 +1066,6 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
         width: w,
         height: barHeight,
         transform: `translateX(${translateX}px)`,
-        transition: isDragging ? 'none' : 'transform 0.15s ease',
       }}
       onMouseDown={onMouseDown}
     >
@@ -1350,9 +1354,8 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         style={{
           left: x - style.size / 2,
           top: iconTop,
-          transform: `translateX(${translateX}px)`,
-          transition: isDragging ? 'none' : 'transform 0.15s ease',
-        }}
+        transform: `translateX(${translateX}px)`,
+      }}
         onMouseDown={onMouseDown}
       >
         <div className="flex flex-col items-center gap-px">
@@ -1404,7 +1407,6 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         left: x - style.size / 2,
         top: iconTop,
         transform: `translateX(${translateX}px)`,
-        transition: isDragging ? 'none' : 'transform 0.15s ease',
       }}
       onMouseDown={onMouseDown}
     >
