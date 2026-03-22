@@ -51,8 +51,10 @@ import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsM
 function TaskIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <rect x="1" y="3" width="10" height="4" rx="1" fill="currentColor" />
-      <rect x="1" y="9" width="7" height="4" rx="1" fill="currentColor" />
+      {/* Top bar: longer, right-aligned arrow shape */}
+      <polygon points="2,3 12,3 14,5 12,7 2,7" fill="currentColor" />
+      {/* Bottom bar: shorter, right-aligned arrow shape */}
+      <polygon points="5,9 12,9 14,11 12,13 5,13" fill="currentColor" />
     </svg>
   );
 }
