@@ -159,7 +159,7 @@ function App() {
         {/* Left: Save + Undo/Redo */}
         <div className="flex items-center gap-1 flex-1 min-w-0">
           <button
-            onClick={saveProject}
+            onClick={() => saveProject()}
             className="p-1.5 rounded text-white/70 hover:text-white hover:bg-white/15 transition-all"
             title="Save"
           >

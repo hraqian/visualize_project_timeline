@@ -25,7 +25,7 @@ import type {
 import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY, DEFAULT_DEPENDENCY_SETTINGS } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, scheduleDependents } from '@/utils';
 import { getGlobalSettings } from '@/utils/storage';
-import { saveProjectToFile, loadProjectFromFile, getDirectoryHandle, pickDirectory } from '@/utils/fileStorage';
+import { saveProjectToFile, loadProjectFromFile, getDirectoryHandle, pickDirectory, isFileSystemSupported } from '@/utils/fileStorage';
 
 /** Apply lag adjustments (from allow-exception mode) to a dependencies array. */
 function applyLagAdjustments(deps: Dependency[], adjustments: DependencyLagAdjustment[]): Dependency[] {
@@ -359,11 +359,20 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     const state = get();
     // If no directory is selected yet, prompt the user to pick one
     if (!getDirectoryHandle()) {
+      if (!isFileSystemSupported()) {
+        alert('File system access is not supported in this browser. Please use Chrome or Edge.');
+        return;
+      }
       const picked = await pickDirectory();
       if (!picked) return; // User cancelled
     }
-    const now = await saveProjectToFile(state as ProjectState);
-    set({ lastModified: now, isDirty: false });
+    try {
+      const now = await saveProjectToFile(state as ProjectState);
+      set({ lastModified: now, isDirty: false });
+    } catch (err) {
+      console.error('Failed to save project:', err);
+      alert('Failed to save project. Please try again or choose a different folder.');
+    }
   },
   loadProject: async (id) => {
     const data = await loadProjectFromFile(id);
