@@ -18,6 +18,8 @@ import {
 import type {
   ProjectItem,
   Dependency,
+  DependencyType,
+  LagUnit,
   TimescaleTier,
   TimescaleConfig,
   TierFormat,
@@ -447,4 +449,175 @@ export function getDefaultTimescale(): TimescaleConfig {
       textDecoration: 'none',
     },
   };
+}
+
+// ─── Dependency Shorthand Parsing/Formatting ─────────────────────────────────
+
+const DEP_TYPE_SHORT: Record<string, DependencyType> = {
+  FS: 'finish-to-start',
+  SS: 'start-to-start',
+  FF: 'finish-to-finish',
+  SF: 'start-to-finish',
+};
+
+const DEP_TYPE_TO_SHORT: Record<DependencyType, string> = {
+  'finish-to-start': 'FS',
+  'start-to-start': 'SS',
+  'finish-to-finish': 'FF',
+  'start-to-finish': 'SF',
+};
+
+/**
+ * Build a map of item ID -> 1-based display row number in DataView order.
+ * Order: independent items (sorted by row), then swimlane items
+ * (sorted by swimlane order, then row within swimlane).
+ */
+export function buildRowNumberMap(
+  items: ProjectItem[],
+  swimlanes: { id: string; order: number }[]
+): Map<string, number> {
+  const slOrder = new Map(swimlanes.map((s) => [s.id, s.order]));
+
+  // Independent items first (no swimlane), then swimlane items sorted by swimlane order then row
+  const sorted = [...items].sort((a, b) => {
+    const asl = a.swimlaneId ? (slOrder.get(a.swimlaneId) ?? 999) : -1;
+    const bsl = b.swimlaneId ? (slOrder.get(b.swimlaneId) ?? 999) : -1;
+    if (asl !== bsl) return asl - bsl;
+    return a.row - b.row;
+  });
+
+  const map = new Map<string, number>();
+  sorted.forEach((item, i) => map.set(item.id, i + 1));
+  return map;
+}
+
+/** Reverse lookup: row number -> item ID */
+export function rowNumberToId(
+  rowNum: number,
+  rowMap: Map<string, number>
+): string | undefined {
+  for (const [id, num] of rowMap) {
+    if (num === rowNum) return id;
+  }
+  return undefined;
+}
+
+interface ParsedDependency {
+  rowNum: number;
+  type: DependencyType;
+  lag: number;
+  lagUnit: LagUnit;
+}
+
+/**
+ * Parse a single shorthand token like "7FS+7d" or "3" or "5FF-2w".
+ * Returns null if unparseable.
+ */
+function parseSingleShorthand(token: string): ParsedDependency | null {
+  const trimmed = token.trim();
+  if (!trimmed) return null;
+
+  // Pattern: {rowNum}{optional type}{optional lag}
+  // e.g. "7", "7FS", "7FS+7d", "7+7d", "7-5d", "7FF-2w"
+  const match = trimmed.match(/^(\d+)\s*(FS|SS|FF|SF)?\s*([+-]\s*\d+\s*[dwm]?)?$/i);
+  if (!match) return null;
+
+  const rowNum = parseInt(match[1], 10);
+  if (rowNum < 1) return null;
+
+  const typeStr = (match[2] || 'FS').toUpperCase();
+  const type = DEP_TYPE_SHORT[typeStr] || 'finish-to-start';
+
+  let lag = 0;
+  let lagUnit: LagUnit = 'd';
+
+  if (match[3]) {
+    const lagMatch = match[3].replace(/\s/g, '').match(/^([+-])(\d+)([dwm])?$/i);
+    if (lagMatch) {
+      const sign = lagMatch[1] === '-' ? -1 : 1;
+      lag = sign * parseInt(lagMatch[2], 10);
+      lagUnit = ((lagMatch[3] || 'd').toLowerCase()) as LagUnit;
+    }
+  }
+
+  return { rowNum, type, lag, lagUnit };
+}
+
+/**
+ * Parse a full shorthand string like "7FS+7d,6FF-5d" into an array of parsed dependencies.
+ */
+export function parseDependencyShorthand(input: string): ParsedDependency[] {
+  if (!input.trim()) return [];
+  return input
+    .split(',')
+    .map(parseSingleShorthand)
+    .filter((d): d is ParsedDependency => d !== null);
+}
+
+/**
+ * Format a single dependency as shorthand like "7FS+7d".
+ * Omits type suffix if FS (default). Omits lag if 0.
+ */
+export function formatDependencyShorthand(
+  dep: Dependency,
+  rowMap: Map<string, number>
+): string {
+  const rowNum = rowMap.get(dep.fromId);
+  if (rowNum == null) return '';
+
+  const typeStr = dep.type === 'finish-to-start' ? '' : DEP_TYPE_TO_SHORT[dep.type];
+
+  let lagStr = '';
+  if (dep.lag !== 0) {
+    const sign = dep.lag > 0 ? '+' : '';
+    lagStr = `${sign}${dep.lag}${dep.lagUnit || 'd'}`;
+  }
+
+  return `${rowNum}${typeStr}${lagStr}`;
+}
+
+/**
+ * Format all dependencies targeting a given item as a shorthand string.
+ */
+export function formatItemDependencies(
+  itemId: string,
+  dependencies: Dependency[],
+  rowMap: Map<string, number>
+): string {
+  return dependencies
+    .filter((d) => d.toId === itemId)
+    .map((d) => formatDependencyShorthand(d, rowMap))
+    .filter(Boolean)
+    .join(',');
+}
+
+/**
+ * Convert parsed shorthands into Dependency objects for a given target item.
+ */
+export function shorthandToDependencies(
+  parsed: ParsedDependency[],
+  targetItemId: string,
+  rowMap: Map<string, number>,
+  existingDeps: Dependency[]
+): Dependency[] {
+  // Build a map of existing deps keyed by fromId for preserving visibility
+  const existingByFrom = new Map(
+    existingDeps.filter((d) => d.toId === targetItemId).map((d) => [d.fromId, d])
+  );
+
+  return parsed
+    .map((p) => {
+      const fromId = rowNumberToId(p.rowNum, rowMap);
+      if (!fromId || fromId === targetItemId) return null; // can't depend on self
+      const existing = existingByFrom.get(fromId);
+      return {
+        fromId,
+        toId: targetItemId,
+        type: p.type,
+        lag: p.lag,
+        lagUnit: p.lagUnit,
+        visible: existing?.visible ?? true,
+      } as Dependency;
+    })
+    .filter((d): d is Dependency => d !== null);
 }

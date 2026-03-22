@@ -273,6 +273,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
   const depPaths = useMemo(() => {
     if (!showDependencies) return [];
     return dependencies
+      .filter((dep) => dep.visible !== false)
       .map((dep) => {
         const from = visibleItems.find((i) => i.id === dep.fromId);
         const to = visibleItems.find((i) => i.id === dep.toId);

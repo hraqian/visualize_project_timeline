@@ -119,19 +119,23 @@ function createSampleData(): Pick<ProjectState, 'items' | 'swimlanes' | 'depende
     },
   ];
 
+  const makeDep = (fromId: string, toId: string): Dependency => ({
+    fromId, toId, type: 'finish-to-start', lag: 0, lagUnit: 'd', visible: true,
+  });
+
   const dependencies: Dependency[] = [
-    { fromId: 'i1', toId: 'i2', type: 'finish-to-start' },
-    { fromId: 'i2', toId: 'i3', type: 'finish-to-start' },
-    { fromId: 'i3', toId: 'i4', type: 'finish-to-start' },
-    { fromId: 'i4', toId: 'i6', type: 'finish-to-start' },
-    { fromId: 'i5', toId: 'i6', type: 'finish-to-start' },
-    { fromId: 'i6', toId: 'i7', type: 'finish-to-start' },
-    { fromId: 'i6', toId: 'i8', type: 'finish-to-start' },
-    { fromId: 'i6', toId: 'i9', type: 'finish-to-start' },
-    { fromId: 'i7', toId: 'i10', type: 'finish-to-start' },
-    { fromId: 'i8', toId: 'i10', type: 'finish-to-start' },
-    { fromId: 'i10', toId: 'i11', type: 'finish-to-start' },
-    { fromId: 'i11', toId: 'i12', type: 'finish-to-start' },
+    makeDep('i1', 'i2'),
+    makeDep('i2', 'i3'),
+    makeDep('i3', 'i4'),
+    makeDep('i4', 'i6'),
+    makeDep('i5', 'i6'),
+    makeDep('i6', 'i7'),
+    makeDep('i6', 'i8'),
+    makeDep('i6', 'i9'),
+    makeDep('i7', 'i10'),
+    makeDep('i8', 'i10'),
+    makeDep('i10', 'i11'),
+    makeDep('i11', 'i12'),
   ];
 
   return { items, swimlanes, dependencies };
@@ -185,8 +189,11 @@ interface ProjectActions {
   reorderSwimlane: (id: string, newOrder: number) => void;
 
   // Dependencies
-  addDependency: (fromId: string, toId: string) => void;
+  addDependency: (fromId: string, toId: string, options?: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible'>>) => void;
   removeDependency: (fromId: string, toId: string) => void;
+  updateDependency: (fromId: string, toId: string, updates: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible'>>) => void;
+  toggleDependencyVisibility: (fromId: string, toId: string) => void;
+  setItemDependencies: (itemId: string, deps: Dependency[]) => void;
 
   // Styles
   updateTaskStyle: (id: string, style: Partial<TaskStyle>) => void;
@@ -711,14 +718,42 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     }),
 
   // ─── Dependencies ──────────────────────────────────────────────────
-  addDependency: (fromId, toId) =>
+  addDependency: (fromId, toId, options) =>
     set((state) => ({
-      dependencies: [...state.dependencies, { fromId, toId, type: 'finish-to-start' }],
+      dependencies: [...state.dependencies, {
+        fromId, toId,
+        type: options?.type ?? 'finish-to-start',
+        lag: options?.lag ?? 0,
+        lagUnit: options?.lagUnit ?? 'd',
+        visible: options?.visible ?? true,
+      }],
     })),
 
   removeDependency: (fromId, toId) =>
     set((state) => ({
       dependencies: state.dependencies.filter((d) => !(d.fromId === fromId && d.toId === toId)),
+    })),
+
+  updateDependency: (fromId, toId, updates) =>
+    set((state) => ({
+      dependencies: state.dependencies.map((d) =>
+        d.fromId === fromId && d.toId === toId ? { ...d, ...updates } : d
+      ),
+    })),
+
+  toggleDependencyVisibility: (fromId, toId) =>
+    set((state) => ({
+      dependencies: state.dependencies.map((d) =>
+        d.fromId === fromId && d.toId === toId ? { ...d, visible: !d.visible } : d
+      ),
+    })),
+
+  setItemDependencies: (itemId, deps) =>
+    set((state) => ({
+      dependencies: [
+        ...state.dependencies.filter((d) => d.toId !== itemId),
+        ...deps,
+      ],
     })),
 
   // ─── Styles ────────────────────────────────────────────────────────

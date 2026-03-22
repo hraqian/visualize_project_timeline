@@ -226,10 +226,17 @@ export const DEFAULT_SWIMLANE_STYLE = {
   outlineColor: '#f59e0b',
 };
 
+export type DependencyType = 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish';
+
+export type LagUnit = 'd' | 'w' | 'm';
+
 export interface Dependency {
   fromId: string;
   toId: string;
-  type: 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish';
+  type: DependencyType;
+  lag: number;       // positive = lag, negative = lead, in lagUnit
+  lagUnit: LagUnit;  // 'd' = days, 'w' = weeks, 'm' = months
+  visible: boolean;  // whether the link is shown on the timeline
 }
 
 // ─── Timescale Types ─────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { addDays, parseISO, differenceInDays, format } from 'date-fns';
 import { v4 as uuid } from 'uuid';
@@ -19,10 +19,13 @@ import {
   CopyPlus,
   Eye,
   ListPlus,
+  ListChecks,
 } from 'lucide-react';
 import { TypePickerCell } from './TypePicker';
-import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn, ProjectItem, ColumnVisibility } from '@/types';
+import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn, ProjectItem, ColumnVisibility, Dependency } from '@/types';
 import { PRESET_COLORS } from '@/types';
+import { buildRowNumberMap, formatItemDependencies, parseDependencyShorthand, shorthandToDependencies } from '@/utils';
+import { DependencyEditorModal } from '@/components/common/DependencyEditorModal';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -135,6 +138,8 @@ export function DataView() {
   const setColorForCheckedItems = useProjectStore((s) => s.setColorForCheckedItems);
   const reorderSwimlane = useProjectStore((s) => s.reorderSwimlane);
   const moveItemToGroup = useProjectStore((s) => s.moveItemToGroup);
+  const dependencies = useProjectStore((s) => s.dependencies);
+  const setItemDependencies = useProjectStore((s) => s.setItemDependencies);
 
   const [collapsedSwimlanes, setCollapsedSwimlanes] = useState<Set<string>>(new Set());
   const [dragSwimId, setDragSwimId] = useState<string | null>(null);
@@ -155,6 +160,21 @@ export function DataView() {
   const independentItems = items
     .filter((i) => i.swimlaneId === null || !swimlaneIds.has(i.swimlaneId))
     .sort((a, b) => a.row - b.row);
+
+  // Row number map: item ID -> 1-based display index (for dependency shorthand)
+  const rowNumberMap = useMemo(
+    () => buildRowNumberMap(items, swimlanes),
+    [items, swimlanes]
+  );
+
+  // Dependency editor modal state
+  const [depEditorItemId, setDepEditorItemId] = useState<string | null>(null);
+
+  const handleDependencyChange = useCallback((itemId: string, shorthand: string) => {
+    const parsed = parseDependencyShorthand(shorthand);
+    const newDeps = shorthandToDependencies(parsed, itemId, rowNumberMap, dependencies);
+    setItemDependencies(itemId, newDeps);
+  }, [rowNumberMap, dependencies, setItemDependencies]);
 
   const hasChecked = checkedItemIds.length > 0;
   const allChecked = items.length > 0 && checkedItemIds.length === items.length;
@@ -353,6 +373,10 @@ export function DataView() {
                 setDragItemId(null);
                 setDropTarget(null);
               }}
+              dependencies={dependencies}
+              rowNumberMap={rowNumberMap}
+              onDependencyChange={handleDependencyChange}
+              onOpenDependencyEditor={(id) => setDepEditorItemId(id)}
             />
 
             {sortedSwimlanes.map((swimlane, idx) => {
@@ -425,6 +449,10 @@ export function DataView() {
                     setDragSwimId(null);
                     setDropTargetIdx(null);
                   }}
+                  dependencies={dependencies}
+                  rowNumberMap={rowNumberMap}
+                  onDependencyChange={handleDependencyChange}
+                  onOpenDependencyEditor={(id) => setDepEditorItemId(id)}
                 />
               );
             })}
@@ -443,6 +471,22 @@ export function DataView() {
           </tbody>
         </table>
       </div>
+
+      {/* Dependency Editor Modal */}
+      {depEditorItemId && (() => {
+        const depItem = items.find((i) => i.id === depEditorItemId);
+        if (!depItem) return null;
+        return (
+          <DependencyEditorModal
+            item={depItem}
+            allItems={items}
+            dependencies={dependencies}
+            rowNumberMap={rowNumberMap}
+            onApply={(itemId, newDeps) => setItemDependencies(itemId, newDeps)}
+            onClose={() => setDepEditorItemId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -726,6 +770,11 @@ interface IndependentItemsGroupProps {
   onItemDragEnd: () => void;
   onItemDragOver: (swimlaneId: string | null, index: number, e: React.DragEvent) => void;
   onItemDrop: (swimlaneId: string | null, index: number) => void;
+  // Dependencies
+  dependencies: Dependency[];
+  rowNumberMap: Map<string, number>;
+  onDependencyChange: (itemId: string, shorthand: string) => void;
+  onOpenDependencyEditor: (itemId: string) => void;
 }
 
 function IndependentItemsGroup({
@@ -757,6 +806,10 @@ function IndependentItemsGroup({
   onItemDragEnd,
   onItemDragOver,
   onItemDrop,
+  dependencies,
+  rowNumberMap,
+  onDependencyChange,
+  onOpenDependencyEditor,
 }: IndependentItemsGroupProps) {
   return (
     <>
@@ -810,6 +863,10 @@ function IndependentItemsGroup({
               onItemDrop(null, idx);
             }
           }}
+          dependencies={dependencies}
+          rowNumberMap={rowNumberMap}
+          onDependencyChange={onDependencyChange}
+          onOpenDependencyEditor={onOpenDependencyEditor}
         />
       ))}
 
@@ -881,6 +938,11 @@ interface SwimlaneGroupProps {
   onDragEnd: () => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: () => void;
+  // Dependencies
+  dependencies: Dependency[];
+  rowNumberMap: Map<string, number>;
+  onDependencyChange: (itemId: string, shorthand: string) => void;
+  onOpenDependencyEditor: (itemId: string) => void;
 }
 
 function SwimlaneGroup({
@@ -929,6 +991,10 @@ function SwimlaneGroup({
   onDragEnd,
   onDragOver,
   onDrop,
+  dependencies,
+  rowNumberMap,
+  onDependencyChange,
+  onOpenDependencyEditor,
 }: SwimlaneGroupProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(swimlane.name);
@@ -1072,6 +1138,10 @@ function SwimlaneGroup({
                 onItemDrop(swimlane.id, idx);
               }
             }}
+            dependencies={dependencies}
+            rowNumberMap={rowNumberMap}
+            onDependencyChange={onDependencyChange}
+            onOpenDependencyEditor={onOpenDependencyEditor}
           />
         ))}
 
@@ -1117,6 +1187,11 @@ interface ItemRowProps {
   onItemDragEnd: () => void;
   onItemDragOver: (e: React.DragEvent) => void;
   onItemDrop: () => void;
+  // Dependencies
+  dependencies: Dependency[];
+  rowNumberMap: Map<string, number>;
+  onDependencyChange: (itemId: string, shorthand: string) => void;
+  onOpenDependencyEditor: (itemId: string) => void;
 }
 
 function ItemRow({
@@ -1147,6 +1222,10 @@ function ItemRow({
   onItemDragEnd,
   onItemDragOver,
   onItemDrop,
+  dependencies,
+  rowNumberMap,
+  onDependencyChange,
+  onOpenDependencyEditor,
 }: ItemRowProps) {
   const duration = item.type === 'milestone' ? 0 : computeDuration(item.startDate, item.endDate);
 
@@ -1156,6 +1235,14 @@ function ItemRow({
   const [progressValue, setProgressValue] = useState(String(item.percentComplete));
   const [editingAssigned, setEditingAssigned] = useState(false);
   const [assignedValue, setAssignedValue] = useState(item.assignedTo);
+  const [editingPredecessors, setEditingPredecessors] = useState(false);
+  const [predecessorsValue, setPredecessorsValue] = useState('');
+
+  // Compute the shorthand string for this item's dependencies
+  const predecessorsShorthand = useMemo(
+    () => formatItemDependencies(item.id, dependencies, rowNumberMap),
+    [item.id, dependencies, rowNumberMap]
+  );
 
   const startDateRef = useRef<HTMLInputElement>(null);
   const endDateRef = useRef<HTMLInputElement>(null);
@@ -1442,17 +1529,58 @@ function ItemRow({
       {/* Predecessors */}
       {columnVisibility.predecessors && (
         <td className="px-3 py-2">
-          <span className="text-xs text-slate-400 truncate block max-w-[140px]">
-            {item.dependsOn.length > 0
-              ? item.dependsOn
-                  .map((depId) => {
-                    const dep = allItems.find((i) => i.id === depId);
-                    return dep ? dep.name : '';
-                  })
-                  .filter(Boolean)
-                  .join(', ')
-              : '\u2014'}
-          </span>
+          <div className="flex items-center gap-1 max-w-[160px]">
+            {editingPredecessors ? (
+              <input
+                type="text"
+                className="w-full text-xs px-1.5 py-0.5 border border-indigo-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-400 text-slate-700 font-mono"
+                value={predecessorsValue}
+                onChange={(e) => setPredecessorsValue(e.target.value)}
+                onBlur={() => {
+                  setEditingPredecessors(false);
+                  if (predecessorsValue !== predecessorsShorthand) {
+                    onDependencyChange(item.id, predecessorsValue);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setEditingPredecessors(false);
+                    if (predecessorsValue !== predecessorsShorthand) {
+                      onDependencyChange(item.id, predecessorsValue);
+                    }
+                  } else if (e.key === 'Escape') {
+                    setEditingPredecessors(false);
+                    setPredecessorsValue(predecessorsShorthand);
+                  }
+                }}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <>
+                <span
+                  className="text-xs text-slate-500 truncate flex-1 cursor-text font-mono"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPredecessorsValue(predecessorsShorthand);
+                    setEditingPredecessors(true);
+                  }}
+                >
+                  {predecessorsShorthand || '\u2014'}
+                </span>
+                <button
+                  className="p-0.5 rounded text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-all shrink-0 opacity-0 group-hover/row:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenDependencyEditor(item.id);
+                  }}
+                  title="Edit dependencies"
+                >
+                  <ListChecks size={13} />
+                </button>
+              </>
+            )}
+          </div>
         </td>
       )}
 
