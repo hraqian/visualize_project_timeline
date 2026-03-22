@@ -107,7 +107,7 @@ function App() {
     const x = (13.333 - w) / 2;
     const y = (7.5 - h) / 2;
     slide.addImage({ data: imgData, x, y, w, h });
-    pptx.writeFile({ fileName: `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx` });
+    await pptx.writeFile({ fileName: `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx` });
   }, [captureTimeline, projectName]);
 
   const viewTabs: { id: ActiveView; label: string; icon: typeof List }[] = [
