@@ -228,6 +228,10 @@ interface ProjectActions {
   hideCheckedItems: () => void;
   deleteCheckedItems: () => void;
   setColorForCheckedItems: (color: string) => void;
+
+  // Undo / Redo
+  undo: () => void;
+  redo: () => void;
 }
 
 type ProjectStore = ProjectState & ProjectActions;
@@ -238,15 +242,40 @@ const DIRTY_KEYS: Set<string> = new Set([
   'statusLabels', 'columnVisibility', 'timescale', 'zoom', 'swimlaneSpacing', 'showCriticalPath', 'taskLayout',
 ]);
 
+// ─── Undo / Redo stacks (kept outside store to avoid triggering re-renders) ──
+type Snapshot = Record<string, unknown>;
+const MAX_UNDO = 50;
+let undoStack: Snapshot[] = [];
+let redoStack: Snapshot[] = [];
+let isUndoRedoing = false;          // guard to prevent snapshotting during undo/redo
+
+function takeSnapshot(state: ProjectStore): Snapshot {
+  const snap: Snapshot = {};
+  for (const key of DIRTY_KEYS) {
+    snap[key] = structuredClone((state as Record<string, unknown>)[key]);
+  }
+  return snap;
+}
+
+function applySnapshot(snap: Snapshot): Partial<ProjectStore> {
+  return { ...snap, isDirty: true } as Partial<ProjectStore>;
+}
+
 export const useProjectStore = create<ProjectStore>((_set, get) => {
-  // Wrap set to auto-mark dirty when saveable data changes
+  // Wrap set to auto-mark dirty when saveable data changes + push undo snapshots
   const set: typeof _set = (partial, replace) => {
     _set((prev) => {
       const next = typeof partial === 'function' ? partial(prev) : partial;
       // Check if any saveable key is being changed
       const touchesSaveable = Object.keys(next as object).some((k) => DIRTY_KEYS.has(k));
       if (touchesSaveable && !(next as Record<string, unknown>).hasOwnProperty('isDirty')) {
-        return { ...next, isDirty: true } as ProjectStore;
+        // Push undo snapshot (unless we're in an undo/redo operation)
+        if (!isUndoRedoing) {
+          undoStack.push(takeSnapshot(prev as unknown as ProjectStore));
+          if (undoStack.length > MAX_UNDO) undoStack.shift();
+          redoStack = [];
+        }
+        return { ...next, isDirty: true, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 } as ProjectStore;
       }
       return next as ProjectStore;
     }, replace);
@@ -257,6 +286,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   projectId: uuid(),
   lastModified: null,
   isDirty: false,
+  canUndo: false,
+  canRedo: false,
   projectName: 'New Project',
   timelineTitle: 'New Project',
   items: [],
@@ -295,9 +326,13 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   loadProject: (id) => {
     const data = loadProjectFromStorage(id);
     if (!data) return;
+    undoStack = [];
+    redoStack = [];
     set({
       ...data,
       isDirty: false,
+      canUndo: false,
+      canRedo: false,
       // Reset transient UI state
       activeView: 'data',
       selectedItemId: null,
@@ -308,10 +343,14 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     });
   },
   newProject: () => {
+    undoStack = [];
+    redoStack = [];
     set({
       projectId: uuid(),
       lastModified: null,
       isDirty: false,
+      canUndo: false,
+      canRedo: false,
       projectName: 'New Project',
       timelineTitle: 'New Project',
       items: [],
@@ -331,6 +370,26 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       swimlaneSpacing: 5,
       selectedTierIndex: null,
     });
+  },
+
+  // ─── Undo / Redo ─────────────────────────────────────────────────────
+  undo: () => {
+    if (undoStack.length === 0) return;
+    const current = takeSnapshot(get() as unknown as ProjectStore);
+    redoStack.push(current);
+    const prev = undoStack.pop()!;
+    isUndoRedoing = true;
+    set({ ...applySnapshot(prev), canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 });
+    isUndoRedoing = false;
+  },
+  redo: () => {
+    if (redoStack.length === 0) return;
+    const current = takeSnapshot(get() as unknown as ProjectStore);
+    undoStack.push(current);
+    const next = redoStack.pop()!;
+    isUndoRedoing = true;
+    set({ ...applySnapshot(next), canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 });
+    isUndoRedoing = false;
   },
 
   // ─── Project ─────────────────────────────────────────────────────────

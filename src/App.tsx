@@ -19,6 +19,8 @@ import {
   Image,
   Presentation,
   ChevronDown,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 import type { ActiveView } from '@/types';
 
@@ -34,6 +36,10 @@ function App() {
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
   const isDirty = useProjectStore((s) => s.isDirty);
   const saveProject = useProjectStore((s) => s.saveProject);
+  const canUndo = useProjectStore((s) => s.canUndo);
+  const canRedo = useProjectStore((s) => s.canRedo);
+  const undo = useProjectStore((s) => s.undo);
+  const redo = useProjectStore((s) => s.redo);
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(projectName);
@@ -47,6 +53,19 @@ function App() {
     else setNameValue(projectName);
     setEditingName(false);
   }, [nameValue, projectName, setProjectName]);
+
+  // Keyboard shortcuts: Cmd+Z undo, Cmd+Shift+Z redo, Cmd+S save
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if (e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
+      else if (e.key === 's') { e.preventDefault(); saveProject(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo, redo, saveProject]);
 
   const handleAddTask = useCallback(() => {
     const targetSwimlane = swimlanes.length > 0
@@ -114,7 +133,37 @@ function App() {
   return (
     <div className="h-full flex flex-col bg-[var(--color-bg)]">
       {/* ─── Row 1: Project title banner ─── */}
-      <div className="flex items-center justify-center h-10 bg-[#4f46e5] shrink-0 relative">
+      <div className="flex items-center h-10 bg-[#4f46e5] shrink-0 px-3">
+        {/* Left: Save + Undo/Redo */}
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+          <button
+            onClick={saveProject}
+            className="p-1.5 rounded text-white/70 hover:text-white hover:bg-white/15 transition-all"
+            title="Save"
+          >
+            <Save size={16} />
+          </button>
+          <div className="w-px h-4 bg-white/20 mx-0.5" />
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            className={`p-1.5 rounded transition-all ${canUndo ? 'text-white/70 hover:text-white hover:bg-white/15' : 'text-white/25 cursor-not-allowed'}`}
+            title="Undo"
+          >
+            <Undo2 size={16} />
+          </button>
+          <button
+            onClick={redo}
+            disabled={!canRedo}
+            className={`p-1.5 rounded transition-all ${canRedo ? 'text-white/70 hover:text-white hover:bg-white/15' : 'text-white/25 cursor-not-allowed'}`}
+            title="Redo"
+          >
+            <Redo2 size={16} />
+          </button>
+        </div>
+
+        {/* Center: Project name + save status */}
+        <div className="flex items-center justify-center">
         {editingName ? (
           <input
             className="text-sm font-semibold text-white bg-white/20 border border-white/30 rounded-md px-3 py-1 outline-none focus:border-white/60 min-w-[200px] text-center placeholder:text-white/50"
@@ -148,6 +197,10 @@ function App() {
             />
           </button>
         )}
+        </div>
+
+        {/* Right: balance spacer */}
+        <div className="flex-1" />
       </div>
 
       {/* ─── Row 2: Toolbar ─── */}
@@ -215,19 +268,8 @@ function App() {
           })}
         </div>
 
-        {/* Right: Save + Projects + Download + Settings */}
+        {/* Right: Projects + Export + Settings */}
         <div className="flex items-center gap-2 flex-1 justify-end">
-          <button
-            onClick={saveProject}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
-              isDirty
-                ? 'text-white bg-[#4f46e5] border-[#4f46e5] hover:bg-[#4338ca]'
-                : 'text-[var(--color-text-secondary)] border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
-            }`}
-          >
-            <Save size={14} />
-            Save
-          </button>
           <button
             onClick={() => setShowProjectManager(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"

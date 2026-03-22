@@ -317,6 +317,8 @@ export interface ProjectState {
   projectId: string;
   lastModified: string | null; // ISO timestamp of last save
   isDirty: boolean; // true when there are unsaved changes
+  canUndo: boolean;
+  canRedo: boolean;
   projectName: string;
   timelineTitle: string; // separate title shown inside TimelineView (for exports)
   items: ProjectItem[];
