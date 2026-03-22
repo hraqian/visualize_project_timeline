@@ -446,6 +446,12 @@ export function TimelineView() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onClick={() => {
+          setSelectedItem(null);
+          setSelectedSwimlane(null);
+          setSelectedTierIndex(null);
+          setStylePaneSection(null);
+        }}
       >
         <div style={{ width: totalWidth, position: 'relative', margin: '0 auto' }}>
           {/* ─── "Above" milestones row (before sticky timescale header) ─── */}
@@ -513,7 +519,7 @@ export function TimelineView() {
                         key={tierIdx}
                         className={`flex h-7 relative cursor-pointer transition-shadow ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
                         style={{ backgroundColor: tier.backgroundColor }}
-                        onClick={() => { setSelectedTierIndex(storeIndex); setStylePaneSection('scale'); }}
+                        onClick={(e) => { e.stopPropagation(); setSelectedTierIndex(storeIndex); setStylePaneSection('scale'); }}
                       >
                         {cells.map((cell, ci) => (
                           <div
