@@ -522,12 +522,16 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
           )}
 
            {/* Timescale Headers */}
-           <div className="sticky top-0 z-10 relative flex items-center" style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}>
-              {/* Left end cap */}
+           <div className="sticky top-0 z-10 relative" style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}>
+              {/* Left end cap — positioned outside the timescale bar */}
               {timescale.leftEndCap?.show && (
                 <div
-                  className="shrink-0 pr-3 whitespace-nowrap"
+                  className="absolute whitespace-nowrap"
                   style={{
+                    right: '100%',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    paddingRight: 8,
                     color: timescale.leftEndCap.fontColor,
                     fontFamily: timescale.leftEndCap.fontFamily,
                     fontSize: timescale.leftEndCap.fontSize,
@@ -540,7 +544,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                 </div>
               )}
 
-              <div className="flex-1 relative">
+              <div className="relative">
                 <div className="border-b border-[var(--color-border)] overflow-hidden relative" style={getTimescaleBarShapeStyle(timescale.barShape)}>
                   {tierLabels.map(({ tier, storeIndex, labels }, tierIdx) => {
                     const originDate = parseISO(origin);
@@ -625,11 +629,15 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                 )}
               </div>
 
-              {/* Right end cap */}
+              {/* Right end cap — positioned outside the timescale bar */}
               {timescale.rightEndCap?.show && (
                 <div
-                  className="shrink-0 pl-3 whitespace-nowrap"
+                  className="absolute whitespace-nowrap"
                   style={{
+                    left: '100%',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    paddingLeft: 8,
                     color: timescale.rightEndCap.fontColor,
                     fontFamily: timescale.rightEndCap.fontFamily,
                     fontSize: timescale.rightEndCap.fontSize,
