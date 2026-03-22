@@ -70,8 +70,8 @@ function MilestoneIcon({ size = 16 }: { size?: number }) {
 function SwimlaneIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <rect x="1" y="3" width="6" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="9" y="3" width="6" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="1" y="3" width="3" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="6" y="3" width="9" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
 }
