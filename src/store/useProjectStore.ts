@@ -1061,10 +1061,22 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       columnVisibility: { ...state.columnVisibility, predecessors: show },
     })),
 
-  setDependencySettings: (settings: Partial<DependencySettings>) =>
-    set((state) => ({
-      dependencySettings: { ...state.dependencySettings, ...settings },
-    })),
+  setDependencySettings: (settings: Partial<DependencySettings>) => {
+    const state = get();
+    const newSettings = { ...state.dependencySettings, ...settings };
+    const switchingToStrict =
+      settings.schedulingMode === 'automatic-strict' &&
+      state.dependencySettings.schedulingMode !== 'automatic-strict';
+
+    if (switchingToStrict && state.dependencies.length > 0) {
+      // Re-evaluate all items that are predecessors to snap successors to exact constraints
+      const predecessorIds = [...new Set(state.dependencies.map((d) => d.fromId))];
+      const result = scheduleDependents(predecessorIds, state.items, state.dependencies, 'dont-allow', true);
+      set({ dependencySettings: newSettings, items: result.items, dependencies: applyLagAdjustments(state.dependencies, result.lagAdjustments) });
+    } else {
+      set({ dependencySettings: newSettings });
+    }
+  },
 
   // ─── Conflict Resolution ───────────────────────────────────────────
   resolveConflicts: (resolutions) => {
