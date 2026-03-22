@@ -39,10 +39,20 @@ import {
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 import { generateTierLabels, buildVisibleTierCells, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
+
+function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
+  switch (shape) {
+    case 'rectangle': return {};
+    case 'rounded': return { borderRadius: '6px' };
+    case 'leaf': return { borderRadius: '0 9999px 9999px 0' };
+    case 'ellipse': return { borderRadius: '9999px' };
+    case 'modern': return { borderRadius: '4px 12px 4px 12px' };
+  }
+}
 
 const MILESTONE_ICONS: { id: MilestoneIcon; label: string }[] = [
   { id: 'flag', label: 'Flag' },
@@ -2600,18 +2610,14 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   };
 
   // Project range — same padding as main TimelineView
-  const { origin, totalDays, rangeEndDate, startYear, endYear } = useMemo(() => {
+  const { origin, totalDays, rangeEndDate } = useMemo(() => {
     const range = getProjectRange(items);
     const padStart = startOfMonth(subDays(parseISO(range.start), 14));
-    // End at the end of the month containing the last item
     const endMonth = startOfMonth(parseISO(range.end));
     const numMonths = differenceInCalendarMonths(endMonth, padStart) + 1;
     const padEnd = addMonths(padStart, numMonths);
     const days = differenceInDays(padEnd, padStart);
-    const sy = padStart.getFullYear();
-    const lastVisibleMonth = subDays(padEnd, 1);
-    const ey = lastVisibleMonth.getFullYear() + (lastVisibleMonth.getMonth() > 0 || lastVisibleMonth.getDate() > 1 ? 1 : 0);
-    return { origin: padStart.toISOString().split('T')[0], totalDays: days, rangeEndDate: lastVisibleMonth, startYear: sy, endYear: ey };
+    return { origin: padStart.toISOString().split('T')[0], totalDays: days, rangeEndDate: subDays(padEnd, 1) };
   }, [items]);
 
   // Today position as fraction (0-1)
@@ -2620,6 +2626,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     const frac = differenceInDays(today, parseISO(origin)) / totalDays;
     return Math.max(0, Math.min(1, frac));
   }, [origin, totalDays]);
+  const todayPos = timescale.todayPosition ?? 'below';
 
   const visibleTiers = useMemo(() => tiers.filter((t) => t.visible), [tiers]);
   const visibleCount = visibleTiers.length;
@@ -2659,70 +2666,127 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8">
-          {/* Timescale preview — same algorithm as main TimelineView */}
+          {/* Timescale preview — mirrors main TimelineView rendering */}
           {visibleCount > 0 && (
-            <div className="relative mx-16">
-              {/* Left end cap — outside the bar */}
-              <span
-                className="absolute whitespace-nowrap text-xl font-bold text-[var(--color-text)] tabular-nums"
-                style={{ right: '100%', top: '50%', transform: 'translateY(-50%)', paddingRight: 12 }}
-              >
-                {startYear}
-              </span>
+            <div className="relative mx-16" style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}>
+              {/* Left end cap — conditional on config, uses config styling */}
+              {timescale.leftEndCap?.show && (
+                <div
+                  className="absolute whitespace-nowrap"
+                  style={{
+                    right: '100%',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    paddingRight: 8,
+                    color: timescale.leftEndCap.fontColor,
+                    fontFamily: timescale.leftEndCap.fontFamily,
+                    fontSize: Math.min(timescale.leftEndCap.fontSize, 16),
+                    fontWeight: timescale.leftEndCap.fontWeight,
+                    fontStyle: timescale.leftEndCap.fontStyle,
+                    textDecoration: timescale.leftEndCap.textDecoration,
+                  }}
+                >
+                  {format(parseISO(origin), 'yyyy')}
+                </div>
+              )}
 
-              {/* Bar */}
-              <div className="rounded-lg overflow-hidden border border-[var(--color-border)] relative">
-                {previewTierLabels.map(({ tier, cells }, tierIdx) => (
-                  <div
-                    key={tierIdx}
-                    className="relative"
-                    style={{ backgroundColor: tier.backgroundColor, height: 28 }}
-                  >
-                    {cells.map((cell, ci) => (
-                      <div
-                        key={ci}
-                        className={`absolute top-0 h-full flex items-center overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
-                        style={{
-                          left: `${cell.fraction * 100}%`,
-                          width: `${cell.widthFrac * 100}%`,
-                          color: tier.fontColor,
-                          fontSize: Math.min(tier.fontSize, 12),
-                          fontFamily: tier.fontFamily,
-                          fontWeight: tier.fontWeight,
-                          fontStyle: tier.fontStyle,
-                          textDecoration: tier.textDecoration,
-                           justifyContent: 'flex-start',
-                        }}
-                      >
-                        <span className="truncate px-1">{cell.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-                {/* Today marker */}
-                {todayFraction > 0 && todayFraction < 1 && (
-                  <div
-                    className="absolute top-0 z-10 pointer-events-none"
-                    style={{ left: `${todayFraction * 100}%`, height: visibleCount * 28 }}
-                  >
-                    <div className="w-0.5 h-full" style={{ backgroundColor: timescale.todayColor }} />
+              {/* Bar — uses timescale.barShape */}
+              <div className="relative">
+                <div className="border-b border-[var(--color-border)] overflow-hidden relative" style={getTimescaleBarShapeStyle(timescale.barShape)}>
+                  {previewTierLabels.map(({ tier, cells }, tierIdx) => (
                     <div
-                      className="absolute top-full mt-0.5 -translate-x-1/2 text-[10px] font-medium"
-                      style={{ color: timescale.todayColor }}
+                      key={tierIdx}
+                      className="relative"
+                      style={{ backgroundColor: tier.backgroundColor, height: 28 }}
                     >
-                      Today
+                      {cells.map((cell, ci) => (
+                        <div
+                          key={ci}
+                          className={`absolute top-0 h-full flex items-center overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
+                          style={{
+                            left: `${cell.fraction * 100}%`,
+                            width: `${cell.widthFrac * 100}%`,
+                            color: tier.fontColor,
+                            fontSize: Math.min(tier.fontSize, 12),
+                            fontFamily: tier.fontFamily,
+                            fontWeight: tier.fontWeight,
+                            fontStyle: tier.fontStyle,
+                            textDecoration: tier.textDecoration,
+                            justifyContent: 'flex-start',
+                          }}
+                        >
+                          <span className="truncate px-1">{cell.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+
+                  {/* Elapsed time bar — colored strip from left to today */}
+                  {(timescale.showElapsedTime ?? false) && todayFraction > 0 && (
+                    <div
+                      className="absolute left-0 pointer-events-none z-10"
+                      style={{
+                        width: `${Math.min(todayFraction, 1) * 100}%`,
+                        height: (timescale.elapsedTimeThickness ?? 'thin') === 'thick' ? 6 : 3,
+                        backgroundColor: timescale.elapsedTimeColor ?? '#ef4444',
+                        ...(todayPos === 'above' ? { top: 0 } : { bottom: 0 }),
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Today label — gated on showToday, respects todayPosition */}
+                {timescale.showToday && todayFraction > 0 && todayFraction < 1 && (
+                  <div
+                    className="absolute pointer-events-none z-20"
+                    style={{
+                      left: `${todayFraction * 100}%`,
+                      transform: 'translateX(-50%)',
+                      ...(todayPos === 'above'
+                        ? { bottom: '100%' }
+                        : { top: '100%' }
+                      ),
+                    }}
+                  >
+                    <div className="flex flex-col items-center">
+                      {todayPos === 'below' && (
+                        <svg width="10" height="6" viewBox="0 0 10 6">
+                          <path d="M5 0L0 6h10L5 0z" fill={timescale.todayColor} />
+                        </svg>
+                      )}
+                      <div className="border border-[var(--color-border)] bg-white rounded px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text)] whitespace-nowrap leading-tight">
+                        Today
+                      </div>
+                      {todayPos === 'above' && (
+                        <svg width="10" height="6" viewBox="0 0 10 6">
+                          <path d="M5 6L0 0h10L5 6z" fill={timescale.todayColor} />
+                        </svg>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Right end cap — outside the bar */}
-              <span
-                className="absolute whitespace-nowrap text-xl font-bold text-[var(--color-text)] tabular-nums"
-                style={{ left: '100%', top: '50%', transform: 'translateY(-50%)', paddingLeft: 12 }}
-              >
-                {endYear}
-              </span>
+              {/* Right end cap — conditional on config, uses config styling */}
+              {timescale.rightEndCap?.show && (
+                <div
+                  className="absolute whitespace-nowrap"
+                  style={{
+                    left: '100%',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    paddingLeft: 8,
+                    color: timescale.rightEndCap.fontColor,
+                    fontFamily: timescale.rightEndCap.fontFamily,
+                    fontSize: Math.min(timescale.rightEndCap.fontSize, 16),
+                    fontWeight: timescale.rightEndCap.fontWeight,
+                    fontStyle: timescale.rightEndCap.fontStyle,
+                    textDecoration: timescale.rightEndCap.textDecoration,
+                  }}
+                >
+                  {format(rangeEndDate, 'yyyy')}
+                </div>
+              )}
             </div>
           )}
 
