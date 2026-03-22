@@ -353,7 +353,7 @@ function addLag(date: Date, lag: number, unit: LagUnit): string {
  * Returns { earliestStart, earliestEnd } as ISO strings, or null values
  * for whichever anchor the dependency type doesn't constrain directly.
  *
- * FS: successor.start >= predecessor.end + lag
+ * FS: successor.start >= predecessor.end + 1 + lag  (end-of-day means next day)
  * SS: successor.start >= predecessor.start + lag
  * FF: successor.end   >= predecessor.end + lag
  * SF: successor.end   >= predecessor.start + lag
@@ -369,7 +369,9 @@ function computeConstraint(
 
   switch (dep.type) {
     case 'finish-to-start':
-      return { constrainedStart: addLag(predEnd, lag, unit), constrainedEnd: null };
+      // predEnd represents end-of-day (5 PM), so successor can't start until the next day.
+      // Add 1 day to account for this, then apply lag on top.
+      return { constrainedStart: addLag(addDays(predEnd, 1), lag, unit), constrainedEnd: null };
     case 'start-to-start':
       return { constrainedStart: addLag(predStart, lag, unit), constrainedEnd: null };
     case 'finish-to-finish':
@@ -422,7 +424,9 @@ export function scheduleDependents(
     const succEnd = parseISO(succ.endDate);
 
     switch (dep.type) {
-      case 'finish-to-start':  return differenceInDays(succStart, predEnd);
+      // FS: natural baseline gap is 1 day (successor starts day after predecessor ends),
+      // so required lag = actual gap - 1.
+      case 'finish-to-start':  return differenceInDays(succStart, predEnd) - 1;
       case 'start-to-start':   return differenceInDays(succStart, predStart);
       case 'finish-to-finish': return differenceInDays(succEnd, predEnd);
       case 'start-to-finish':  return differenceInDays(succEnd, predStart);
