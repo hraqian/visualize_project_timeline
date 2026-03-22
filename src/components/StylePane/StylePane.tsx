@@ -2661,14 +2661,17 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8">
           {/* Timescale preview — same algorithm as main TimelineView */}
           {visibleCount > 0 && (
-            <div className="flex items-center gap-3">
-              {/* Left end cap */}
-              <span className="text-xl font-bold text-[var(--color-text)] shrink-0 tabular-nums">
+            <div className="relative mx-16">
+              {/* Left end cap — outside the bar */}
+              <span
+                className="absolute whitespace-nowrap text-xl font-bold text-[var(--color-text)] tabular-nums"
+                style={{ right: '100%', top: '50%', transform: 'translateY(-50%)', paddingRight: 12 }}
+              >
                 {startYear}
               </span>
 
               {/* Bar */}
-              <div className="flex-1 rounded-lg overflow-hidden border border-[var(--color-border)] relative">
+              <div className="rounded-lg overflow-hidden border border-[var(--color-border)] relative">
                 {previewTierLabels.map(({ tier, cells }, tierIdx) => (
                   <div
                     key={tierIdx}
@@ -2713,8 +2716,11 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                 )}
               </div>
 
-              {/* Right end cap */}
-              <span className="text-xl font-bold text-[var(--color-text)] shrink-0 tabular-nums">
+              {/* Right end cap — outside the bar */}
+              <span
+                className="absolute whitespace-nowrap text-xl font-bold text-[var(--color-text)] tabular-nums"
+                style={{ left: '100%', top: '50%', transform: 'translateY(-50%)', paddingLeft: 12 }}
+              >
                 {endYear}
               </span>
             </div>
