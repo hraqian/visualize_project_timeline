@@ -264,13 +264,13 @@ export function StylePane() {
 
         {/* Sub-icons for Items tab */}
         {mainTab === 'items' && (
-          <div className="flex items-center gap-1 px-3 pb-2">
+          <div className="flex items-center gap-4 px-3 pb-2">
             <button
               onClick={() => handleSubTabClick('task')}
-              className={`p-1.5 rounded-md transition-all ${
+              className={`transition-all ${
                 activeSubTab === 'task'
-                  ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm border border-[var(--color-border)]'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  ? 'text-[var(--color-text)]'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
               }`}
               title="Task"
             >
@@ -278,10 +278,10 @@ export function StylePane() {
             </button>
             <button
               onClick={() => handleSubTabClick('milestone')}
-              className={`p-1.5 rounded-md transition-all ${
+              className={`transition-all ${
                 activeSubTab === 'milestone'
-                  ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm border border-[var(--color-border)]'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  ? 'text-[var(--color-text)]'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
               }`}
               title="Milestone"
             >
@@ -289,10 +289,10 @@ export function StylePane() {
             </button>
             <button
               onClick={() => handleSubTabClick('swimlane')}
-              className={`p-1.5 rounded-md transition-all ${
+              className={`transition-all ${
                 activeSubTab === 'swimlane'
-                  ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm border border-[var(--color-border)]'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  ? 'text-[var(--color-text)]'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
               }`}
               title="Swimlane"
             >
@@ -300,10 +300,10 @@ export function StylePane() {
             </button>
             <button
               onClick={() => handleSubTabClick('dependency')}
-              className={`p-1.5 rounded-md transition-all ${
+              className={`transition-all ${
                 activeSubTab === 'dependency'
-                  ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm border border-[var(--color-border)]'
-                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  ? 'text-[var(--color-text)]'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
               }`}
               title="Dependency Link"
             >
