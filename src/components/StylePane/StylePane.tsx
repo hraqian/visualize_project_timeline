@@ -52,9 +52,9 @@ function TaskIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       {/* Top bar: longer, right-aligned arrow shape */}
-      <polygon points="2,3 12,3 14,5 12,7 2,7" fill="currentColor" />
+      <polygon points="0,3 12,3 15,5 12,7 0,7" fill="currentColor" />
       {/* Bottom bar: shorter, right-aligned arrow shape */}
-      <polygon points="5,9 12,9 14,11 12,13 5,13" fill="currentColor" />
+      <polygon points="3,9 12,9 15,11 12,13 3,13" fill="currentColor" />
     </svg>
   );
 }
