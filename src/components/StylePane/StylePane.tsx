@@ -5,13 +5,9 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
-  ListChecks,
-  Diamond,
-  Layers,
   Info,
   Settings,
   X,
-  Link2,
   Eye,
   EyeOff,
 } from 'lucide-react';
@@ -50,6 +46,43 @@ import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
+
+// Custom sub-tab icons matching the design mockup
+function TaskIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="3" width="10" height="4" rx="1" fill="currentColor" />
+      <rect x="1" y="9" width="7" height="4" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function MilestoneIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="8" y="1.34" width="9" height="9" rx="1" transform="rotate(45 8 1.34)" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function SwimlaneIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="3" width="6" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="9" y="3" width="6" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function DependencyIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <rect x="1" y="2" width="5" height="5" rx="1" fill="currentColor" />
+      <rect x="10" y="9" width="5" height="5" rx="1" fill="currentColor" />
+      <path d="M6 4.5H8V11.5H10" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
 
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
   switch (shape) {
@@ -239,7 +272,7 @@ export function StylePane() {
               }`}
               title="Task"
             >
-              <ListChecks size={15} />
+              <TaskIcon size={15} />
             </button>
             <button
               onClick={() => handleSubTabClick('milestone')}
@@ -250,7 +283,7 @@ export function StylePane() {
               }`}
               title="Milestone"
             >
-              <Diamond size={15} />
+              <MilestoneIcon size={15} />
             </button>
             <button
               onClick={() => handleSubTabClick('swimlane')}
@@ -261,7 +294,7 @@ export function StylePane() {
               }`}
               title="Swimlane"
             >
-              <Layers size={15} />
+              <SwimlaneIcon size={15} />
             </button>
             <button
               onClick={() => handleSubTabClick('dependency')}
@@ -272,7 +305,7 @@ export function StylePane() {
               }`}
               title="Dependency Link"
             >
-              <Link2 size={15} />
+              <DependencyIcon size={15} />
             </button>
           </div>
         )}
