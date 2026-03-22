@@ -1,9 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { DataView, AddDropdownButton } from '@/components/DataView/DataView';
 import { TimelineView } from '@/components/TimelineView/TimelineView';
+import type { TimelineViewHandle } from '@/components/TimelineView/TimelineView';
 import { StylePane } from '@/components/StylePane/StylePane';
 import { ProjectManagerModal } from '@/components/common/ProjectManagerModal';
+import html2canvas from 'html2canvas';
+import PptxGenJS from 'pptxgenjs';
 import {
   Pencil,
   Plus,
@@ -13,6 +16,9 @@ import {
   GanttChart,
   Save,
   FolderOpen,
+  Image,
+  Presentation,
+  ChevronDown,
 } from 'lucide-react';
 import type { ActiveView } from '@/types';
 
@@ -32,6 +38,8 @@ function App() {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(projectName);
   const [showProjectManager, setShowProjectManager] = useState(true);
+
+  const timelineRef = useRef<TimelineViewHandle>(null);
 
   const commitName = useCallback(() => {
     const trimmed = nameValue.trim();
@@ -57,6 +65,50 @@ function App() {
   const handleAddSwimlane = useCallback(() => {
     addSwimlane('New Swimlane');
   }, [addSwimlane]);
+
+  const captureTimeline = useCallback(async (): Promise<HTMLCanvasElement | null> => {
+    const el = timelineRef.current?.getExportElement();
+    if (!el) return null;
+    return html2canvas(el, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true,
+    });
+  }, []);
+
+  const exportPNG = useCallback(async () => {
+    const canvas = await captureTimeline();
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }, [captureTimeline, projectName]);
+
+  const exportPPTX = useCallback(async () => {
+    const canvas = await captureTimeline();
+    if (!canvas) return;
+    const imgData = canvas.toDataURL('image/png');
+    const pptx = new PptxGenJS();
+    // Use widescreen 16:9 layout
+    pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
+    pptx.layout = 'WIDE';
+    const slide = pptx.addSlide();
+    // Fit image to slide with padding
+    const imgAspect = canvas.width / canvas.height;
+    const slideW = 12.5; // leave 0.4" margin each side
+    const slideH = 6.8; // leave some margin top/bottom
+    let w = slideW;
+    let h = w / imgAspect;
+    if (h > slideH) {
+      h = slideH;
+      w = h * imgAspect;
+    }
+    const x = (13.333 - w) / 2;
+    const y = (7.5 - h) / 2;
+    slide.addImage({ data: imgData, x, y, w, h });
+    pptx.writeFile({ fileName: `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx` });
+  }, [captureTimeline, projectName]);
 
   const viewTabs: { id: ActiveView; label: string; icon: typeof List }[] = [
     { id: 'data', label: 'Data', icon: List },
@@ -189,12 +241,11 @@ function App() {
             <FolderOpen size={14} />
             Projects
           </button>
-          <button
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
-          >
-            <Download size={14} />
-            Download
-          </button>
+          <ExportButton
+            disabled={!isTimeline}
+            onExportPNG={exportPNG}
+            onExportPPTX={exportPPTX}
+          />
           <button
             className="p-1.5 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
           >
@@ -206,7 +257,7 @@ function App() {
       {/* ─── Main content ─── */}
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-hidden">
-          {activeView === 'data' ? <DataView /> : <TimelineView />}
+          {activeView === 'data' ? <DataView /> : <TimelineView ref={timelineRef} />}
         </div>
         {isTimeline && (
           <div className="w-[280px] border-l border-[var(--color-border)] overflow-y-auto scrollbar-thin shrink-0">
@@ -217,6 +268,64 @@ function App() {
 
       {showProjectManager && (
         <ProjectManagerModal onClose={() => setShowProjectManager(false)} />
+      )}
+    </div>
+  );
+}
+
+// ─── Export Dropdown Button ──────────────────────────────────────────────────
+
+function ExportButton({
+  disabled,
+  onExportPNG,
+  onExportPPTX,
+}: {
+  disabled: boolean;
+  onExportPNG: () => void;
+  onExportPPTX: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => !disabled && setOpen(!open)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
+          disabled
+            ? 'text-[var(--color-text-secondary)]/40 border-[var(--color-border)]/40 cursor-not-allowed'
+            : 'text-[var(--color-text-secondary)] border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
+        }`}
+      >
+        <Download size={14} />
+        Export
+        <ChevronDown size={12} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 min-w-[180px]">
+          <button
+            onClick={() => { onExportPNG(); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-2"
+          >
+            <Image size={14} />
+            Export as PNG
+          </button>
+          <button
+            onClick={() => { onExportPPTX(); setOpen(false); }}
+            className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-2"
+          >
+            <Presentation size={14} />
+            Export as PowerPoint
+          </button>
+        </div>
       )}
     </div>
   );

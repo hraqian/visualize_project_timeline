@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
+import { useRef, useState, useCallback, useMemo, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
@@ -50,7 +50,11 @@ function formatDuration(startDate: string, endDate: string, fmt: DurationFormat)
 
 // ─── TimelineView ────────────────────────────────────────────────────────────
 
-export function TimelineView() {
+export interface TimelineViewHandle {
+  getExportElement: () => HTMLDivElement | null;
+}
+
+export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView(_props, ref) {
   const items = useProjectStore((s) => s.items);
   const swimlanes = useProjectStore((s) => s.swimlanes);
   const dependencies = useProjectStore((s) => s.dependencies);
@@ -71,6 +75,10 @@ export function TimelineView() {
   const setSelectedTierIndex = useProjectStore((s) => s.setSelectedTierIndex);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+  useImperativeHandle(ref, () => ({
+    getExportElement: () => exportRef.current,
+  }));
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragStartX, setDragStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
@@ -453,7 +461,7 @@ export function TimelineView() {
           setStylePaneSection(null);
         }}
       >
-        <div style={{ width: totalWidth, position: 'relative', margin: '0 auto' }}>
+        <div ref={exportRef} style={{ width: totalWidth, position: 'relative', margin: '0 auto' }}>
           {/* ─── "Above" milestones row (before sticky timescale header) ─── */}
           {aboveHeight > 0 && (
             <div className="relative" style={{ height: aboveHeight }}>
@@ -783,7 +791,7 @@ export function TimelineView() {
       </div>
     </div>
   );
-}
+});
 
 // ─── TaskBar Component ───────────────────────────────────────────────────────
 
