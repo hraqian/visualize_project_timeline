@@ -11,6 +11,9 @@ import {
   Info,
   Settings,
   X,
+  Link2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { AdvancedColorPicker } from '@/components/common/AdvancedColorPicker';
@@ -36,11 +39,15 @@ import {
   type ElapsedTimeThickness,
   type EndCapConfig,
   type TaskLayout,
+  type DependencySchedulingMode,
+  type DependencyConflictMode,
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
 import { generateTierLabels, buildVisibleTierCells, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
+import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
+import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -117,7 +124,7 @@ const MILESTONE_DATE_POSITIONS: { id: LabelPosition; label: string }[] = [
 ];
 
 type MainTab = 'items' | 'timescale' | 'design';
-type ItemSubTab = 'task' | 'milestone' | 'swimlane';
+type ItemSubTab = 'task' | 'milestone' | 'swimlane' | 'dependency';
 
 // ─── StylePane ───────────────────────────────────────────────────────────────
 
@@ -259,6 +266,18 @@ export function StylePane() {
               <Layers size={13} />
               Swimlane
             </button>
+            <button
+              onClick={() => handleSubTabClick('dependency')}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                activeSubTab === 'dependency'
+                  ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm border border-[var(--color-border)]'
+                  : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title="Dependency link styling"
+            >
+              <Link2 size={13} />
+              Dep. Link
+            </button>
           </div>
         )}
       </div>
@@ -311,6 +330,11 @@ function ItemsTabContent({
   deleteItem: ReturnType<typeof useProjectStore.getState>['deleteItem'];
   updateSwimlane: ReturnType<typeof useProjectStore.getState>['updateSwimlane'];
 }) {
+  // Dependency tab always shows, regardless of item selection
+  if (activeSubTab === 'dependency') {
+    return <DependencyLinkControls />;
+  }
+
   if (!item) {
     // Even without an item selected, show swimlane controls if a swimlane is directly selected
     if (activeSubTab === 'swimlane' && selectedSwimlane) {
@@ -373,6 +397,143 @@ function ItemsTabContent({
     <div className="text-center py-12 px-6">
       <div className="text-sm font-semibold text-[var(--color-text)] mb-1">Select {label} to style it</div>
       <div className="text-xs text-[var(--color-text-muted)]">Styling options will show up here once you select {label}.</div>
+    </div>
+  );
+}
+
+// ─── Dependency Link Controls ────────────────────────────────────────────────
+
+type DepSubTab = 'link' | 'critical-path';
+
+function DependencyLinkControls() {
+  const showDependencies = useProjectStore((s) => s.showDependencies);
+  const setShowDependencies = useProjectStore((s) => s.setShowDependencies);
+  const dependencySettings = useProjectStore((s) => s.dependencySettings);
+
+  const [depSubTab, setDepSubTab] = useState<DepSubTab>('link');
+  const [showSchedulingModal, setShowSchedulingModal] = useState(false);
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-tabs: Dependency Link / Critical Path */}
+      <div className="flex border-b border-[var(--color-border)]">
+        <button
+          onClick={() => setDepSubTab('link')}
+          className={`px-3 py-1.5 text-xs font-medium transition-all border-b-2 ${
+            depSubTab === 'link'
+              ? 'border-indigo-500 text-indigo-600'
+              : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+          }`}
+        >
+          Dependency Link
+        </button>
+        <button
+          onClick={() => setDepSubTab('critical-path')}
+          className={`px-3 py-1.5 text-xs font-medium transition-all border-b-2 ${
+            depSubTab === 'critical-path'
+              ? 'border-indigo-500 text-indigo-600'
+              : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+          }`}
+        >
+          Critical Path
+        </button>
+      </div>
+
+      {depSubTab === 'link' ? (
+        <div className="space-y-4">
+          {/* Visible toggle */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--color-text)]">Visible</span>
+            <button
+              onClick={() => setShowDependencies(!showDependencies)}
+              className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+            >
+              {showDependencies ? <Eye size={14} /> : <EyeOff size={14} />}
+              {showDependencies ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          {/* Scaffolded styling controls (non-functional placeholders) */}
+          <div
+            className={`space-y-3 transition-opacity ${showDependencies ? '' : 'opacity-40 pointer-events-none'}`}
+          >
+            {/* Color */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Color</span>
+              <div className="w-6 h-6 rounded border border-[var(--color-border)] bg-[#6366f1] cursor-not-allowed" title="Coming soon" />
+            </div>
+
+            {/* Transparency */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Transparency</span>
+              <span className="text-xs text-[var(--color-text-muted)]">0%</span>
+            </div>
+
+            {/* Line dash */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Line Dash</span>
+              <span className="text-xs text-[var(--color-text-muted)]">Solid</span>
+            </div>
+
+            {/* Line width */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Line Width</span>
+              <span className="text-xs text-[var(--color-text-muted)]">1.5px</span>
+            </div>
+
+            {/* Arrow type */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Arrow Type</span>
+              <span className="text-xs text-[var(--color-text-muted)]">Standard</span>
+            </div>
+
+            {/* Arrow size */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Arrow Size</span>
+              <span className="text-xs text-[var(--color-text-muted)]">Medium</span>
+            </div>
+
+            {/* Connection points */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[var(--color-text-muted)]">Connection Points</span>
+              <span className="text-xs text-[var(--color-text-muted)]">Auto</span>
+            </div>
+          </div>
+
+          {/* Scheduling Settings button */}
+          <div className="pt-2 border-t border-[var(--color-border)]">
+            <button
+              onClick={() => setShowSchedulingModal(true)}
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-colors"
+            >
+              <Settings size={14} />
+              Scheduling Settings
+            </button>
+          </div>
+
+          {/* Current scheduling mode indicator */}
+          <div className="text-[10px] text-[var(--color-text-muted)] px-1">
+            Current mode: <span className="font-medium text-[var(--color-text-secondary)]">
+              {dependencySettings.schedulingMode === 'manual'
+                ? 'Manual'
+                : dependencySettings.schedulingMode === 'automatic-flexible'
+                  ? 'Automatic (Flexible)'
+                  : 'Automatic (Strict)'}
+            </span>
+          </div>
+        </div>
+      ) : (
+        /* Critical Path placeholder */
+        <div className="text-center py-12 px-6">
+          <div className="text-sm font-semibold text-[var(--color-text)] mb-1">Critical Path</div>
+          <div className="text-xs text-[var(--color-text-muted)]">Coming soon. Critical path highlighting and analysis will appear here.</div>
+        </div>
+      )}
+
+      {/* Scheduling Settings Modal */}
+      {showSchedulingModal && (
+        <SchedulingSettingsModal onClose={() => setShowSchedulingModal(false)} />
+      )}
     </div>
   );
 }
