@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import type { DependencySchedulingMode, DependencyConflictMode } from '@/types';
@@ -12,6 +12,7 @@ interface Props {
 export function SchedulingSettingsModal({ onClose }: Props) {
   const dependencySettings = useProjectStore((s) => s.dependencySettings);
   const setDependencySettings = useProjectStore((s) => s.setDependencySettings);
+  const dependencies = useProjectStore((s) => s.dependencies);
 
   // Local state for editing (initialized from current project)
   const [schedulingMode, setSchedulingMode] = useState<DependencySchedulingMode>(
@@ -21,11 +22,17 @@ export function SchedulingSettingsModal({ onClose }: Props) {
     dependencySettings.conflictMode
   );
   const [rememberForFuture, setRememberForFuture] = useState(false);
+  const [showStrictWarning, setShowStrictWarning] = useState(false);
 
   const isAutomatic =
     schedulingMode === 'automatic-flexible' || schedulingMode === 'automatic-strict';
 
-  const handleSave = () => {
+  const isSwitchingToStrict =
+    schedulingMode === 'automatic-strict' &&
+    dependencySettings.schedulingMode !== 'automatic-strict' &&
+    dependencies.length > 0;
+
+  const doSave = () => {
     // Update current project's dependency settings
     setDependencySettings({ schedulingMode, conflictMode });
 
@@ -43,6 +50,14 @@ export function SchedulingSettingsModal({ onClose }: Props) {
     }
 
     onClose();
+  };
+
+  const handleSave = () => {
+    if (isSwitchingToStrict) {
+      setShowStrictWarning(true);
+      return;
+    }
+    doSave();
   };
 
   return createPortal(
@@ -206,6 +221,36 @@ export function SchedulingSettingsModal({ onClose }: Props) {
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-200 shrink-0">
+          {/* Strict mode warning */}
+          {showStrictWarning && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-2.5">
+              <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-slate-700 font-medium">
+                  Switching to strict mode may change your schedule
+                </p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Items with slack (positioned after their dependency constraint) will be
+                  snapped to their exact required dates. This cannot be undone automatically.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => setShowStrictWarning(false)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-amber-100 transition-colors"
+                  >
+                    Go Back
+                  </button>
+                  <button
+                    onClick={doSave}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Remember checkbox */}
           <label className="flex items-center gap-2 mb-4 cursor-pointer">
             <input
