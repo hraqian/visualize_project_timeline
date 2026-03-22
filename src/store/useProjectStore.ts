@@ -19,7 +19,7 @@ import type {
   TaskLayout,
 } from '@/types';
 import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY, DEFAULT_DEPENDENCY_SETTINGS } from '@/types';
-import { getDefaultTimescale, computeCriticalPath, shiftDependents } from '@/utils';
+import { getDefaultTimescale, computeCriticalPath, scheduleDependents } from '@/utils';
 import { saveProject as saveProjectToStorage, loadProject as loadProjectFromStorage, getGlobalSettings } from '@/utils/storage';
 
 // ─── Sample Data ─────────────────────────────────────────────────────────────
@@ -495,10 +495,18 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     set({ items: [...shifted, newItem] });
   },
 
-  updateItem: (id, updates) =>
-    set((state) => ({
-      items: state.items.map((i) => (i.id === id ? { ...i, ...updates } : i)),
-    })),
+  updateItem: (id, updates) => {
+    const state = get();
+    let newItems = state.items.map((i) => (i.id === id ? { ...i, ...updates } : i));
+
+    // If dates changed and we're in automatic scheduling mode, cascade to dependents
+    const datesChanged = updates.startDate !== undefined || updates.endDate !== undefined;
+    if (datesChanged && state.dependencySettings.schedulingMode !== 'manual') {
+      newItems = scheduleDependents([id], newItems, state.dependencies);
+    }
+
+    set({ items: newItems });
+  },
 
   deleteItem: (id) =>
     set((state) => ({
@@ -537,16 +545,27 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       i.id === id ? { ...i, startDate: newStart, endDate: newEnd } : i
     );
 
-    // Auto-shift dependents
-    newItems = shiftDependents(id, daysDelta, newItems, state.dependencies);
+    // Auto-schedule dependents (only in automatic modes)
+    if (state.dependencySettings.schedulingMode !== 'manual') {
+      newItems = scheduleDependents([id], newItems, state.dependencies);
+    }
 
     set({ items: newItems });
   },
 
-  resizeItem: (id, newEndDate) =>
-    set((state) => ({
-      items: state.items.map((i) => (i.id === id ? { ...i, endDate: newEndDate } : i)),
-    })),
+  resizeItem: (id, newEndDate) => {
+    const state = get();
+    let newItems = state.items.map((i) =>
+      i.id === id ? { ...i, endDate: newEndDate } : i
+    );
+
+    // Auto-schedule dependents (only in automatic modes)
+    if (state.dependencySettings.schedulingMode !== 'manual') {
+      newItems = scheduleDependents([id], newItems, state.dependencies);
+    }
+
+    set({ items: newItems });
+  },
 
   setItemRow: (id, row) =>
     set((state) => ({
@@ -718,28 +737,38 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     }),
 
   // ─── Dependencies ──────────────────────────────────────────────────
-  addDependency: (fromId, toId, options) =>
-    set((state) => ({
-      dependencies: [...state.dependencies, {
-        fromId, toId,
-        type: options?.type ?? 'finish-to-start',
-        lag: options?.lag ?? 0,
-        lagUnit: options?.lagUnit ?? 'd',
-        visible: options?.visible ?? true,
-      }],
-    })),
+  addDependency: (fromId, toId, options) => {
+    const state = get();
+    const newDeps = [...state.dependencies, {
+      fromId, toId,
+      type: options?.type ?? 'finish-to-start',
+      lag: options?.lag ?? 0,
+      lagUnit: options?.lagUnit ?? 'd',
+      visible: options?.visible ?? true,
+    }];
+    let newItems = state.items;
+    if (state.dependencySettings.schedulingMode !== 'manual') {
+      newItems = scheduleDependents([toId], newItems, newDeps);
+    }
+    set({ dependencies: newDeps, items: newItems });
+  },
 
   removeDependency: (fromId, toId) =>
     set((state) => ({
       dependencies: state.dependencies.filter((d) => !(d.fromId === fromId && d.toId === toId)),
     })),
 
-  updateDependency: (fromId, toId, updates) =>
-    set((state) => ({
-      dependencies: state.dependencies.map((d) =>
-        d.fromId === fromId && d.toId === toId ? { ...d, ...updates } : d
-      ),
-    })),
+  updateDependency: (fromId, toId, updates) => {
+    const state = get();
+    const newDeps = state.dependencies.map((d) =>
+      d.fromId === fromId && d.toId === toId ? { ...d, ...updates } : d
+    );
+    let newItems = state.items;
+    if (state.dependencySettings.schedulingMode !== 'manual') {
+      newItems = scheduleDependents([toId], newItems, newDeps);
+    }
+    set({ dependencies: newDeps, items: newItems });
+  },
 
   toggleDependencyVisibility: (fromId, toId) =>
     set((state) => ({
@@ -748,13 +777,18 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       ),
     })),
 
-  setItemDependencies: (itemId, deps) =>
-    set((state) => ({
-      dependencies: [
-        ...state.dependencies.filter((d) => d.toId !== itemId),
-        ...deps,
-      ],
-    })),
+  setItemDependencies: (itemId, deps) => {
+    const state = get();
+    const newDeps = [
+      ...state.dependencies.filter((d) => d.toId !== itemId),
+      ...deps,
+    ];
+    let newItems = state.items;
+    if (state.dependencySettings.schedulingMode !== 'manual') {
+      newItems = scheduleDependents([itemId], newItems, newDeps);
+    }
+    set({ dependencies: newDeps, items: newItems });
+  },
 
   // ─── Styles ────────────────────────────────────────────────────────
   updateTaskStyle: (id, style) =>

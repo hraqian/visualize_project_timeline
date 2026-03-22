@@ -1,6 +1,8 @@
 import {
   differenceInDays,
   addDays,
+  addWeeks,
+  addMonths,
   parseISO,
   startOfMonth,
   startOfYear,
@@ -317,37 +319,174 @@ export function computeCriticalPath(
   return criticalSet;
 }
 
-// ─── Dependency Auto-shift ───────────────────────────────────────────────────
+// ─── Dependency Scheduling ───────────────────────────────────────────────────
 
-export function shiftDependents(
-  movedItemId: string,
-  daysDelta: number,
+/** Convert a lag value + unit to a number of days. */
+function lagToDays(lag: number, unit: LagUnit): number {
+  switch (unit) {
+    case 'w': return lag * 7;
+    case 'm': return lag * 30; // approximate
+    case 'd':
+    default: return lag;
+  }
+}
+
+/** Add lag (in its native unit) to a date, returning ISO date string. */
+function addLag(date: Date, lag: number, unit: LagUnit): string {
+  let result: Date;
+  switch (unit) {
+    case 'w': result = addWeeks(date, lag); break;
+    case 'm': result = addMonths(date, lag); break;
+    case 'd':
+    default: result = addDays(date, lag); break;
+  }
+  return result.toISOString().split('T')[0];
+}
+
+/**
+ * For a given dependency, compute the earliest allowed start and end dates
+ * for the successor, based on the predecessor's current dates.
+ *
+ * Returns { earliestStart, earliestEnd } as ISO strings, or null values
+ * for whichever anchor the dependency type doesn't constrain directly.
+ *
+ * FS: successor.start >= predecessor.end + lag
+ * SS: successor.start >= predecessor.start + lag
+ * FF: successor.end   >= predecessor.end + lag
+ * SF: successor.end   >= predecessor.start + lag
+ */
+function computeConstraint(
+  dep: Dependency,
+  predecessor: ProjectItem
+): { constrainedStart: string | null; constrainedEnd: string | null } {
+  const predStart = parseISO(predecessor.startDate);
+  const predEnd = parseISO(predecessor.endDate);
+  const lag = dep.lag ?? 0;
+  const unit = dep.lagUnit ?? 'd';
+
+  switch (dep.type) {
+    case 'finish-to-start':
+      return { constrainedStart: addLag(predEnd, lag, unit), constrainedEnd: null };
+    case 'start-to-start':
+      return { constrainedStart: addLag(predStart, lag, unit), constrainedEnd: null };
+    case 'finish-to-finish':
+      return { constrainedEnd: addLag(predEnd, lag, unit), constrainedStart: null };
+    case 'start-to-finish':
+      return { constrainedEnd: addLag(predStart, lag, unit), constrainedStart: null };
+    default:
+      return { constrainedStart: null, constrainedEnd: null };
+  }
+}
+
+/**
+ * Schedule dependents after an item has been moved or resized.
+ * Uses BFS in topological order. For each successor, computes the tightest
+ * constraint from ALL its predecessors, then shifts forward if needed
+ * (preserving duration). Cascades transitively to further dependents.
+ *
+ * @param changedItemIds - IDs of items that were just modified (moved/resized)
+ * @param items - the full items array (already updated for the changed items)
+ * @param dependencies - all dependency links
+ * @returns updated items array
+ */
+export function scheduleDependents(
+  changedItemIds: string[],
   items: ProjectItem[],
   dependencies: Dependency[]
 ): ProjectItem[] {
   const updated = items.map((i) => ({ ...i }));
   const itemMap = new Map(updated.map((i) => [i.id, i]));
 
+  // BFS from changed items through successor chain
   const visited = new Set<string>();
-  const queue = [movedItemId];
+  const queue = [...changedItemIds];
 
   while (queue.length > 0) {
     const currId = queue.shift()!;
     if (visited.has(currId)) continue;
     visited.add(currId);
 
-    const successors = dependencies.filter((d) => d.fromId === currId);
-    for (const dep of successors) {
-      const successor = itemMap.get(dep.toId);
-      if (successor) {
-        successor.startDate = addDays(parseISO(successor.startDate), daysDelta).toISOString().split('T')[0];
-        successor.endDate = addDays(parseISO(successor.endDate), daysDelta).toISOString().split('T')[0];
-        queue.push(successor.id);
+    // Find all successors (deps where currId is the predecessor)
+    const successorDeps = dependencies.filter((d) => d.fromId === currId);
+    const successorIds = new Set(successorDeps.map((d) => d.toId));
+
+    for (const succId of successorIds) {
+      const successor = itemMap.get(succId);
+      if (!successor) continue;
+
+      // Gather ALL dependencies pointing to this successor (not just from currId)
+      const allDepsToSuccessor = dependencies.filter((d) => d.toId === succId);
+
+      const succStart = parseISO(successor.startDate);
+      const succEnd = parseISO(successor.endDate);
+      const duration = differenceInDays(succEnd, succStart);
+
+      let needsShift = false;
+      let latestRequiredStart: Date | null = null;
+      let latestRequiredEnd: Date | null = null;
+
+      for (const dep of allDepsToSuccessor) {
+        const pred = itemMap.get(dep.fromId);
+        if (!pred) continue;
+
+        const { constrainedStart, constrainedEnd } = computeConstraint(dep, pred);
+
+        if (constrainedStart) {
+          const cs = parseISO(constrainedStart);
+          if (!latestRequiredStart || cs > latestRequiredStart) {
+            latestRequiredStart = cs;
+          }
+        }
+        if (constrainedEnd) {
+          const ce = parseISO(constrainedEnd);
+          if (!latestRequiredEnd || ce > latestRequiredEnd) {
+            latestRequiredEnd = ce;
+          }
+        }
+      }
+
+      // Determine the new start date
+      let newStart = succStart;
+      let newEnd = succEnd;
+
+      if (latestRequiredStart && latestRequiredStart > succStart) {
+        newStart = latestRequiredStart;
+        newEnd = addDays(newStart, duration);
+        needsShift = true;
+      }
+
+      if (latestRequiredEnd) {
+        const requiredEnd = latestRequiredEnd;
+        if (requiredEnd > newEnd) {
+          // Shift forward to satisfy end constraint, preserving duration
+          newEnd = requiredEnd;
+          newStart = addDays(newEnd, -duration);
+          needsShift = true;
+        }
+      }
+
+      if (needsShift) {
+        successor.startDate = newStart.toISOString().split('T')[0];
+        successor.endDate = newEnd.toISOString().split('T')[0];
+        queue.push(succId); // cascade to its dependents
       }
     }
   }
 
   return updated;
+}
+
+/**
+ * Legacy wrapper — kept for backward compatibility.
+ * @deprecated Use scheduleDependents instead.
+ */
+export function shiftDependents(
+  movedItemId: string,
+  _daysDelta: number,
+  items: ProjectItem[],
+  dependencies: Dependency[]
+): ProjectItem[] {
+  return scheduleDependents([movedItemId], items, dependencies);
 }
 
 // ─── Auto Unit Resolution ────────────────────────────────────────────────────
