@@ -340,6 +340,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   swimlaneSpacing: 5,
   selectedTierIndex: null,
   pendingConflicts: [],
+  preConflictSnapshot: null,
 
   // ─── View ────────────────────────────────────────────────────────────
   setActiveView: (view) => set({ activeView: view }),
@@ -375,6 +376,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       checkedItemIds: [],
       selectedTierIndex: null,
       pendingConflicts: [],
+      preConflictSnapshot: null,
     });
   },
   newProject: () => {
@@ -409,6 +411,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       swimlaneSpacing: 5,
       selectedTierIndex: null,
       pendingConflicts: [],
+      preConflictSnapshot: null,
     });
   },
 
@@ -532,7 +535,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
-        set({ items: newItems, dependencies: newDeps, pendingConflicts: result.conflicts });
+        set({ items: newItems, dependencies: newDeps, pendingConflicts: result.conflicts, preConflictSnapshot: { items: state.items, dependencies: state.dependencies } });
         return;
       }
     }
@@ -588,7 +591,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
-        set({ items: newItems, dependencies: newDeps, pendingConflicts: result.conflicts });
+        set({ items: newItems, dependencies: newDeps, pendingConflicts: result.conflicts, preConflictSnapshot: { items: state.items, dependencies: state.dependencies } });
         return;
       }
     }
@@ -613,7 +616,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
-        set({ items: newItems, dependencies: newDeps, pendingConflicts: result.conflicts });
+        set({ items: newItems, dependencies: newDeps, pendingConflicts: result.conflicts, preConflictSnapshot: { items: state.items, dependencies: state.dependencies } });
         return;
       }
     }
@@ -810,7 +813,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
-        set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts });
+        set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts, preConflictSnapshot: { items: state.items, dependencies: state.dependencies } });
         return;
       }
     }
@@ -837,7 +840,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
-        set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts });
+        set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts, preConflictSnapshot: { items: state.items, dependencies: state.dependencies } });
         return;
       }
     }
@@ -867,7 +870,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
       if (result.conflicts.length > 0 && effectiveMode === 'ask') {
-        set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts });
+        set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts, preConflictSnapshot: { items: state.items, dependencies: state.dependencies } });
         return;
       }
     }
@@ -1106,10 +1109,18 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
     }
 
-    set({ items: finalItems, dependencies: newDeps, pendingConflicts: [] });
+    set({ items: finalItems, dependencies: newDeps, pendingConflicts: [], preConflictSnapshot: null });
   },
 
-  dismissConflicts: () => set({ pendingConflicts: [] }),
+  dismissConflicts: () => {
+    const state = get();
+    if (state.preConflictSnapshot) {
+      // Revert to the state before the conflict-triggering mutation
+      set({ items: state.preConflictSnapshot.items, dependencies: state.preConflictSnapshot.dependencies, pendingConflicts: [], preConflictSnapshot: null });
+    } else {
+      set({ pendingConflicts: [], preConflictSnapshot: null });
+    }
+  },
 
   // ─── Multi-select (checkboxes) ─────────────────────────────────────
   toggleCheckedItem: (id) =>

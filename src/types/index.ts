@@ -380,6 +380,7 @@ export interface ProjectState {
   swimlaneSpacing: number; // px gap between swimlane bands
   selectedTierIndex: number | null; // which tier row is selected for Scale section editing
   pendingConflicts: SchedulingConflict[]; // conflicts awaiting user resolution (for 'ask' mode)
+  preConflictSnapshot: { items: ProjectItem[]; dependencies: Dependency[] } | null; // state before conflict-triggering mutation
 }
 
 // ─── Default Styles ──────────────────────────────────────────────────────────
