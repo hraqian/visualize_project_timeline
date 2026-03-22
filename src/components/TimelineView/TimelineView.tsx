@@ -80,8 +80,8 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     getExportElement: () => exportRef.current,
   }));
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragStartX, setDragStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
+  const dragRef = useRef<{ id: string; startX: number } | null>(null);
 
   const sortedSwimlanes = useMemo(
     () => [...swimlanes].sort((a, b) => a.order - b.order),
@@ -356,30 +356,39 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
   const handleMouseDown = useCallback(
     (e: React.MouseEvent, itemId: string) => {
       e.stopPropagation();
+      e.preventDefault();
+      dragRef.current = { id: itemId, startX: e.clientX };
       setDraggingId(itemId);
-      setDragStartX(e.clientX);
       setDragOffset(0);
     },
     []
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!draggingId) return;
-      setDragOffset(e.clientX - dragStartX);
-    },
-    [draggingId, dragStartX]
-  );
-
-  const handleMouseUp = useCallback(() => {
+  // Attach mousemove/mouseup to window so drag works even outside the container
+  useEffect(() => {
     if (!draggingId) return;
-    const daysDelta = Math.round(dragOffset / zoom);
-    if (daysDelta !== 0) {
-      moveItem(draggingId, daysDelta);
-    }
-    setDraggingId(null);
-    setDragOffset(0);
-  }, [draggingId, dragOffset, zoom, moveItem]);
+    const onMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      setDragOffset(e.clientX - dragRef.current.startX);
+    };
+    const onUp = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const offset = e.clientX - dragRef.current.startX;
+      const daysDelta = Math.round(offset / zoom);
+      if (daysDelta !== 0) {
+        moveItem(dragRef.current.id, daysDelta);
+      }
+      dragRef.current = null;
+      setDraggingId(null);
+      setDragOffset(0);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [draggingId, zoom, moveItem]);
 
   const handleDropOnSwimlane = useCallback(
     (swimlaneId: string, e: React.DragEvent) => {
@@ -452,9 +461,6 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
       <div
         ref={containerRef}
         className="flex-1 overflow-auto scrollbar-thin relative"
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
         onClick={() => {
           setSelectedItem(null);
           setSelectedSwimlane(null);
@@ -873,8 +879,6 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
         transition: isDragging ? 'none' : 'transform 0.15s ease',
       }}
       onMouseDown={onMouseDown}
-      draggable
-      onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
     >
       <div
         className="w-full h-full relative overflow-hidden cursor-pointer"
@@ -1165,8 +1169,6 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           transition: isDragging ? 'none' : 'transform 0.15s ease',
         }}
         onMouseDown={onMouseDown}
-        draggable
-        onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
       >
         <div className="flex flex-col items-center gap-px">
           {isAbove ? (
@@ -1220,8 +1222,6 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         transition: isDragging ? 'none' : 'transform 0.15s ease',
       }}
       onMouseDown={onMouseDown}
-      draggable
-      onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
     >
       <div
         className={`relative cursor-pointer ${isSelected ? 'drop-shadow-lg' : ''}`}
