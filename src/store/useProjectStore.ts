@@ -19,10 +19,22 @@ import type {
   TaskLayout,
   SchedulingConflict,
   DependencyConflictMode,
+  DependencyLagAdjustment,
 } from '@/types';
 import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY, DEFAULT_DEPENDENCY_SETTINGS } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, scheduleDependents } from '@/utils';
 import { saveProject as saveProjectToStorage, loadProject as loadProjectFromStorage, getGlobalSettings } from '@/utils/storage';
+
+/** Apply lag adjustments (from allow-exception mode) to a dependencies array. */
+function applyLagAdjustments(deps: Dependency[], adjustments: DependencyLagAdjustment[]): Dependency[] {
+  if (adjustments.length === 0) return deps;
+  const adjMap = new Map(adjustments.map((a) => [`${a.fromId}:${a.toId}`, a]));
+  return deps.map((d) => {
+    const adj = adjMap.get(`${d.fromId}:${d.toId}`);
+    if (adj) return { ...d, lag: adj.newLag, lagUnit: adj.newLagUnit };
+    return d;
+  });
+}
 
 // ─── Sample Data ─────────────────────────────────────────────────────────────
 
@@ -507,6 +519,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   updateItem: (id, updates) => {
     const state = get();
     let newItems = state.items.map((i) => (i.id === id ? { ...i, ...updates } : i));
+    let newDeps = state.dependencies;
 
     // If dates changed and we're in automatic scheduling mode, cascade to dependents
     const datesChanged = updates.startDate !== undefined || updates.endDate !== undefined;
@@ -515,15 +528,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
         state.dependencySettings.schedulingMode === 'automatic-strict'
           ? 'dont-allow'
           : state.dependencySettings.conflictMode;
-      const result = scheduleDependents([id], newItems, state.dependencies, effectiveMode);
+      const result = scheduleDependents([id], newItems, newDeps, effectiveMode);
       newItems = result.items;
-      if (result.conflicts.length > 0) {
-        set({ items: newItems, pendingConflicts: result.conflicts });
+      newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
+      if (result.conflicts.length > 0 && effectiveMode === 'ask') {
+        set({ items: newItems, dependencies: newDeps, pendingConflicts: result.conflicts });
         return;
       }
     }
 
-    set({ items: newItems });
+    set({ items: newItems, dependencies: newDeps });
   },
 
   deleteItem: (id) =>
@@ -562,6 +576,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     let newItems = state.items.map((i) =>
       i.id === id ? { ...i, startDate: newStart, endDate: newEnd } : i
     );
+    let newDeps = state.dependencies;
 
     // Auto-schedule dependents (only in automatic modes)
     if (state.dependencySettings.schedulingMode !== 'manual') {
@@ -569,15 +584,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
         state.dependencySettings.schedulingMode === 'automatic-strict'
           ? 'dont-allow'
           : state.dependencySettings.conflictMode;
-      const result = scheduleDependents([id], newItems, state.dependencies, effectiveMode);
+      const result = scheduleDependents([id], newItems, newDeps, effectiveMode);
       newItems = result.items;
-      if (result.conflicts.length > 0) {
-        set({ items: newItems, pendingConflicts: result.conflicts });
+      newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
+      if (result.conflicts.length > 0 && effectiveMode === 'ask') {
+        set({ items: newItems, dependencies: newDeps, pendingConflicts: result.conflicts });
         return;
       }
     }
 
-    set({ items: newItems });
+    set({ items: newItems, dependencies: newDeps });
   },
 
   resizeItem: (id, newEndDate) => {
@@ -585,6 +601,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     let newItems = state.items.map((i) =>
       i.id === id ? { ...i, endDate: newEndDate } : i
     );
+    let newDeps = state.dependencies;
 
     // Auto-schedule dependents (only in automatic modes)
     if (state.dependencySettings.schedulingMode !== 'manual') {
@@ -592,15 +609,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
         state.dependencySettings.schedulingMode === 'automatic-strict'
           ? 'dont-allow'
           : state.dependencySettings.conflictMode;
-      const result = scheduleDependents([id], newItems, state.dependencies, effectiveMode);
+      const result = scheduleDependents([id], newItems, newDeps, effectiveMode);
       newItems = result.items;
-      if (result.conflicts.length > 0) {
-        set({ items: newItems, pendingConflicts: result.conflicts });
+      newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
+      if (result.conflicts.length > 0 && effectiveMode === 'ask') {
+        set({ items: newItems, dependencies: newDeps, pendingConflicts: result.conflicts });
         return;
       }
     }
 
-    set({ items: newItems });
+    set({ items: newItems, dependencies: newDeps });
   },
 
   setItemRow: (id, row) =>
@@ -775,7 +793,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   // ─── Dependencies ──────────────────────────────────────────────────
   addDependency: (fromId, toId, options) => {
     const state = get();
-    const newDeps = [...state.dependencies, {
+    let newDeps: Dependency[] = [...state.dependencies, {
       fromId, toId,
       type: options?.type ?? 'finish-to-start',
       lag: options?.lag ?? 0,
@@ -790,7 +808,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
           : state.dependencySettings.conflictMode;
       const result = scheduleDependents([toId], newItems, newDeps, effectiveMode);
       newItems = result.items;
-      if (result.conflicts.length > 0) {
+      newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
+      if (result.conflicts.length > 0 && effectiveMode === 'ask') {
         set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts });
         return;
       }
@@ -805,7 +824,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
   updateDependency: (fromId, toId, updates) => {
     const state = get();
-    const newDeps = state.dependencies.map((d) =>
+    let newDeps = state.dependencies.map((d) =>
       d.fromId === fromId && d.toId === toId ? { ...d, ...updates } : d
     );
     let newItems = state.items;
@@ -816,7 +835,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
           : state.dependencySettings.conflictMode;
       const result = scheduleDependents([toId], newItems, newDeps, effectiveMode);
       newItems = result.items;
-      if (result.conflicts.length > 0) {
+      newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
+      if (result.conflicts.length > 0 && effectiveMode === 'ask') {
         set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts });
         return;
       }
@@ -833,7 +853,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
   setItemDependencies: (itemId, deps) => {
     const state = get();
-    const newDeps = [
+    let newDeps: Dependency[] = [
       ...state.dependencies.filter((d) => d.toId !== itemId),
       ...deps,
     ];
@@ -845,7 +865,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
           : state.dependencySettings.conflictMode;
       const result = scheduleDependents([itemId], newItems, newDeps, effectiveMode);
       newItems = result.items;
-      if (result.conflicts.length > 0) {
+      newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
+      if (result.conflicts.length > 0 && effectiveMode === 'ask') {
         set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts });
         return;
       }
@@ -1054,9 +1075,23 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
           return { ...item, startDate: conflict.requiredStart, endDate: conflict.requiredEnd };
         }
       }
-      // 'keep' — leave as-is
+      // 'keep' — leave as-is (lag will be adjusted below)
       return item;
     });
+
+    // For items kept as-is, adjust dependency lag to reflect actual position
+    const keptIds = new Set(
+      resolutions.filter((r) => r.action === 'keep').map((r) => r.itemId)
+    );
+    let newDeps = state.dependencies;
+    if (keptIds.size > 0) {
+      // Run scheduleDependents in allow-exception mode just for the kept items
+      // to compute the lag adjustments needed
+      const keptResult = scheduleDependents(
+        [...keptIds], newItems, newDeps, 'allow-exception'
+      );
+      newDeps = applyLagAdjustments(newDeps, keptResult.lagAdjustments);
+    }
 
     // After resolving, cascade any rescheduled items
     const rescheduledIds = resolutions
@@ -1065,11 +1100,12 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
     let finalItems = newItems;
     if (rescheduledIds.length > 0 && state.dependencySettings.schedulingMode !== 'manual') {
-      const result = scheduleDependents(rescheduledIds, newItems, state.dependencies, 'dont-allow');
+      const result = scheduleDependents(rescheduledIds, newItems, newDeps, 'dont-allow');
       finalItems = result.items;
+      newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
     }
 
-    set({ items: finalItems, pendingConflicts: [] });
+    set({ items: finalItems, dependencies: newDeps, pendingConflicts: [] });
   },
 
   dismissConflicts: () => set({ pendingConflicts: [] }),

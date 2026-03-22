@@ -27,6 +27,7 @@ import type {
   TierFormat,
   DependencyConflictMode,
   SchedulingConflict,
+  DependencyLagAdjustment,
 } from '@/types';
 
 // ─── Date Helpers ────────────────────────────────────────────────────────────
@@ -381,29 +382,49 @@ function computeConstraint(
 }
 
 /**
- * Schedule dependents after an item has been moved or resized.
- * Uses BFS in topological order. For each successor, computes the tightest
- * constraint from ALL its predecessors, then shifts forward if needed
- * (preserving duration). Cascades transitively to further dependents.
+ * Schedule dependents after an item has been moved/resized or dependencies changed.
  *
- * @param changedItemIds - IDs of items that were just modified (moved/resized)
- * @param items - the full items array (already updated for the changed items)
- * @param dependencies - all dependency links
- * @param conflictMode - how to handle conflicts: 'dont-allow' (auto-resolve),
- *   'allow-exception' (skip conflicting items), 'ask' (detect and return conflicts)
- * @returns { items, conflicts } — updated items and any detected conflicts
+ * For each successor, computes the exact constraint date from ALL its predecessors.
+ * If the successor's current dates don't match the constraint:
+ *
+ * - dont-allow: Auto-snap the successor to the constraint date. Cascade.
+ * - allow-exception: Leave item in place. Adjust each dependency's lag so
+ *     the link reflects the actual gap. Record as conflict. Cascade.
+ * - ask: Record as conflict for user decision. Don't cascade.
+ *
+ * @returns { items, conflicts, lagAdjustments }
  */
 export function scheduleDependents(
   changedItemIds: string[],
   items: ProjectItem[],
   dependencies: Dependency[],
   conflictMode: DependencyConflictMode = 'dont-allow'
-): { items: ProjectItem[]; conflicts: SchedulingConflict[] } {
+): { items: ProjectItem[]; conflicts: SchedulingConflict[]; lagAdjustments: DependencyLagAdjustment[] } {
   const updated = items.map((i) => ({ ...i }));
   const itemMap = new Map(updated.map((i) => [i.id, i]));
   const conflicts: SchedulingConflict[] = [];
+  const lagAdjustments: DependencyLagAdjustment[] = [];
 
-  // Helper: evaluate a successor item against all its predecessors
+  /**
+   * Compute the lag (in days) that a single dependency would need so that
+   * its constraint matches the successor's actual position.
+   */
+  const computeRequiredLag = (dep: Dependency, pred: ProjectItem, succ: ProjectItem): number => {
+    const predStart = parseISO(pred.startDate);
+    const predEnd = parseISO(pred.endDate);
+    const succStart = parseISO(succ.startDate);
+    const succEnd = parseISO(succ.endDate);
+
+    switch (dep.type) {
+      case 'finish-to-start':  return differenceInDays(succStart, predEnd);
+      case 'start-to-start':   return differenceInDays(succStart, predStart);
+      case 'finish-to-finish': return differenceInDays(succEnd, predEnd);
+      case 'start-to-finish':  return differenceInDays(succEnd, predStart);
+      default: return 0;
+    }
+  };
+
+  /** Evaluate a successor against all its predecessors. Returns true if BFS should cascade. */
   const evaluateSuccessor = (succId: string): boolean => {
     const successor = itemMap.get(succId);
     if (!successor) return false;
@@ -415,6 +436,7 @@ export function scheduleDependents(
     const succEnd = parseISO(successor.endDate);
     const duration = differenceInDays(succEnd, succStart);
 
+    // Compute the tightest constraint from all predecessors
     let latestRequiredStart: Date | null = null;
     let latestRequiredEnd: Date | null = null;
 
@@ -438,66 +460,72 @@ export function scheduleDependents(
       }
     }
 
-    // Determine the new start/end dates
-    let newStart = succStart;
-    let newEnd = succEnd;
-    let hasMismatch = false;
+    // Compute what the successor's dates should be per the constraints
+    let reqStart = succStart;
+    let reqEnd = succEnd;
 
     if (latestRequiredStart) {
-      const startMatches = latestRequiredStart.getTime() === succStart.getTime();
-      if (!startMatches) {
-        newStart = latestRequiredStart;
-        newEnd = addDays(newStart, duration);
-        hasMismatch = true;
-      }
+      reqStart = latestRequiredStart;
+      reqEnd = addDays(reqStart, duration);
     }
 
-    if (latestRequiredEnd) {
-      const endMatches = latestRequiredEnd.getTime() === newEnd.getTime();
-      if (!endMatches && latestRequiredEnd > newEnd) {
-        newEnd = latestRequiredEnd;
-        newStart = addDays(newEnd, -duration);
-        hasMismatch = true;
-      } else if (!endMatches && !hasMismatch) {
-        newEnd = latestRequiredEnd;
-        newStart = addDays(newEnd, -duration);
-        hasMismatch = true;
-      }
+    if (latestRequiredEnd && latestRequiredEnd > reqEnd) {
+      reqEnd = latestRequiredEnd;
+      reqStart = addDays(reqEnd, -duration);
     }
 
-    if (hasMismatch) {
-      const reqStartISO = newStart.toISOString().split('T')[0];
-      const reqEndISO = newEnd.toISOString().split('T')[0];
+    // Check if there's any mismatch (either direction)
+    const hasMismatch =
+      reqStart.getTime() !== succStart.getTime() ||
+      reqEnd.getTime() !== succEnd.getTime();
 
-      if (conflictMode === 'dont-allow') {
-        successor.startDate = reqStartISO;
-        successor.endDate = reqEndISO;
-        return true; // was shifted — cascade
-      } else if (conflictMode === 'allow-exception') {
-        conflicts.push({
-          itemId: succId,
-          itemName: successor.name,
-          currentStart: successor.startDate,
-          currentEnd: successor.endDate,
-          requiredStart: reqStartISO,
-          requiredEnd: reqEndISO,
-        });
-        return true; // still cascade to check further dependents
-      } else {
-        // 'ask' mode
-        conflicts.push({
-          itemId: succId,
-          itemName: successor.name,
-          currentStart: successor.startDate,
-          currentEnd: successor.endDate,
-          requiredStart: reqStartISO,
-          requiredEnd: reqEndISO,
-        });
-        return false; // don't cascade — wait for user decision
+    if (!hasMismatch) return false;
+
+    const reqStartISO = reqStart.toISOString().split('T')[0];
+    const reqEndISO = reqEnd.toISOString().split('T')[0];
+
+    if (conflictMode === 'dont-allow') {
+      // Auto-snap to exact constraint date
+      successor.startDate = reqStartISO;
+      successor.endDate = reqEndISO;
+      return true; // cascade
+    } else if (conflictMode === 'allow-exception') {
+      // Leave item in place, adjust lag on each dependency to match actual position
+      for (const dep of allDepsToSuccessor) {
+        const pred = itemMap.get(dep.fromId);
+        if (!pred) continue;
+        const requiredLag = computeRequiredLag(dep, pred, successor);
+        const currentLagDays = lagToDays(dep.lag ?? 0, dep.lagUnit ?? 'd');
+        if (requiredLag !== currentLagDays) {
+          lagAdjustments.push({
+            fromId: dep.fromId,
+            toId: dep.toId,
+            newLag: requiredLag,
+            newLagUnit: 'd',
+          });
+        }
       }
+      conflicts.push({
+        itemId: succId,
+        itemName: successor.name,
+        currentStart: successor.startDate,
+        currentEnd: successor.endDate,
+        requiredStart: reqStartISO,
+        requiredEnd: reqEndISO,
+      });
+      return true; // cascade to check further dependents
+    } else {
+      // 'ask' mode: record conflict, wait for user decision
+      conflicts.push({
+        itemId: succId,
+        itemName: successor.name,
+        currentStart: successor.startDate,
+        currentEnd: successor.endDate,
+        requiredStart: reqStartISO,
+        requiredEnd: reqEndISO,
+      });
+      return false; // don't cascade
     }
-
-    return false;
   };
 
   // Phase 1: If any changedItemIds are themselves successors (have incoming deps),
@@ -538,7 +566,7 @@ export function scheduleDependents(
     }
   }
 
-  return { items: updated, conflicts };
+  return { items: updated, conflicts, lagAdjustments };
 }
 
 /**

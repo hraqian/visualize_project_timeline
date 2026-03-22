@@ -334,6 +334,13 @@ export interface SchedulingConflict {
   requiredEnd: string;    // required end date per dependency rules (ISO)
 }
 
+export interface DependencyLagAdjustment {
+  fromId: string;
+  toId: string;
+  newLag: number;         // new lag value in days
+  newLagUnit: LagUnit;
+}
+
 export interface DependencySettings {
   enabled: boolean;
   schedulingMode: DependencySchedulingMode;
