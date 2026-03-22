@@ -5,7 +5,7 @@ import { TimelineView } from '@/components/TimelineView/TimelineView';
 import type { TimelineViewHandle } from '@/components/TimelineView/TimelineView';
 import { StylePane } from '@/components/StylePane/StylePane';
 import { ProjectManagerModal } from '@/components/common/ProjectManagerModal';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import PptxGenJS from 'pptxgenjs';
 import {
   Pencil,
@@ -66,38 +66,40 @@ function App() {
     addSwimlane('New Swimlane');
   }, [addSwimlane]);
 
-  const captureTimeline = useCallback(async (): Promise<HTMLCanvasElement | null> => {
+  const captureTimeline = useCallback(async (): Promise<string | null> => {
     const el = timelineRef.current?.getExportElement();
     if (!el) return null;
-    return html2canvas(el, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      useCORS: true,
-    });
+    try {
+      return await toPng(el, { backgroundColor: '#ffffff', pixelRatio: 2 });
+    } catch (err) {
+      console.error('Export failed:', err);
+      return null;
+    }
   }, []);
 
   const exportPNG = useCallback(async () => {
-    const canvas = await captureTimeline();
-    if (!canvas) return;
+    const dataUrl = await captureTimeline();
+    if (!dataUrl) return;
     const link = document.createElement('a');
     link.download = `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
-    link.href = canvas.toDataURL('image/png');
+    link.href = dataUrl;
     link.click();
   }, [captureTimeline, projectName]);
 
   const exportPPTX = useCallback(async () => {
-    const canvas = await captureTimeline();
-    if (!canvas) return;
-    const imgData = canvas.toDataURL('image/png');
+    const dataUrl = await captureTimeline();
+    if (!dataUrl) return;
+    // Load image to get dimensions for aspect ratio
+    const img = new window.Image();
+    img.src = dataUrl;
+    await new Promise((resolve) => { img.onload = resolve; });
     const pptx = new PptxGenJS();
-    // Use widescreen 16:9 layout
     pptx.defineLayout({ name: 'WIDE', width: 13.333, height: 7.5 });
     pptx.layout = 'WIDE';
     const slide = pptx.addSlide();
-    // Fit image to slide with padding
-    const imgAspect = canvas.width / canvas.height;
-    const slideW = 12.5; // leave 0.4" margin each side
-    const slideH = 6.8; // leave some margin top/bottom
+    const imgAspect = img.width / img.height;
+    const slideW = 12.5;
+    const slideH = 6.8;
     let w = slideW;
     let h = w / imgAspect;
     if (h > slideH) {
@@ -106,7 +108,7 @@ function App() {
     }
     const x = (13.333 - w) / 2;
     const y = (7.5 - h) / 2;
-    slide.addImage({ data: imgData, x, y, w, h });
+    slide.addImage({ data: dataUrl, x, y, w, h });
     await pptx.writeFile({ fileName: `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx` });
   }, [captureTimeline, projectName]);
 
