@@ -441,21 +441,11 @@ export function scheduleDependents(
     // Determine the new start/end dates
     let newStart = succStart;
     let newEnd = succEnd;
-    let needsShift = false;
-    // For 'ask' and 'allow-exception', detect mismatch in either direction
-    // (successor too early OR too late vs constraint). For 'dont-allow', only
-    // push forward (allow slack).
     let hasMismatch = false;
 
     if (latestRequiredStart) {
-      if (latestRequiredStart > succStart) {
-        // Successor starts too early — needs to shift forward
-        newStart = latestRequiredStart;
-        newEnd = addDays(newStart, duration);
-        needsShift = true;
-        hasMismatch = true;
-      } else if (latestRequiredStart < succStart && conflictMode !== 'dont-allow') {
-        // Successor starts later than required (slack) — mismatch for ask/allow-exception
+      const startMatches = latestRequiredStart.getTime() === succStart.getTime();
+      if (!startMatches) {
         newStart = latestRequiredStart;
         newEnd = addDays(newStart, duration);
         hasMismatch = true;
@@ -463,24 +453,19 @@ export function scheduleDependents(
     }
 
     if (latestRequiredEnd) {
-      if (latestRequiredEnd > newEnd) {
+      const endMatches = latestRequiredEnd.getTime() === newEnd.getTime();
+      if (!endMatches && latestRequiredEnd > newEnd) {
         newEnd = latestRequiredEnd;
         newStart = addDays(newEnd, -duration);
-        needsShift = true;
         hasMismatch = true;
-      } else if (latestRequiredEnd < newEnd && conflictMode !== 'dont-allow' && !needsShift) {
-        // Successor ends later than required (slack) — mismatch for ask/allow-exception
+      } else if (!endMatches && !hasMismatch) {
         newEnd = latestRequiredEnd;
         newStart = addDays(newEnd, -duration);
         hasMismatch = true;
       }
     }
 
-    // For dont-allow: only act when needsShift (push forward, allow slack)
-    // For ask/allow-exception: act on any mismatch (either direction)
-    const shouldAct = conflictMode === 'dont-allow' ? needsShift : hasMismatch;
-
-    if (shouldAct) {
+    if (hasMismatch) {
       const reqStartISO = newStart.toISOString().split('T')[0];
       const reqEndISO = newEnd.toISOString().split('T')[0];
 
