@@ -478,22 +478,25 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
       const cx = x + snappedOffsetPx;
       const cy = y + (ROW_HEIGHT - iconSize) / 2;
       return (
-        <div
-          key="drag-guide"
-          className="absolute pointer-events-none z-40"
-          style={{ left: cx - iconSize / 2, top: cy, width: iconSize, height: iconSize }}
-        >
+        <>
           <div
-            className="w-full h-full rotate-45"
-            style={{ border: '2px dashed #6366f1' }}
-          />
+            key="drag-guide-outline"
+            className="absolute pointer-events-none"
+            style={{ left: cx - iconSize / 2, top: cy, width: iconSize, height: iconSize, zIndex: 40 }}
+          >
+            <div
+              className="w-full h-full rotate-45"
+              style={{ border: '2px dashed #6366f1' }}
+            />
+          </div>
           <div
-            className="absolute left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap px-2 py-1 rounded text-xs font-medium text-white shadow-lg"
-            style={{ top: '100%', backgroundColor: '#334155' }}
+            key="drag-guide-tooltip"
+            className="absolute pointer-events-none whitespace-nowrap px-2 py-1 rounded text-xs font-medium text-white shadow-lg"
+            style={{ left: cx, top: cy + iconSize + 6, transform: 'translateX(-50%)', backgroundColor: '#334155', zIndex: 40 }}
           >
             {format(newStart, 'EEE, MMM d, yyyy')}
           </div>
-        </div>
+        </>
       );
     }
 
@@ -503,33 +506,37 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     const w = Math.max(width, 8);
 
     return (
-      <div key="drag-guide" className="absolute pointer-events-none z-40">
+      <>
         {/* Dashed outline at snapped position */}
         <div
-          className="absolute rounded"
+          key="drag-guide-outline"
+          className="absolute pointer-events-none rounded"
           style={{
             left: x + snappedOffsetPx,
             top: barY,
             width: w,
             height: barHeight,
             border: `2px dashed ${item.taskStyle.color}`,
+            zIndex: 40,
           }}
         />
         {/* Date tooltip */}
         <div
-          className="absolute whitespace-nowrap px-2.5 py-1.5 rounded text-xs font-medium text-white shadow-lg"
+          key="drag-guide-tooltip"
+          className="absolute pointer-events-none whitespace-nowrap px-2.5 py-1.5 rounded text-xs font-medium text-white shadow-lg"
           style={{
             left: x + snappedOffsetPx + w / 2,
             top: barY + barHeight + 6,
             transform: 'translateX(-50%)',
             backgroundColor: '#334155',
+            zIndex: 40,
           }}
         >
           {format(newStart, 'EEE, MMM d, yyyy')}
           <span style={{ margin: '0 6px', opacity: 0.5 }}>&mdash;</span>
           {format(newEnd, 'EEE, MMM d, yyyy')}
         </div>
-      </div>
+      </>
     );
   };
 
