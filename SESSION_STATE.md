@@ -1,6 +1,6 @@
 # Project Timeline — Session State Document
 
-> **Last updated**: March 21, 2026 (session 13 — UX fixes, Apply to All swimlane-aware)
+> **Last updated**: March 21, 2026 (session 15 — Export functionality, click-to-deselect)
 > **Purpose**: Recovery document so a fresh AI session can pick up exactly where we left off.
 
 ---
@@ -21,6 +21,8 @@
 - date-fns for date manipulation
 - lucide-react for icons
 - uuid for ID generation
+- html-to-image for PNG export
+- pptxgenjs for native PowerPoint export
 
 ### Path Aliases
 - `@/` → `./src/`
@@ -45,7 +47,7 @@
 ### File Structure
 ```
 src/
-├── App.tsx                              # Root layout: banner + toolbar + main content, Save/Projects buttons, dirty state banner
+├── App.tsx                              # Root layout: banner + toolbar + main content, Save/Projects/Export buttons, dirty state banner, ExportButton component with PNG/PPTX dropdown
 ├── index.css                            # CSS variables (light-only), Tailwind directives
 ├── main.tsx                             # Entry point
 ├── types/
@@ -54,22 +56,23 @@ src/
 │   └── useProjectStore.ts               # Zustand store — all state + actions, wrapped set() for auto-dirty tracking, save/load/new project actions, addItem/addSwimlane return string
 ├── utils/
 │   ├── index.ts                         # Utility functions: timescale generation, buildVisibleTierCells, resolveAutoUnit, critical path, project range
-│   └── storage.ts                       # localStorage save/load/delete/list utilities, ProjectIndexEntry type
+│   ├── storage.ts                       # localStorage save/load/delete/list utilities, ProjectIndexEntry type
+│   └── exportPptx.ts                    # Native PPTX export utility — computeLayout, drawTimescale, drawGridLines, drawSwimlanes, drawTaskBar, drawMilestone, drawDependencies, exportNativePptx
 ├── components/
 │   ├── DataView/
 │   │   ├── DataView.tsx                 # Spreadsheet editor with swimlane groups, focusItemId + focusSwimlaneId auto-focus
 │   │   └── TypePicker.tsx               # Type column cell + popover (shape/color picker)
 │   ├── TimelineView/
-│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, timescale header, card container, auto-fit zoom
+│   │   └── TimelineView.tsx             # Gantt canvas with drag-and-drop, dependency lines, timescale header, card container, auto-fit zoom, forwardRef + useImperativeHandle for export
 │   ├── StylePane/
-│   │   └── StylePane.tsx                # Per-item style editor + TierSettingsModal
+│   │   └── StylePane.tsx                # Per-item style editor + TierSettingsModal, 3 tabs (Items/Timescale/Design)
 │   └── common/
 │       ├── ProjectManagerModal.tsx       # Modal listing saved projects with New/Open/Delete
 │       ├── MilestoneIconComponent.tsx   # Renders milestone icons using Lucide
-│       ├── AdvancedColorPicker.tsx      # Full Office-style color picker with theme/standard/recent colors
-│       ├── ShapeDropdown.tsx            # Clean trigger + 6-col icon grid; exports ShapePreview
-│       ├── SizeControl.tsx              # S/M/L toggles + numeric stepper
-│       ├── SpacingControl.tsx           # Tight/Normal/Wide toggle with SVG icons
+│       ├── AdvancedColorPicker.tsx      # Full Office-style color picker: theme colors (10 columns x 6 shades), standard colors, recent colors (module-level persistence)
+│       ├── ShapeDropdown.tsx            # Trigger showing current shape + 6-col icon grid dropdown; exports ShapePreview
+│       ├── SizeControl.tsx              # S/M/L toggle buttons + numeric stepper with +/- 
+│       ├── SpacingControl.tsx           # Tight/Normal/Wide toggle with inline SVG line-spacing icons
 │       ├── FontDropdowns.tsx            # FontFamilyDropdown + FontSizeDropdown (reusable)
 │       ├── DateFormatDropdown.tsx       # 11 date-fns formats with sample date preview
 │       └── DurationFormatDropdown.tsx   # Cascading dropdown with 5 categories + hover submenus
@@ -267,7 +270,7 @@ interface TimescaleConfig {
 ### Row 2 (toolbar)
 - Left: view-specific add buttons (+ Task, + Milestone always enabled)
 - Center: `Data` / `Timeline` tabs
-- Right: `Save` button + `Projects` button (FolderOpen icon) + `Download` + gear icon
+- Right: `Save` button + `Projects` button (FolderOpen icon) + `Export` dropdown (PNG/PPTX, disabled when not on Timeline) + gear icon
 
 ### Main content
 - Data View or Timeline View fills remaining space
@@ -275,8 +278,10 @@ interface TimescaleConfig {
 - Empty state: "Select tasks to style them" when no item selected
 
 ### StylePane Structure
-- **Tabs**: `Items` and `Timescale`
+- **Tabs**: `Items`, `Timescale`, and `Design`
 - Items tab has **3 sub-icons** (task, milestone, swimlane) at top
+- **Design tab** (`DesignTabContent`): Task Layout radio options (single-row, compact, one-per-row)
+- **Auto-switch**: `useEffect` watches `stylePaneSection` — switches to timescale tab for timescale sections, items tab for item sections. Clicking items on timeline switches to Items tab, clicking tier rows switches to Timescale tab.
 - Task sub-tab has **6 collapsible sections** (accordion-style, one at a time, driven by `stylePaneSection` in Zustand):
 
 | # | Section | Collapse Arrow | Toggle | Default | Status |
@@ -666,18 +671,51 @@ Contains:
 - **Auto-focus swimlane name** (`75f7fe9`): `focusSwimlaneId` state in DataView, `shouldFocusName` prop on SwimlaneGroup triggers `editingName` state + `onFocus` selects text. `addSwimlane` now returns the new ID.
 - **Default timescale to single tier months** (`751a921`): `getDefaultTimescale()` changed from 2 tiers (year+month) to 1 tier (month only).
 - **Removed timeline title row** (`afc6b33`): Removed the "New Project" heading + Pencil edit from TimelineView. Cleaned up unused imports.
-- **Auto-fit zoom on mount** (`d4b3eaa` + `e8b2d36`): `useEffect` in TimelineView measures container width and sets `zoom = Math.round(containerWidth / totalDays)` clamped 2-30. Fixed missing `useEffect` import. Runs only on mount (`[]` deps).
+- **Auto-fit zoom on mount** (`d4b3eaa` + `e8b2d36`): `useEffect` in TimelineView measures container width and sets `zoom = Math.floor(containerWidth / totalDays)` clamped 2-30. Fixed missing `useEffect` import. Runs only on mount (`[]` deps).
 - **Apply to All: swimlane-aware for tasks** (`5320649`): All 6 task Apply components (TaskBarApplyToAll, TaskTitleApplyToAll, TaskDateApplyToAll, TaskDurationApplyToAll, TaskPctApplyToAll, ConnectorApplyToAll) now show "Only this swimlane" checkbox when the item is in a swimlane, and "Exclude swimlanes" when the item is independent. Matches existing milestone Apply to All pattern.
+
+### Phase 15 — Design Tab + Timeline Content Centering + Auto-fit Zoom Fix (session 14)
+- **Design tab in StylePane**: Third tab added after Items and Timescale. Contains `DesignTabContent` with Task Layout radio options:
+  - **Single row**: Tasks stay on their assigned row (`item.row`)
+  - **Compact (packed)**: Tasks packed to minimize vertical space (no overlapping bars)
+  - **One per row**: Each task gets its own row
+- **`taskLayout`** state added to store (`TaskLayout` type: `'single-row' | 'packed' | 'one-per-row'`)
+- **`getRow` function** in TimelineView: `useMemo` that returns a function `(item: ProjectItem) => number`. For `single-row`, returns `item.row`. For `packed`/`one-per-row`, builds `rowMap` per group (independent + each swimlane). Swimlane band heights dynamically grow based on `maxRow`.
+- **Timeline content centering** (`margin: '0 auto'` on content div): Timeline content centered horizontally within the white canvas card.
+- **Content div uses `width: totalWidth`** (not `minWidth`): Prevents background from extending past last timescale cell.
+- **Auto-fit zoom fix**: Changed `Math.round` to `Math.floor` to prevent overflow. Also accounts for end cap widths: estimates `fontSize * 3 + 12` per visible end cap and subtracts from container width before computing zoom.
+- **StylePane auto-switch Items/Timescale tabs**: `useEffect` watches `stylePaneSection` and auto-switches `mainTab`. Clicking items switches to Items tab, clicking tier rows switches to Timescale tab.
+
+### Phase 16 — Export Functionality + Click-to-Deselect (session 15)
+- **Clear selections on canvas background click** (`cbb970a`): Added `onClick` handler on scrollable container div in TimelineView that clears `selectedItemId`, `selectedSwimlaneId`, `selectedTierIndex`, and `stylePaneSection` when clicking empty space. Fixed tier row click handler to include `e.stopPropagation()` (was the only clickable element missing it).
+- **Export dropdown button** (`950c793`, `cf909af`): Replaced placeholder "Download" button with "Export" dropdown (chevron menu) with "Export as PNG" and "Export as PowerPoint" options. Export button disabled when not on Timeline view. Uses `html-to-image` for PNG capture.
+- **Fixed html-to-image issues** (`39478d9`): Switched from `html2canvas` (can't parse `oklab()` colors from Tailwind v4) to `html-to-image`. Added `skipFonts: true` to avoid cross-origin Google Fonts stylesheet errors.
+- **TimelineView forwardRef** (`39478d9`): TimelineView uses `forwardRef` + `useImperativeHandle` to expose `getExportElement()` method returning the inner content div ref for PNG capture.
+- **Native PowerPoint export** (`517e184`): Created `src/utils/exportPptx.ts` — comprehensive utility recreating entire timeline as editable PPTX shapes:
+  - Timescale tier rows with cell labels, separators, end caps, today marker, elapsed time bar
+  - Task bars with progress fill + title/date/duration/% complete labels (position-aware)
+  - Milestones (diamond shapes) with title and date labels
+  - Swimlane bands with body background opacity, colored badges, title text
+  - Grid lines matching finest tier
+  - Dependency lines with arrowheads (`endArrowType: 'triangle'`)
+  - Vertical connector dashed lines
+  - Auto-scales to fit 16:9 widescreen slide (13.333" x 7.5") with 0.4" margins and centering
+  - Milestone shapes always `'diamond'` regardless of `milestoneStyle.icon` (simplification — 23 lucide variants can't map to PPTX shapes)
+  - Dependency lines drawn as straight lines (pptxgenjs doesn't support Bezier curves natively)
 
 ---
 
 ## Known Pre-existing Build Errors
 
-`npx tsc --noEmit` passes clean as of session 13.
+`npx tsc --noEmit` passes clean as of session 15.
 
 ---
 
 ## What's Next (TODO)
+
+### Export
+- **PNG export needs testing** — `html-to-image` export set up but not yet confirmed working by user
+- **PPTX export needs testing** — native PPTX export implemented but may need visual tweaks after user review
 
 ### Timescale Tab
 All sections COMPLETED:
@@ -686,6 +724,9 @@ All sections COMPLETED:
 - ~~Today marker section~~ DONE
 - ~~Elapsed time section~~ DONE
 - ~~Left/right end cap sections~~ DONE
+
+### Design Tab
+- Currently has Task Layout only; could expand with more design options
 
 ### Swimlane Sections (remaining)
 1. Swimlane spacing section content (placeholder exists)
@@ -736,3 +777,14 @@ All sections COMPLETED:
 - The `Toggle` component is defined locally inside StylePane.tsx (~line 350)
 - `CollapsibleRow` supports optional `toggle` prop for show/hide switch
 - TierSettingsModal `DEFAULT_3_TIERS`: tier 0 = month/green (#6b7f5c), tier 1 = week/slate (hidden), tier 2 = day/slate (hidden)
+- **html-to-image requires `skipFonts: true`** — cross-origin Google Fonts stylesheets cause `CSSStyleSheet.cssRules` access errors. The `skipFonts` option bypasses web font embedding (fonts still render since they're loaded in browser).
+- **html2canvas does NOT work with Tailwind CSS v4** — it cannot parse `oklab()` color functions. Use `html-to-image` instead.
+- **Vite dep cache** (`node_modules/.vite/`) can get stale when swapping npm packages. Fix: `rm -rf node_modules/.vite` and restart dev server.
+- **TimelineView uses `forwardRef`** with `useImperativeHandle` to expose `getExportElement()` that returns the inner content div ref for PNG capture.
+- **PPTX export coordinate system**: Mirrors TimelineView's layout computation (origin, totalDays, zoom, swimlane layout, row assignment) then scales px to inches using `scale = Math.min(CONTENT_W / totalWidth, CONTENT_H / totalContentHeight)`. Content centered on 13.333" x 7.5" widescreen slide with 0.4" margins.
+- **pptxgenjs `addShape('line', ...)`** supports `endArrowType: 'triangle'` for dependency arrows. Bezier curves not natively supported — dependency lines drawn as straight lines.
+- **Milestone shapes in PPTX**: Always `'diamond'` regardless of `milestoneStyle.icon` (23 lucide-react icon variants can't all map to PPTX shapes).
+- **Task layout row system**: Every `ProjectItem` has `row: number`. Vertical position = `sectionBaseY + row * ROW_HEIGHT` (ROW_HEIGHT=44). `getRow` in TimelineView is a `useMemo` returning `(item: ProjectItem) => number`. `single-row` returns `item.row`, `packed`/`one-per-row` build `rowMap` per group.
+- **Timescale cell widths** are proportional to calendar days. `buildVisibleTierCells()` computes fractional positions. The `+1` on `endFrac` converts inclusive end dates to exclusive boundaries.
+- **Auto-fit zoom reserves space for end caps**: estimates `fontSize * 3 + 12` per visible end cap, subtracts from container width before computing zoom. Uses `Math.floor` (not `Math.round`) to prevent overflow.
+- **`taskLayout`** added to `DIRTY_KEYS` — persisted to localStorage along with other saveable keys.
