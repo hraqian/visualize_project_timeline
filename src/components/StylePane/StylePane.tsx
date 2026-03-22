@@ -71,7 +71,7 @@ function SwimlaneIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <rect x="1" y="4" width="3.5" height="8" rx="1" stroke="currentColor" strokeWidth="0.7" />
-      <rect x="6.5" y="4" width="9" height="8" rx="1" stroke="currentColor" strokeWidth="0.7" />
+      <rect x="6.5" y="4" width="11" height="8" rx="1" stroke="currentColor" strokeWidth="0.7" />
     </svg>
   );
 }
