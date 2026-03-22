@@ -341,6 +341,14 @@ export interface DependencyLagAdjustment {
   newLagUnit: LagUnit;
 }
 
+export interface RescheduledItemChange {
+  itemName: string;
+  oldStart: string;       // ISO date
+  oldEnd: string;         // ISO date
+  newStart: string;       // ISO date
+  newEnd: string;         // ISO date
+}
+
 export interface DependencySettings {
   enabled: boolean;
   schedulingMode: DependencySchedulingMode;

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { useProjectStore } from '@/store/useProjectStore';
 import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
-import type { DependencySchedulingMode, DependencyConflictMode } from '@/types';
+import type { DependencySchedulingMode, DependencyConflictMode, RescheduledItemChange } from '@/types';
 
 interface Props {
   onClose: () => void;
@@ -23,6 +24,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
   );
   const [rememberForFuture, setRememberForFuture] = useState(false);
   const [showStrictWarning, setShowStrictWarning] = useState(false);
+  const [summaryChanges, setSummaryChanges] = useState<RescheduledItemChange[] | null>(null);
 
   const isAutomatic =
     schedulingMode === 'automatic-flexible' || schedulingMode === 'automatic-strict';
@@ -32,9 +34,11 @@ export function SchedulingSettingsModal({ onClose }: Props) {
     dependencySettings.schedulingMode !== 'automatic-strict' &&
     dependencies.length > 0;
 
+  const fmt = (iso: string) => format(parseISO(iso), 'MM/dd/yyyy');
+
   const doSave = () => {
     // Update current project's dependency settings
-    setDependencySettings({ schedulingMode, conflictMode });
+    const changes = setDependencySettings({ schedulingMode, conflictMode });
 
     // Optionally save to global defaults for future timelines
     if (rememberForFuture) {
@@ -49,7 +53,13 @@ export function SchedulingSettingsModal({ onClose }: Props) {
       });
     }
 
-    onClose();
+    // If strict mode caused rescheduling, show summary instead of closing
+    if (changes.length > 0) {
+      setSummaryChanges(changes);
+      setShowStrictWarning(false);
+    } else {
+      onClose();
+    }
   };
 
   const handleSave = () => {
@@ -60,6 +70,81 @@ export function SchedulingSettingsModal({ onClose }: Props) {
     doSave();
   };
 
+  // ─── Summary view ────────────────────────────────────────────────────
+  if (summaryChanges !== null) {
+    return createPortal(
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+        <div className="relative bg-white rounded-xl shadow-2xl w-[520px] max-h-[80vh] flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-slate-200 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={18} className="text-emerald-500" />
+                <h2 className="text-base font-semibold text-slate-800">Rescheduling Complete</h2>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-sm text-slate-500 mt-1">
+              {summaryChanges.length === 0
+                ? 'No items were changed. All items already match their dependency constraints.'
+                : `${summaryChanges.length} item${summaryChanges.length === 1 ? ' was' : 's were'} rescheduled to match strict dependency constraints.`}
+            </p>
+          </div>
+
+          {/* Body — change list */}
+          {summaryChanges.length > 0 && (
+            <div className="px-6 py-4 overflow-y-auto flex-1">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-slate-400 text-xs uppercase tracking-wide">
+                    <th className="pb-2 font-medium">Item</th>
+                    <th className="pb-2 font-medium">Previous dates</th>
+                    <th className="pb-2 font-medium">New dates</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {summaryChanges.map((change, i) => {
+                    const oldSame = change.oldStart === change.oldEnd;
+                    const newSame = change.newStart === change.newEnd;
+                    return (
+                      <tr key={i}>
+                        <td className="py-2.5 pr-3 text-slate-700 font-medium">{change.itemName}</td>
+                        <td className="py-2.5 pr-3 text-slate-500">
+                          {oldSame ? fmt(change.oldStart) : `${fmt(change.oldStart)} - ${fmt(change.oldEnd)}`}
+                        </td>
+                        <td className="py-2.5 text-slate-700">
+                          {newSame ? fmt(change.newStart) : `${fmt(change.newStart)} - ${fmt(change.newEnd)}`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-slate-200 shrink-0 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  // ─── Settings view ───────────────────────────────────────────────────
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -231,7 +316,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                 </p>
                 <p className="text-sm text-slate-500 mt-1">
                   Items with slack (positioned after their dependency constraint) will be
-                  snapped to their exact required dates. This cannot be undone automatically.
+                  snapped to their exact required dates.
                 </p>
                 <div className="flex gap-2 mt-3">
                   <button

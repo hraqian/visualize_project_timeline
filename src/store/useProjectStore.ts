@@ -20,6 +20,7 @@ import type {
   SchedulingConflict,
   DependencyConflictMode,
   DependencyLagAdjustment,
+  RescheduledItemChange,
 } from '@/types';
 import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY, DEFAULT_DEPENDENCY_SETTINGS } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, scheduleDependents } from '@/utils';
@@ -241,7 +242,7 @@ interface ProjectActions {
 
   // Dependencies toggle
   setShowDependencies: (show: boolean) => void;
-  setDependencySettings: (settings: Partial<DependencySettings>) => void;
+  setDependencySettings: (settings: Partial<DependencySettings>) => RescheduledItemChange[];
 
   // Conflict resolution
   resolveConflicts: (resolutions: { itemId: string; action: 'reschedule' | 'keep' }[]) => void;
@@ -1073,8 +1074,26 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       const predecessorIds = [...new Set(state.dependencies.map((d) => d.fromId))];
       const result = scheduleDependents(predecessorIds, state.items, state.dependencies, 'dont-allow', true);
       set({ dependencySettings: newSettings, items: result.items, dependencies: applyLagAdjustments(state.dependencies, result.lagAdjustments) });
+
+      // Compute changes for the summary
+      const changes: RescheduledItemChange[] = [];
+      const oldMap = new Map(state.items.map((i) => [i.id, i]));
+      for (const item of result.items) {
+        const old = oldMap.get(item.id);
+        if (old && (old.startDate !== item.startDate || old.endDate !== item.endDate)) {
+          changes.push({
+            itemName: item.name,
+            oldStart: old.startDate,
+            oldEnd: old.endDate,
+            newStart: item.startDate,
+            newEnd: item.endDate,
+          });
+        }
+      }
+      return changes;
     } else {
       set({ dependencySettings: newSettings });
+      return [];
     }
   },
 
