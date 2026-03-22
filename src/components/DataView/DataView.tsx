@@ -1280,12 +1280,16 @@ function ItemRow({
         onDragOver={(e) => { e.stopPropagation(); onItemDragOver(e); }}
         onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onItemDrop(); }}
       >
-      {/* Checkbox / Grip Handle */}
+      {/* Checkbox / Grip Handle / Row Number */}
       <td className="px-1 py-2 text-center">
         {hasAnyChecked || isChecked ? (
           <Checkbox checked={isChecked} onChange={onToggleChecked} />
         ) : (
           <div className="relative w-[18px] h-[18px] mx-auto">
+            {/* Row number (visible by default, hidden on row hover) */}
+            <span className="text-[10px] text-slate-400 font-mono leading-[18px] absolute inset-0 flex items-center justify-center group-hover/row:opacity-0 transition-opacity select-none">
+              {rowNumberMap.get(item.id) ?? ''}
+            </span>
             {/* Show grip by default on hover, checkbox on hover of the grip area */}
             <GripVertical
               size={14}
