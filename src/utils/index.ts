@@ -403,9 +403,115 @@ export function scheduleDependents(
   const itemMap = new Map(updated.map((i) => [i.id, i]));
   const conflicts: SchedulingConflict[] = [];
 
-  // BFS from changed items through successor chain
+  // Helper: evaluate a successor item against all its predecessors
+  const evaluateSuccessor = (succId: string): boolean => {
+    const successor = itemMap.get(succId);
+    if (!successor) return false;
+
+    const allDepsToSuccessor = dependencies.filter((d) => d.toId === succId);
+    if (allDepsToSuccessor.length === 0) return false;
+
+    const succStart = parseISO(successor.startDate);
+    const succEnd = parseISO(successor.endDate);
+    const duration = differenceInDays(succEnd, succStart);
+
+    let latestRequiredStart: Date | null = null;
+    let latestRequiredEnd: Date | null = null;
+
+    for (const dep of allDepsToSuccessor) {
+      const pred = itemMap.get(dep.fromId);
+      if (!pred) continue;
+
+      const { constrainedStart, constrainedEnd } = computeConstraint(dep, pred);
+
+      if (constrainedStart) {
+        const cs = parseISO(constrainedStart);
+        if (!latestRequiredStart || cs > latestRequiredStart) {
+          latestRequiredStart = cs;
+        }
+      }
+      if (constrainedEnd) {
+        const ce = parseISO(constrainedEnd);
+        if (!latestRequiredEnd || ce > latestRequiredEnd) {
+          latestRequiredEnd = ce;
+        }
+      }
+    }
+
+    // Determine the new start/end dates
+    let newStart = succStart;
+    let newEnd = succEnd;
+    let needsShift = false;
+
+    if (latestRequiredStart && latestRequiredStart > succStart) {
+      newStart = latestRequiredStart;
+      newEnd = addDays(newStart, duration);
+      needsShift = true;
+    }
+
+    if (latestRequiredEnd) {
+      const requiredEnd = latestRequiredEnd;
+      if (requiredEnd > newEnd) {
+        newEnd = requiredEnd;
+        newStart = addDays(newEnd, -duration);
+        needsShift = true;
+      }
+    }
+
+    if (needsShift) {
+      const reqStartISO = newStart.toISOString().split('T')[0];
+      const reqEndISO = newEnd.toISOString().split('T')[0];
+
+      if (conflictMode === 'dont-allow') {
+        successor.startDate = reqStartISO;
+        successor.endDate = reqEndISO;
+        return true; // was shifted — cascade
+      } else if (conflictMode === 'allow-exception') {
+        conflicts.push({
+          itemId: succId,
+          itemName: successor.name,
+          currentStart: successor.startDate,
+          currentEnd: successor.endDate,
+          requiredStart: reqStartISO,
+          requiredEnd: reqEndISO,
+        });
+        return true; // still cascade to check further dependents
+      } else {
+        // 'ask' mode
+        conflicts.push({
+          itemId: succId,
+          itemName: successor.name,
+          currentStart: successor.startDate,
+          currentEnd: successor.endDate,
+          requiredStart: reqStartISO,
+          requiredEnd: reqEndISO,
+        });
+        return false; // don't cascade — wait for user decision
+      }
+    }
+
+    return false;
+  };
+
+  // Phase 1: If any changedItemIds are themselves successors (have incoming deps),
+  // evaluate them first. This handles the case where dependencies were added/changed
+  // ON the item itself (e.g. setItemDependencies, addDependency passing toId).
+  const seedIds = new Set<string>();
+  for (const id of changedItemIds) {
+    const incomingDeps = dependencies.filter((d) => d.toId === id);
+    if (incomingDeps.length > 0) {
+      const shouldCascade = evaluateSuccessor(id);
+      if (shouldCascade) {
+        seedIds.add(id);
+      }
+    }
+    // Always seed the item for downstream BFS (it may also be a predecessor)
+    seedIds.add(id);
+  }
+
+  // Phase 2: BFS from seed items through successor chain
   const visited = new Set<string>();
-  const queue = [...changedItemIds];
+  const queue = [...seedIds];
 
   while (queue.length > 0) {
     const currId = queue.shift()!;
@@ -417,92 +523,10 @@ export function scheduleDependents(
     const successorIds = new Set(successorDeps.map((d) => d.toId));
 
     for (const succId of successorIds) {
-      const successor = itemMap.get(succId);
-      if (!successor) continue;
-
-      // Gather ALL dependencies pointing to this successor (not just from currId)
-      const allDepsToSuccessor = dependencies.filter((d) => d.toId === succId);
-
-      const succStart = parseISO(successor.startDate);
-      const succEnd = parseISO(successor.endDate);
-      const duration = differenceInDays(succEnd, succStart);
-
-      let latestRequiredStart: Date | null = null;
-      let latestRequiredEnd: Date | null = null;
-
-      for (const dep of allDepsToSuccessor) {
-        const pred = itemMap.get(dep.fromId);
-        if (!pred) continue;
-
-        const { constrainedStart, constrainedEnd } = computeConstraint(dep, pred);
-
-        if (constrainedStart) {
-          const cs = parseISO(constrainedStart);
-          if (!latestRequiredStart || cs > latestRequiredStart) {
-            latestRequiredStart = cs;
-          }
-        }
-        if (constrainedEnd) {
-          const ce = parseISO(constrainedEnd);
-          if (!latestRequiredEnd || ce > latestRequiredEnd) {
-            latestRequiredEnd = ce;
-          }
-        }
-      }
-
-      // Determine the new start/end dates
-      let newStart = succStart;
-      let newEnd = succEnd;
-      let needsShift = false;
-
-      if (latestRequiredStart && latestRequiredStart > succStart) {
-        newStart = latestRequiredStart;
-        newEnd = addDays(newStart, duration);
-        needsShift = true;
-      }
-
-      if (latestRequiredEnd) {
-        const requiredEnd = latestRequiredEnd;
-        if (requiredEnd > newEnd) {
-          newEnd = requiredEnd;
-          newStart = addDays(newEnd, -duration);
-          needsShift = true;
-        }
-      }
-
-      if (needsShift) {
-        const reqStartISO = newStart.toISOString().split('T')[0];
-        const reqEndISO = newEnd.toISOString().split('T')[0];
-
-        if (conflictMode === 'dont-allow') {
-          // Auto-resolve: shift the item
-          successor.startDate = reqStartISO;
-          successor.endDate = reqEndISO;
-          queue.push(succId);
-        } else if (conflictMode === 'allow-exception') {
-          // Record the conflict but don't shift — keep item in place
-          conflicts.push({
-            itemId: succId,
-            itemName: successor.name,
-            currentStart: successor.startDate,
-            currentEnd: successor.endDate,
-            requiredStart: reqStartISO,
-            requiredEnd: reqEndISO,
-          });
-          // Still cascade through this item's dependents (they may need checking)
-          queue.push(succId);
-        } else {
-          // 'ask' mode: record conflict, don't shift yet
-          conflicts.push({
-            itemId: succId,
-            itemName: successor.name,
-            currentStart: successor.startDate,
-            currentEnd: successor.endDate,
-            requiredStart: reqStartISO,
-            requiredEnd: reqEndISO,
-          });
-          // Don't cascade — user needs to decide first
-        }
+      if (visited.has(succId)) continue;
+      const shouldCascade = evaluateSuccessor(succId);
+      if (shouldCascade) {
+        queue.push(succId);
       }
     }
   }
