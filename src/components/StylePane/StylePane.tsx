@@ -232,51 +232,47 @@ export function StylePane() {
           <div className="flex items-center gap-1 px-3 pb-2">
             <button
               onClick={() => handleSubTabClick('task')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+              className={`p-1.5 rounded-md transition-all ${
                 activeSubTab === 'task'
                   ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm border border-[var(--color-border)]'
                   : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
-              title="Task styling"
+              title="Task"
             >
-              <ListChecks size={13} />
-              Task
+              <ListChecks size={15} />
             </button>
             <button
               onClick={() => handleSubTabClick('milestone')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+              className={`p-1.5 rounded-md transition-all ${
                 activeSubTab === 'milestone'
                   ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm border border-[var(--color-border)]'
                   : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
-              title="Milestone styling"
+              title="Milestone"
             >
-              <Diamond size={13} />
-              Milestone
+              <Diamond size={15} />
             </button>
             <button
               onClick={() => handleSubTabClick('swimlane')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+              className={`p-1.5 rounded-md transition-all ${
                 activeSubTab === 'swimlane'
                   ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm border border-[var(--color-border)]'
                   : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
-              title="Swimlane styling"
+              title="Swimlane"
             >
-              <Layers size={13} />
-              Swimlane
+              <Layers size={15} />
             </button>
             <button
               onClick={() => handleSubTabClick('dependency')}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+              className={`p-1.5 rounded-md transition-all ${
                 activeSubTab === 'dependency'
                   ? 'bg-[var(--color-bg)] text-[var(--color-text)] shadow-sm border border-[var(--color-border)]'
                   : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
               }`}
-              title="Dependency link styling"
+              title="Dependency Link"
             >
-              <Link2 size={13} />
-              Dep. Link
+              <Link2 size={15} />
             </button>
           </div>
         )}
