@@ -466,80 +466,6 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     );
   };
 
-  // Render drag guide (dashed outline at snapped position + date tooltip)
-  const renderDragGuide = (yBase: number) => {
-    if (!dragGuide) return null;
-    const { item, snappedOffsetPx, newStart, newEnd } = dragGuide;
-    const x = itemToX(item.startDate);
-    const y = yBase + getRow(item) * ROW_HEIGHT;
-
-    if (item.type === 'milestone') {
-      const iconSize = item.milestoneStyle.size;
-      const cx = x + snappedOffsetPx;
-      const cy = y + (ROW_HEIGHT - iconSize) / 2;
-      return (
-        <>
-          <div
-            key="drag-guide-outline"
-            className="absolute pointer-events-none"
-            style={{ left: cx - iconSize / 2, top: cy, width: iconSize, height: iconSize, zIndex: 40 }}
-          >
-            <div
-              className="w-full h-full rotate-45"
-              style={{ border: '2px dashed #6366f1' }}
-            />
-          </div>
-          <div
-            key="drag-guide-tooltip"
-            className="absolute pointer-events-none whitespace-nowrap px-2 py-1 rounded text-xs font-medium text-white shadow-lg"
-            style={{ left: cx, top: cy + iconSize + 6, transform: 'translateX(-50%)', backgroundColor: '#334155', zIndex: 40 }}
-          >
-            {format(newStart, 'EEE, MMM d, yyyy')}
-          </div>
-        </>
-      );
-    }
-
-    const width = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
-    const barHeight = item.taskStyle.thickness;
-    const barY = y + (ROW_HEIGHT - barHeight) / 2;
-    const w = Math.max(width, 8);
-
-    return (
-      <>
-        {/* Dashed outline at snapped position */}
-        <div
-          key="drag-guide-outline"
-          className="absolute pointer-events-none rounded"
-          style={{
-            left: x + snappedOffsetPx,
-            top: barY,
-            width: w,
-            height: barHeight,
-            border: `2px dashed ${item.taskStyle.color}`,
-            zIndex: 40,
-          }}
-        />
-        {/* Date tooltip */}
-        <div
-          key="drag-guide-tooltip"
-          className="absolute pointer-events-none whitespace-nowrap px-2.5 py-1.5 rounded text-xs font-medium text-white shadow-lg"
-          style={{
-            left: x + snappedOffsetPx + w / 2,
-            top: barY + barHeight + 6,
-            transform: 'translateX(-50%)',
-            backgroundColor: '#334155',
-            zIndex: 40,
-          }}
-        >
-          {format(newStart, 'EEE, MMM d, yyyy')}
-          <span style={{ margin: '0 6px', opacity: 0.5 }}>&mdash;</span>
-          {format(newEnd, 'EEE, MMM d, yyyy')}
-        </div>
-      </>
-    );
-  };
-
   return (
     <div className="relative h-full flex flex-col overflow-hidden bg-[var(--color-bg)]">
       {/* ─── Card container ─── */}
@@ -865,12 +791,98 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
 
             {/* ─── Drag guide (dashed outline + date tooltip) ─── */}
             {dragGuide && (() => {
-              const { item } = dragGuide;
-              if (!item.swimlaneId || !swimlaneIds.has(item.swimlaneId)) {
-                return renderDragGuide(INDEPENDENT_SECTION_PADDING);
+              const { item, snappedOffsetPx, newStart, newEnd } = dragGuide;
+              const gx = itemToX(item.startDate);
+              // Find yBase
+              let yBase = INDEPENDENT_SECTION_PADDING;
+              if (item.swimlaneId && swimlaneIds.has(item.swimlaneId)) {
+                const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
+                if (sl) yBase = sl.contentY;
               }
-              const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
-              return sl ? renderDragGuide(sl.contentY) : null;
+
+              if (item.type === 'milestone') {
+                const iconSize = item.milestoneStyle.size;
+                const cx = gx + snappedOffsetPx;
+                const cy = yBase + getRow(item) * ROW_HEIGHT + (ROW_HEIGHT - iconSize) / 2;
+                return (
+                  <>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: cx - iconSize / 2,
+                        top: cy,
+                        width: iconSize,
+                        height: iconSize,
+                        zIndex: 40,
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      <div style={{ width: '100%', height: '100%', border: `2px dashed ${item.milestoneStyle.color}`, transform: 'rotate(45deg)' }} />
+                    </div>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: cx,
+                        top: cy + iconSize + 6,
+                        transform: 'translateX(-50%)',
+                        backgroundColor: '#334155',
+                        color: '#fff',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        padding: '4px 10px',
+                        borderRadius: 4,
+                        whiteSpace: 'nowrap',
+                        zIndex: 40,
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      {format(newStart, 'EEE, MMM d, yyyy')}
+                    </div>
+                  </>
+                );
+              }
+
+              const barHeight = item.taskStyle.thickness;
+              const width = Math.max(differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom, 8);
+              const gy = yBase + getRow(item) * ROW_HEIGHT + (ROW_HEIGHT - barHeight) / 2;
+              return (
+                <>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: gx + snappedOffsetPx,
+                      top: gy,
+                      width,
+                      height: barHeight,
+                      border: `2px dashed ${item.taskStyle.color}`,
+                      borderRadius: 4,
+                      zIndex: 40,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: gx + snappedOffsetPx + width / 2,
+                      top: gy + barHeight + 6,
+                      transform: 'translateX(-50%)',
+                      backgroundColor: '#334155',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      padding: '4px 10px',
+                      borderRadius: 4,
+                      whiteSpace: 'nowrap',
+                      zIndex: 40,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {format(newStart, 'EEE, MMM d, yyyy')}
+                    <span style={{ margin: '0 6px', opacity: 0.5 }}>&mdash;</span>
+                    {format(newEnd, 'EEE, MMM d, yyyy')}
+                  </div>
+                </>
+              );
             })()}
           </div>
         </div>
