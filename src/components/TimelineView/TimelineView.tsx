@@ -789,7 +789,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
               return renderItem(item, sl.contentY);
             })}
 
-            {/* ─── Drag guide (dashed outline + date tooltip) ─── */}
+            {/* ─── Drag guide (ghost + dashed outline + vertical guidelines + date tooltip) ─── */}
             {dragGuide && (() => {
               const { item, snappedOffsetPx, newStart, newEnd } = dragGuide;
               const gx = itemToX(item.startDate);
@@ -803,9 +803,39 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
               if (item.type === 'milestone') {
                 const iconSize = item.milestoneStyle.size;
                 const cx = gx + snappedOffsetPx;
+                const origCx = gx;
                 const cy = yBase + getRow(item) * ROW_HEIGHT + (ROW_HEIGHT - iconSize) / 2;
                 return (
                   <>
+                    {/* Ghost at original position */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: origCx - iconSize / 2,
+                        top: cy,
+                        width: iconSize,
+                        height: iconSize,
+                        opacity: 0.25,
+                        zIndex: 35,
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      <div style={{ width: '100%', height: '100%', backgroundColor: item.milestoneStyle.color, transform: 'rotate(45deg)' }} />
+                    </div>
+                    {/* Vertical guideline at snap position */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: cx,
+                        top: 0,
+                        width: 0,
+                        height: canvasHeight,
+                        borderLeft: '1px dashed #94a3b8',
+                        zIndex: 38,
+                        pointerEvents: 'none',
+                      }}
+                    />
+                    {/* Dashed outline at snap position */}
                     <div
                       style={{
                         position: 'absolute',
@@ -819,6 +849,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                     >
                       <div style={{ width: '100%', height: '100%', border: `2px dashed ${item.milestoneStyle.color}`, transform: 'rotate(45deg)' }} />
                     </div>
+                    {/* Date tooltip */}
                     <div
                       style={{
                         position: 'absolute',
@@ -845,12 +876,56 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
               const barHeight = item.taskStyle.thickness;
               const width = Math.max(differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom, 8);
               const gy = yBase + getRow(item) * ROW_HEIGHT + (ROW_HEIGHT - barHeight) / 2;
+              const snapLeft = gx + snappedOffsetPx;
+              const snapRight = snapLeft + width;
               return (
                 <>
+                  {/* Ghost bar at original position */}
                   <div
                     style={{
                       position: 'absolute',
-                      left: gx + snappedOffsetPx,
+                      left: gx,
+                      top: gy,
+                      width,
+                      height: barHeight,
+                      backgroundColor: item.taskStyle.color,
+                      borderRadius: 4,
+                      opacity: 0.2,
+                      zIndex: 35,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  {/* Vertical guideline at snap start */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: snapLeft,
+                      top: 0,
+                      width: 0,
+                      height: canvasHeight,
+                      borderLeft: '1px dashed #94a3b8',
+                      zIndex: 38,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  {/* Vertical guideline at snap end */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: snapRight,
+                      top: 0,
+                      width: 0,
+                      height: canvasHeight,
+                      borderLeft: '1px dashed #94a3b8',
+                      zIndex: 38,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  {/* Dashed outline at snap position */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: snapLeft,
                       top: gy,
                       width,
                       height: barHeight,
@@ -860,10 +935,11 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                       pointerEvents: 'none',
                     }}
                   />
+                  {/* Date tooltip */}
                   <div
                     style={{
                       position: 'absolute',
-                      left: gx + snappedOffsetPx + width / 2,
+                      left: snapLeft + width / 2,
                       top: gy + barHeight + 6,
                       transform: 'translateX(-50%)',
                       backgroundColor: '#334155',
