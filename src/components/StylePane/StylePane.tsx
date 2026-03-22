@@ -62,7 +62,7 @@ function TaskIcon({ size = 16 }: { size?: number }) {
 function MilestoneIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <rect x="8" y="1.34" width="9" height="9" rx="1" transform="rotate(45 8 1.34)" stroke="currentColor" strokeWidth="1" />
+      <rect x="8" y="1.34" width="9" height="9" rx="1" transform="rotate(45 8 1.34)" stroke="currentColor" strokeWidth="0.7" />
     </svg>
   );
 }
@@ -70,8 +70,8 @@ function MilestoneIcon({ size = 16 }: { size?: number }) {
 function SwimlaneIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <rect x="1" y="4" width="3.5" height="8" rx="1" stroke="currentColor" strokeWidth="1" />
-      <rect x="6.5" y="4" width="8.5" height="8" rx="1" stroke="currentColor" strokeWidth="1" />
+      <rect x="1" y="4" width="3.5" height="8" rx="1" stroke="currentColor" strokeWidth="0.7" />
+      <rect x="6.5" y="4" width="8.5" height="8" rx="1" stroke="currentColor" strokeWidth="0.7" />
     </svg>
   );
 }
@@ -81,7 +81,7 @@ function DependencyIcon({ size = 16 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <rect x="1" y="2" width="5" height="5" rx="1" fill="currentColor" />
       <rect x="10" y="9" width="5" height="5" rx="1" fill="currentColor" />
-      <path d="M6 4.5H8V11.5H10" stroke="currentColor" strokeWidth="1" />
+      <path d="M6 4.5H8V11.5H10" stroke="currentColor" strokeWidth="0.7" />
     </svg>
   );
 }
