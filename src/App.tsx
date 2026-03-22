@@ -6,6 +6,7 @@ import type { TimelineViewHandle } from '@/components/TimelineView/TimelineView'
 import { StylePane } from '@/components/StylePane/StylePane';
 import { ProjectManagerModal } from '@/components/common/ProjectManagerModal';
 import { SettingsModal } from '@/components/common/SettingsModal';
+import { ConflictResolutionDialog } from '@/components/common/ConflictResolutionDialog';
 import { toPng } from 'html-to-image';
 import { exportNativePptx } from '@/utils/exportPptx';
 import {
@@ -45,6 +46,7 @@ function App() {
   const showDependencies = useProjectStore((s) => s.showDependencies);
   const setShowDependencies = useProjectStore((s) => s.setShowDependencies);
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
+  const pendingConflicts = useProjectStore((s) => s.pendingConflicts);
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(projectName);
@@ -330,6 +332,7 @@ function App() {
       {showSettingsModal && (
         <SettingsModal onClose={() => setShowSettingsModal(false)} />
       )}
+      {pendingConflicts.length > 0 && <ConflictResolutionDialog />}
     </div>
   );
 }

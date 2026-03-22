@@ -325,6 +325,15 @@ export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
 export type DependencyConflictMode = 'dont-allow' | 'allow-exception' | 'ask';
 export type DependencySchedulingMode = 'automatic-flexible' | 'automatic-strict' | 'manual';
 
+export interface SchedulingConflict {
+  itemId: string;         // the successor item that has a conflict
+  itemName: string;       // display name of the conflicting item
+  currentStart: string;   // current start date (ISO)
+  currentEnd: string;     // current end date (ISO)
+  requiredStart: string;  // required start date per dependency rules (ISO)
+  requiredEnd: string;    // required end date per dependency rules (ISO)
+}
+
 export interface DependencySettings {
   enabled: boolean;
   schedulingMode: DependencySchedulingMode;
@@ -363,6 +372,7 @@ export interface ProjectState {
   taskLayout: TaskLayout; // how tasks are arranged vertically in swimlanes
   swimlaneSpacing: number; // px gap between swimlane bands
   selectedTierIndex: number | null; // which tier row is selected for Scale section editing
+  pendingConflicts: SchedulingConflict[]; // conflicts awaiting user resolution (for 'ask' mode)
 }
 
 // ─── Default Styles ──────────────────────────────────────────────────────────

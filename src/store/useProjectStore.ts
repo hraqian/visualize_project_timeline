@@ -17,6 +17,8 @@ import type {
   OptionalColumn,
   StylePaneSection,
   TaskLayout,
+  SchedulingConflict,
+  DependencyConflictMode,
 } from '@/types';
 import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY, DEFAULT_DEPENDENCY_SETTINGS } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, scheduleDependents } from '@/utils';
@@ -229,6 +231,10 @@ interface ProjectActions {
   setShowDependencies: (show: boolean) => void;
   setDependencySettings: (settings: Partial<DependencySettings>) => void;
 
+  // Conflict resolution
+  resolveConflicts: (resolutions: { itemId: string; action: 'reschedule' | 'keep' }[]) => void;
+  dismissConflicts: () => void;
+
   // Multi-select (checkboxes)
   toggleCheckedItem: (id: string) => void;
   checkAllItems: () => void;
@@ -321,6 +327,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   taskLayout: 'single-row',
   swimlaneSpacing: 5,
   selectedTierIndex: null,
+  pendingConflicts: [],
 
   // ─── View ────────────────────────────────────────────────────────────
   setActiveView: (view) => set({ activeView: view }),
@@ -355,6 +362,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       stylePaneSection: null,
       checkedItemIds: [],
       selectedTierIndex: null,
+      pendingConflicts: [],
     });
   },
   newProject: () => {
@@ -388,6 +396,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       taskLayout: 'single-row',
       swimlaneSpacing: 5,
       selectedTierIndex: null,
+      pendingConflicts: [],
     });
   },
 
@@ -502,7 +511,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     // If dates changed and we're in automatic scheduling mode, cascade to dependents
     const datesChanged = updates.startDate !== undefined || updates.endDate !== undefined;
     if (datesChanged && state.dependencySettings.schedulingMode !== 'manual') {
-      newItems = scheduleDependents([id], newItems, state.dependencies);
+      const effectiveMode: DependencyConflictMode =
+        state.dependencySettings.schedulingMode === 'automatic-strict'
+          ? 'dont-allow'
+          : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([id], newItems, state.dependencies, effectiveMode);
+      newItems = result.items;
+      if (result.conflicts.length > 0) {
+        set({ items: newItems, pendingConflicts: result.conflicts });
+        return;
+      }
     }
 
     set({ items: newItems });
@@ -547,7 +565,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
     // Auto-schedule dependents (only in automatic modes)
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      newItems = scheduleDependents([id], newItems, state.dependencies);
+      const effectiveMode: DependencyConflictMode =
+        state.dependencySettings.schedulingMode === 'automatic-strict'
+          ? 'dont-allow'
+          : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([id], newItems, state.dependencies, effectiveMode);
+      newItems = result.items;
+      if (result.conflicts.length > 0) {
+        set({ items: newItems, pendingConflicts: result.conflicts });
+        return;
+      }
     }
 
     set({ items: newItems });
@@ -561,7 +588,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
     // Auto-schedule dependents (only in automatic modes)
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      newItems = scheduleDependents([id], newItems, state.dependencies);
+      const effectiveMode: DependencyConflictMode =
+        state.dependencySettings.schedulingMode === 'automatic-strict'
+          ? 'dont-allow'
+          : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([id], newItems, state.dependencies, effectiveMode);
+      newItems = result.items;
+      if (result.conflicts.length > 0) {
+        set({ items: newItems, pendingConflicts: result.conflicts });
+        return;
+      }
     }
 
     set({ items: newItems });
@@ -748,7 +784,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     }];
     let newItems = state.items;
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      newItems = scheduleDependents([toId], newItems, newDeps);
+      const effectiveMode: DependencyConflictMode =
+        state.dependencySettings.schedulingMode === 'automatic-strict'
+          ? 'dont-allow'
+          : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([toId], newItems, newDeps, effectiveMode);
+      newItems = result.items;
+      if (result.conflicts.length > 0) {
+        set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts });
+        return;
+      }
     }
     set({ dependencies: newDeps, items: newItems });
   },
@@ -765,7 +810,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     );
     let newItems = state.items;
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      newItems = scheduleDependents([toId], newItems, newDeps);
+      const effectiveMode: DependencyConflictMode =
+        state.dependencySettings.schedulingMode === 'automatic-strict'
+          ? 'dont-allow'
+          : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([toId], newItems, newDeps, effectiveMode);
+      newItems = result.items;
+      if (result.conflicts.length > 0) {
+        set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts });
+        return;
+      }
     }
     set({ dependencies: newDeps, items: newItems });
   },
@@ -785,7 +839,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     ];
     let newItems = state.items;
     if (state.dependencySettings.schedulingMode !== 'manual') {
-      newItems = scheduleDependents([itemId], newItems, newDeps);
+      const effectiveMode: DependencyConflictMode =
+        state.dependencySettings.schedulingMode === 'automatic-strict'
+          ? 'dont-allow'
+          : state.dependencySettings.conflictMode;
+      const result = scheduleDependents([itemId], newItems, newDeps, effectiveMode);
+      newItems = result.items;
+      if (result.conflicts.length > 0) {
+        set({ dependencies: newDeps, items: newItems, pendingConflicts: result.conflicts });
+        return;
+      }
     }
     set({ dependencies: newDeps, items: newItems });
   },
@@ -978,6 +1041,38 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     set((state) => ({
       dependencySettings: { ...state.dependencySettings, ...settings },
     })),
+
+  // ─── Conflict Resolution ───────────────────────────────────────────
+  resolveConflicts: (resolutions) => {
+    const state = get();
+    const newItems = state.items.map((item) => {
+      const resolution = resolutions.find((r) => r.itemId === item.id);
+      if (!resolution) return item;
+      if (resolution.action === 'reschedule') {
+        const conflict = state.pendingConflicts.find((c) => c.itemId === item.id);
+        if (conflict) {
+          return { ...item, startDate: conflict.requiredStart, endDate: conflict.requiredEnd };
+        }
+      }
+      // 'keep' — leave as-is
+      return item;
+    });
+
+    // After resolving, cascade any rescheduled items
+    const rescheduledIds = resolutions
+      .filter((r) => r.action === 'reschedule')
+      .map((r) => r.itemId);
+
+    let finalItems = newItems;
+    if (rescheduledIds.length > 0 && state.dependencySettings.schedulingMode !== 'manual') {
+      const result = scheduleDependents(rescheduledIds, newItems, state.dependencies, 'dont-allow');
+      finalItems = result.items;
+    }
+
+    set({ items: finalItems, pendingConflicts: [] });
+  },
+
+  dismissConflicts: () => set({ pendingConflicts: [] }),
 
   // ─── Multi-select (checkboxes) ─────────────────────────────────────
   toggleCheckedItem: (id) =>

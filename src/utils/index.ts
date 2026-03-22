@@ -25,6 +25,8 @@ import type {
   TimescaleTier,
   TimescaleConfig,
   TierFormat,
+  DependencyConflictMode,
+  SchedulingConflict,
 } from '@/types';
 
 // ─── Date Helpers ────────────────────────────────────────────────────────────
@@ -387,15 +389,19 @@ function computeConstraint(
  * @param changedItemIds - IDs of items that were just modified (moved/resized)
  * @param items - the full items array (already updated for the changed items)
  * @param dependencies - all dependency links
- * @returns updated items array
+ * @param conflictMode - how to handle conflicts: 'dont-allow' (auto-resolve),
+ *   'allow-exception' (skip conflicting items), 'ask' (detect and return conflicts)
+ * @returns { items, conflicts } — updated items and any detected conflicts
  */
 export function scheduleDependents(
   changedItemIds: string[],
   items: ProjectItem[],
-  dependencies: Dependency[]
-): ProjectItem[] {
+  dependencies: Dependency[],
+  conflictMode: DependencyConflictMode = 'dont-allow'
+): { items: ProjectItem[]; conflicts: SchedulingConflict[] } {
   const updated = items.map((i) => ({ ...i }));
   const itemMap = new Map(updated.map((i) => [i.id, i]));
+  const conflicts: SchedulingConflict[] = [];
 
   // BFS from changed items through successor chain
   const visited = new Set<string>();
@@ -421,7 +427,6 @@ export function scheduleDependents(
       const succEnd = parseISO(successor.endDate);
       const duration = differenceInDays(succEnd, succStart);
 
-      let needsShift = false;
       let latestRequiredStart: Date | null = null;
       let latestRequiredEnd: Date | null = null;
 
@@ -445,9 +450,10 @@ export function scheduleDependents(
         }
       }
 
-      // Determine the new start date
+      // Determine the new start/end dates
       let newStart = succStart;
       let newEnd = succEnd;
+      let needsShift = false;
 
       if (latestRequiredStart && latestRequiredStart > succStart) {
         newStart = latestRequiredStart;
@@ -458,7 +464,6 @@ export function scheduleDependents(
       if (latestRequiredEnd) {
         const requiredEnd = latestRequiredEnd;
         if (requiredEnd > newEnd) {
-          // Shift forward to satisfy end constraint, preserving duration
           newEnd = requiredEnd;
           newStart = addDays(newEnd, -duration);
           needsShift = true;
@@ -466,14 +471,43 @@ export function scheduleDependents(
       }
 
       if (needsShift) {
-        successor.startDate = newStart.toISOString().split('T')[0];
-        successor.endDate = newEnd.toISOString().split('T')[0];
-        queue.push(succId); // cascade to its dependents
+        const reqStartISO = newStart.toISOString().split('T')[0];
+        const reqEndISO = newEnd.toISOString().split('T')[0];
+
+        if (conflictMode === 'dont-allow') {
+          // Auto-resolve: shift the item
+          successor.startDate = reqStartISO;
+          successor.endDate = reqEndISO;
+          queue.push(succId);
+        } else if (conflictMode === 'allow-exception') {
+          // Record the conflict but don't shift — keep item in place
+          conflicts.push({
+            itemId: succId,
+            itemName: successor.name,
+            currentStart: successor.startDate,
+            currentEnd: successor.endDate,
+            requiredStart: reqStartISO,
+            requiredEnd: reqEndISO,
+          });
+          // Still cascade through this item's dependents (they may need checking)
+          queue.push(succId);
+        } else {
+          // 'ask' mode: record conflict, don't shift yet
+          conflicts.push({
+            itemId: succId,
+            itemName: successor.name,
+            currentStart: successor.startDate,
+            currentEnd: successor.endDate,
+            requiredStart: reqStartISO,
+            requiredEnd: reqEndISO,
+          });
+          // Don't cascade — user needs to decide first
+        }
       }
     }
   }
 
-  return updated;
+  return { items: updated, conflicts };
 }
 
 /**
@@ -486,7 +520,7 @@ export function shiftDependents(
   items: ProjectItem[],
   dependencies: Dependency[]
 ): ProjectItem[] {
-  return scheduleDependents([movedItemId], items, dependencies);
+  return scheduleDependents([movedItemId], items, dependencies).items;
 }
 
 // ─── Auto Unit Resolution ────────────────────────────────────────────────────
