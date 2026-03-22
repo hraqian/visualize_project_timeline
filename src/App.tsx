@@ -5,6 +5,7 @@ import { TimelineView } from '@/components/TimelineView/TimelineView';
 import type { TimelineViewHandle } from '@/components/TimelineView/TimelineView';
 import { StylePane } from '@/components/StylePane/StylePane';
 import { ProjectManagerModal } from '@/components/common/ProjectManagerModal';
+import { SettingsModal } from '@/components/common/SettingsModal';
 import { toPng } from 'html-to-image';
 import { exportNativePptx } from '@/utils/exportPptx';
 import {
@@ -21,6 +22,7 @@ import {
   ChevronDown,
   Undo2,
   Redo2,
+  Link2,
 } from 'lucide-react';
 import type { ActiveView } from '@/types';
 
@@ -40,10 +42,14 @@ function App() {
   const canRedo = useProjectStore((s) => s.canRedo);
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
+  const showDependencies = useProjectStore((s) => s.showDependencies);
+  const setShowDependencies = useProjectStore((s) => s.setShowDependencies);
+  const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(projectName);
   const [showProjectManager, setShowProjectManager] = useState(true);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const timelineRef = useRef<TimelineViewHandle>(null);
 
@@ -268,7 +274,7 @@ function App() {
           })}
         </div>
 
-        {/* Right: Projects + Export + Settings */}
+        {/* Right: Projects + Dependencies + Export + Settings */}
         <div className="flex items-center gap-2 flex-1 justify-end">
           <button
             onClick={() => setShowProjectManager(true)}
@@ -277,12 +283,20 @@ function App() {
             <FolderOpen size={14} />
             Projects
           </button>
+          {isTimeline && (
+            <DependenciesDropdown
+              showDependencies={showDependencies}
+              onToggleDependencies={() => setShowDependencies(!showDependencies)}
+              showCriticalPath={showCriticalPath}
+            />
+          )}
           <ExportButton
             disabled={!isTimeline}
             onExportPNG={exportPNG}
             onExportPPTX={exportPPTX}
           />
           <button
+            onClick={() => setShowSettingsModal(true)}
             className="p-1.5 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
           >
             <Settings size={16} />
@@ -304,6 +318,9 @@ function App() {
 
       {showProjectManager && (
         <ProjectManagerModal onClose={() => setShowProjectManager(false)} />
+      )}
+      {showSettingsModal && (
+        <SettingsModal onClose={() => setShowSettingsModal(false)} />
       )}
     </div>
   );
@@ -363,6 +380,92 @@ function ExportButton({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Dependencies Dropdown Button ────────────────────────────────────────────
+
+function DependenciesDropdown({
+  showDependencies,
+  onToggleDependencies,
+  showCriticalPath,
+}: {
+  showDependencies: boolean;
+  onToggleDependencies: () => void;
+  showCriticalPath: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
+          showDependencies
+            ? 'text-[#4f46e5] border-[#4f46e5]/30 bg-indigo-50 hover:bg-indigo-100'
+            : 'text-[var(--color-text-secondary)] border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
+        }`}
+      >
+        <Link2 size={14} />
+        Dependencies
+        <ChevronDown size={12} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 min-w-[280px]">
+          {/* Critical Path toggle */}
+          <button
+            className="w-full text-left px-3 py-2 text-sm text-slate-400 cursor-not-allowed flex items-center justify-between"
+          >
+            <span>Critical path</span>
+            <DepToggleSwitch on={showCriticalPath} disabled />
+          </button>
+
+          {/* Separator */}
+          <div className="h-px bg-slate-100 mx-2 my-1" />
+
+          {/* Dependencies toggle */}
+          <button
+            onClick={() => { onToggleDependencies(); setOpen(false); }}
+            className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-700 font-medium">Dependencies</span>
+              <DepToggleSwitch on={showDependencies} />
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Enable or disable the dependency functionality for this timeline.
+            </p>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Toggle Switch (for Dependencies dropdown) ──────────────────────────────
+
+function DepToggleSwitch({ on, disabled }: { on: boolean; disabled?: boolean }) {
+  return (
+    <div
+      className={`relative w-8 h-[18px] rounded-full transition-colors shrink-0 ${
+        disabled ? 'opacity-40' : ''
+      } ${on ? 'bg-green-500' : 'bg-slate-200'}`}
+    >
+      <div
+        className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${
+          on ? 'translate-x-[14px]' : 'translate-x-0.5'
+        }`}
+      />
     </div>
   );
 }

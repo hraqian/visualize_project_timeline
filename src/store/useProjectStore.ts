@@ -6,6 +6,7 @@ import type {
   ProjectItem,
   Swimlane,
   Dependency,
+  DependencySettings,
   ActiveView,
   ItemType,
   TaskStyle,
@@ -17,9 +18,9 @@ import type {
   StylePaneSection,
   TaskLayout,
 } from '@/types';
-import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY } from '@/types';
+import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY, DEFAULT_DEPENDENCY_SETTINGS } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, shiftDependents } from '@/utils';
-import { saveProject as saveProjectToStorage, loadProject as loadProjectFromStorage } from '@/utils/storage';
+import { saveProject as saveProjectToStorage, loadProject as loadProjectFromStorage, getGlobalSettings } from '@/utils/storage';
 
 // ─── Sample Data ─────────────────────────────────────────────────────────────
 
@@ -217,6 +218,10 @@ interface ProjectActions {
   // Column Visibility
   toggleColumn: (column: OptionalColumn) => void;
 
+  // Dependencies toggle
+  setShowDependencies: (show: boolean) => void;
+  setDependencySettings: (settings: Partial<DependencySettings>) => void;
+
   // Multi-select (checkboxes)
   toggleCheckedItem: (id: string) => void;
   checkAllItems: () => void;
@@ -240,6 +245,7 @@ type ProjectStore = ProjectState & ProjectActions;
 const DIRTY_KEYS: Set<string> = new Set([
   'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies',
   'statusLabels', 'columnVisibility', 'timescale', 'zoom', 'swimlaneSpacing', 'showCriticalPath', 'taskLayout',
+  'showDependencies', 'dependencySettings',
 ]);
 
 // ─── Undo / Redo stacks (kept outside store to avoid triggering re-renders) ──
@@ -302,6 +308,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   selectedSwimlaneId: null,
   stylePaneSection: null,
   showCriticalPath: false,
+  showDependencies: false,
+  dependencySettings: { ...DEFAULT_DEPENDENCY_SETTINGS },
   zoom: 8,
   taskLayout: 'single-row',
   swimlaneSpacing: 5,
@@ -345,6 +353,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   newProject: () => {
     undoStack = [];
     redoStack = [];
+    const globalSettings = getGlobalSettings();
+    const depDefaults = globalSettings.defaultDependencySettings;
     set({
       projectId: uuid(),
       lastModified: null,
@@ -357,7 +367,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       swimlanes: [],
       dependencies: [],
       statusLabels: [...DEFAULT_STATUS_LABELS],
-      columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY },
+      columnVisibility: { ...DEFAULT_COLUMN_VISIBILITY, predecessors: depDefaults.enabled },
       checkedItemIds: [],
       timescale: getDefaultTimescale(),
       activeView: 'data',
@@ -365,6 +375,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       selectedSwimlaneId: null,
       stylePaneSection: null,
       showCriticalPath: false,
+      showDependencies: depDefaults.enabled,
+      dependencySettings: { ...depDefaults },
       zoom: 8,
       taskLayout: 'single-row',
       swimlaneSpacing: 5,
@@ -874,11 +886,28 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
   // ─── Column Visibility ──────────────────────────────────────────────
   toggleColumn: (column) =>
-    set((state) => ({
-      columnVisibility: {
+    set((state) => {
+      const newVis = {
         ...state.columnVisibility,
         [column]: !state.columnVisibility[column],
-      },
+      };
+      // Sync showDependencies with predecessors column
+      if (column === 'predecessors') {
+        return { columnVisibility: newVis, showDependencies: newVis.predecessors };
+      }
+      return { columnVisibility: newVis };
+    }),
+
+  // ─── Dependencies ──────────────────────────────────────────────────
+  setShowDependencies: (show: boolean) =>
+    set((state) => ({
+      showDependencies: show,
+      columnVisibility: { ...state.columnVisibility, predecessors: show },
+    })),
+
+  setDependencySettings: (settings: Partial<DependencySettings>) =>
+    set((state) => ({
+      dependencySettings: { ...state.dependencySettings, ...settings },
     })),
 
   // ─── Multi-select (checkboxes) ─────────────────────────────────────

@@ -299,18 +299,35 @@ export type TaskLayout = 'single-row' | 'packed' | 'one-per-row';
 
 export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector' | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector' | 'swimlaneTitle' | 'swimlaneBackground' | 'swimlaneSpacing' | 'scale' | 'todayMarker' | 'elapsedTime' | 'leftEndCap' | 'rightEndCap';
 
-export type OptionalColumn = 'percentComplete' | 'assignedTo' | 'status';
+export type OptionalColumn = 'percentComplete' | 'assignedTo' | 'status' | 'predecessors';
 
 export interface ColumnVisibility {
   percentComplete: boolean;
   assignedTo: boolean;
   status: boolean;
+  predecessors: boolean;
 }
 
 export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
   percentComplete: true,
   assignedTo: true,
   status: true,
+  predecessors: false,
+};
+
+export type DependencyConflictMode = 'dont-allow' | 'allow-exception' | 'ask';
+export type DependencySchedulingMode = 'automatic-flexible' | 'automatic-strict' | 'manual';
+
+export interface DependencySettings {
+  enabled: boolean;
+  schedulingMode: DependencySchedulingMode;
+  conflictMode: DependencyConflictMode; // only applies when schedulingMode === 'automatic-flexible'
+}
+
+export const DEFAULT_DEPENDENCY_SETTINGS: DependencySettings = {
+  enabled: false,
+  schedulingMode: 'manual',
+  conflictMode: 'ask',
 };
 
 export interface ProjectState {
@@ -333,6 +350,8 @@ export interface ProjectState {
   selectedSwimlaneId: string | null;
   stylePaneSection: StylePaneSection | null; // which collapsible section is expanded in StylePane
   showCriticalPath: boolean;
+  showDependencies: boolean; // master toggle — controls dep lines on timeline + Predecessors column in DataView
+  dependencySettings: DependencySettings; // scheduling mode config (per-project)
   zoom: number; // pixels per day
   taskLayout: TaskLayout; // how tasks are arranged vertically in swimlanes
   swimlaneSpacing: number; // px gap between swimlane bands

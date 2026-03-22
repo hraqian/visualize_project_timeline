@@ -69,6 +69,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
   const moveItem = useProjectStore((s) => s.moveItem);
   const moveItemToSwimlane = useProjectStore((s) => s.moveItemToSwimlane);
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
+  const showDependencies = useProjectStore((s) => s.showDependencies);
   const swimlaneSpacing = useProjectStore((s) => s.swimlaneSpacing);
   const taskLayout = useProjectStore((s) => s.taskLayout);
   const selectedTierIndex = useProjectStore((s) => s.selectedTierIndex);
@@ -270,6 +271,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
 
   // Dependency lines SVG paths
   const depPaths = useMemo(() => {
+    if (!showDependencies) return [];
     return dependencies
       .map((dep) => {
         const from = visibleItems.find((i) => i.id === dep.fromId);
@@ -302,7 +304,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
         return { path, isCritical, key: `${dep.fromId}-${dep.toId}` };
       })
       .filter(Boolean);
-  }, [dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRow]);
+  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRow]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
   const verticalConnectors = useMemo(() => {

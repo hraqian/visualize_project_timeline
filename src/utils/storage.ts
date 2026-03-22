@@ -1,7 +1,9 @@
-import type { ProjectState } from '@/types';
+import type { ProjectState, DependencySettings } from '@/types';
+import { DEFAULT_DEPENDENCY_SETTINGS } from '@/types';
 
 const PROJECTS_INDEX_KEY = 'pt_projects_index';
 const PROJECT_DATA_PREFIX = 'pt_project_';
+const GLOBAL_SETTINGS_KEY = 'pt_global_settings';
 
 export interface ProjectIndexEntry {
   id: string;
@@ -25,6 +27,8 @@ const SAVEABLE_KEYS: (keyof ProjectState)[] = [
   'taskLayout',
   'swimlaneSpacing',
   'showCriticalPath',
+  'showDependencies',
+  'dependencySettings',
 ];
 
 /**
@@ -93,4 +97,28 @@ export function deleteProject(id: string): void {
   localStorage.removeItem(PROJECT_DATA_PREFIX + id);
   const index = getProjectIndex().filter((e) => e.id !== id);
   setProjectIndex(index);
+}
+
+// ─── Global Settings (apply to new timelines) ────────────────────────────
+
+export interface GlobalSettings {
+  defaultDependencySettings: DependencySettings;
+}
+
+const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
+  defaultDependencySettings: { ...DEFAULT_DEPENDENCY_SETTINGS },
+};
+
+export function getGlobalSettings(): GlobalSettings {
+  try {
+    const raw = localStorage.getItem(GLOBAL_SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_GLOBAL_SETTINGS };
+    return { ...DEFAULT_GLOBAL_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULT_GLOBAL_SETTINGS };
+  }
+}
+
+export function saveGlobalSettings(settings: GlobalSettings): void {
+  localStorage.setItem(GLOBAL_SETTINGS_KEY, JSON.stringify(settings));
 }

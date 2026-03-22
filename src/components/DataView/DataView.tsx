@@ -21,7 +21,7 @@ import {
   ListPlus,
 } from 'lucide-react';
 import { TypePickerCell } from './TypePicker';
-import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn, ProjectItem } from '@/types';
+import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn, ProjectItem, ColumnVisibility } from '@/types';
 import { PRESET_COLORS } from '@/types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,6 +44,7 @@ const OPTIONAL_COLUMN_LABELS: Record<OptionalColumn, string> = {
   percentComplete: '% Complete',
   assignedTo: 'Assigned To',
   status: 'Status',
+  predecessors: 'Predecessors',
 };
 
 // ─── Tooltip ─────────────────────────────────────────────────────────────────
@@ -163,7 +164,8 @@ export function DataView() {
   // + optional columns + actions column + column-config column = +2
   const visibleOptionalCount = (columnVisibility.percentComplete ? 1 : 0)
     + (columnVisibility.assignedTo ? 1 : 0)
-    + (columnVisibility.status ? 1 : 0);
+    + (columnVisibility.status ? 1 : 0)
+    + (columnVisibility.predecessors ? 1 : 0);
   const totalColumns = 6 + visibleOptionalCount + 2; // 6 fixed + optionals + actions + config
 
   const toggleCollapse = (id: string) => {
@@ -304,6 +306,9 @@ export function DataView() {
               {columnVisibility.status && (
                 <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-36">Status</th>
               )}
+              {columnVisibility.predecessors && (
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-36">Predecessors</th>
+              )}
               <th className="w-10 px-2 py-2.5" />
               <th className="w-10 px-1 py-2.5">
                 <ColumnConfigButton
@@ -317,6 +322,7 @@ export function DataView() {
             {/* Independent items (no swimlane) */}
             <IndependentItemsGroup
               items={independentItems}
+              allItems={items}
               statusLabels={statusLabels}
               columnVisibility={columnVisibility}
               totalColumns={totalColumns}
@@ -361,6 +367,7 @@ export function DataView() {
                   swimlane={swimlane}
                   swimlaneIndex={idx}
                   items={swimItems}
+                  allItems={items}
                   statusLabels={statusLabels}
                   columnVisibility={columnVisibility}
                   totalColumns={totalColumns}
@@ -564,7 +571,7 @@ function ColumnConfigButton({
   columnVisibility,
   onToggle,
 }: {
-  columnVisibility: { percentComplete: boolean; assignedTo: boolean; status: boolean };
+  columnVisibility: ColumnVisibility;
   onToggle: (column: OptionalColumn) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -578,7 +585,7 @@ function ColumnConfigButton({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const columns: OptionalColumn[] = ['percentComplete', 'assignedTo', 'status'];
+  const columns: OptionalColumn[] = ['percentComplete', 'assignedTo', 'status', 'predecessors'];
 
   return (
     <div className="relative" ref={ref}>
@@ -691,8 +698,9 @@ export function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlan
 
 interface IndependentItemsGroupProps {
   items: ReturnType<typeof useProjectStore.getState>['items'];
+  allItems: ProjectItem[];
   statusLabels: StatusLabel[];
-  columnVisibility: { percentComplete: boolean; assignedTo: boolean; status: boolean };
+  columnVisibility: ColumnVisibility;
   totalColumns: number;
   checkedItemIds: string[];
   onToggleChecked: (id: string) => void;
@@ -722,6 +730,7 @@ interface IndependentItemsGroupProps {
 
 function IndependentItemsGroup({
   items: indItems,
+  allItems,
   statusLabels,
   columnVisibility,
   totalColumns,
@@ -771,6 +780,7 @@ function IndependentItemsGroup({
         <ItemRow
           key={item.id}
           item={item}
+          allItems={allItems}
           statusLabels={statusLabels}
           columnVisibility={columnVisibility}
           isSelected={selectedItemId === item.id}
@@ -827,8 +837,9 @@ function IndependentItemsGroup({
 interface SwimlaneGroupProps {
   swimlane: { id: string; name: string; color: string; order: number };
   items: ReturnType<typeof useProjectStore.getState>['items'];
+  allItems: ProjectItem[];
   statusLabels: StatusLabel[];
-  columnVisibility: { percentComplete: boolean; assignedTo: boolean; status: boolean };
+  columnVisibility: ColumnVisibility;
   totalColumns: number;
   isCollapsed: boolean;
   checkedItemIds: string[];
@@ -875,6 +886,7 @@ interface SwimlaneGroupProps {
 function SwimlaneGroup({
   swimlane,
   items: swimItems,
+  allItems,
   statusLabels,
   columnVisibility,
   totalColumns,
@@ -1030,6 +1042,7 @@ function SwimlaneGroup({
           <ItemRow
             key={item.id}
             item={item}
+            allItems={allItems}
             statusLabels={statusLabels}
             columnVisibility={columnVisibility}
             isSelected={selectedItemId === item.id}
@@ -1078,8 +1091,9 @@ function SwimlaneGroup({
 
 interface ItemRowProps {
   item: ReturnType<typeof useProjectStore.getState>['items'][0];
+  allItems: ProjectItem[];
   statusLabels: StatusLabel[];
-  columnVisibility: { percentComplete: boolean; assignedTo: boolean; status: boolean };
+  columnVisibility: ColumnVisibility;
   isSelected: boolean;
   isChecked: boolean;
   hasAnyChecked: boolean;
@@ -1107,6 +1121,7 @@ interface ItemRowProps {
 
 function ItemRow({
   item,
+  allItems,
   statusLabels,
   columnVisibility,
   isSelected,
@@ -1421,6 +1436,23 @@ function ItemRow({
             onChange={(statusId) => onUpdateItem(item.id, { statusId })}
             onAddStatusLabel={onAddStatusLabel}
           />
+        </td>
+      )}
+
+      {/* Predecessors */}
+      {columnVisibility.predecessors && (
+        <td className="px-3 py-2">
+          <span className="text-xs text-slate-400 truncate block max-w-[140px]">
+            {item.dependsOn.length > 0
+              ? item.dependsOn
+                  .map((depId) => {
+                    const dep = allItems.find((i) => i.id === depId);
+                    return dep ? dep.name : '';
+                  })
+                  .filter(Boolean)
+                  .join(', ')
+              : '\u2014'}
+          </span>
         </td>
       )}
 
