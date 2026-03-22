@@ -405,6 +405,19 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
 
   const belowMilestoneGap = 4; // px between timescale bar bottom edge and milestone top edge
 
+  // Drag guide: compute snapped position and new dates
+  const dragGuide = useMemo(() => {
+    if (!draggingId || dragOffset === 0) return null;
+    const item = items.find((i) => i.id === draggingId);
+    if (!item) return null;
+    const daysDelta = Math.round(dragOffset / zoom);
+    if (daysDelta === 0) return null;
+    const snappedOffsetPx = daysDelta * zoom;
+    const newStart = addDays(parseISO(item.startDate), daysDelta);
+    const newEnd = addDays(parseISO(item.endDate), daysDelta);
+    return { item, daysDelta, snappedOffsetPx, newStart, newEnd };
+  }, [draggingId, dragOffset, zoom, items]);
+
   const renderItem = (item: ProjectItem, yBase: number) => {
     const x = itemToX(item.startDate);
     const y = yBase + getRow(item) * ROW_HEIGHT;
@@ -450,6 +463,70 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
         onClickBar={() => { setSelectedItem(item.id); setStylePaneSection('bar'); }}
         onClickSection={(section) => { setSelectedItem(item.id); setStylePaneSection(section); }}
       />
+    );
+  };
+
+  // Render drag guide (dashed outline at snapped position + date tooltip)
+  const renderDragGuide = (yBase: number) => {
+    if (!dragGuide) return null;
+    const { item, snappedOffsetPx, newStart, newEnd } = dragGuide;
+    const x = itemToX(item.startDate);
+    const y = yBase + getRow(item) * ROW_HEIGHT;
+
+    if (item.type === 'milestone') {
+      const iconSize = item.milestoneStyle.size;
+      const cx = x + snappedOffsetPx;
+      const cy = y + (ROW_HEIGHT - iconSize) / 2;
+      return (
+        <div
+          key="drag-guide"
+          className="absolute pointer-events-none z-20"
+          style={{ left: cx - iconSize / 2, top: cy, width: iconSize, height: iconSize }}
+        >
+          <div
+            className="w-full h-full border-2 border-dashed border-slate-400 rotate-45"
+          />
+          <div
+            className="absolute left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap px-2 py-1 rounded text-xs font-medium text-white bg-slate-700 shadow-lg"
+            style={{ top: '100%' }}
+          >
+            {format(newStart, 'EEE, MMM d, yyyy')}
+          </div>
+        </div>
+      );
+    }
+
+    const width = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+    const barHeight = item.taskStyle.thickness;
+    const barY = y + (ROW_HEIGHT - barHeight) / 2;
+    const w = Math.max(width, 8);
+
+    return (
+      <div key="drag-guide" className="absolute pointer-events-none z-20">
+        {/* Dashed outline at snapped position */}
+        <div
+          className="absolute border-2 border-dashed border-slate-400 rounded"
+          style={{
+            left: x + snappedOffsetPx,
+            top: barY,
+            width: w,
+            height: barHeight,
+          }}
+        />
+        {/* Date tooltip */}
+        <div
+          className="absolute whitespace-nowrap px-2.5 py-1.5 rounded text-xs font-medium text-white bg-slate-700 shadow-lg"
+          style={{
+            left: x + snappedOffsetPx + w / 2,
+            top: barY + barHeight + 6,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          {format(newStart, 'EEE, MMM d, yyyy')}
+          <span className="mx-1.5 text-white/50">&mdash;</span>
+          {format(newEnd, 'EEE, MMM d, yyyy')}
+        </div>
+      </div>
     );
   };
 
@@ -775,6 +852,16 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
               if (!sl) return null;
               return renderItem(item, sl.contentY);
             })}
+
+            {/* ─── Drag guide (dashed outline + date tooltip) ─── */}
+            {dragGuide && (() => {
+              const { item } = dragGuide;
+              if (!item.swimlaneId || !swimlaneIds.has(item.swimlaneId)) {
+                return renderDragGuide(INDEPENDENT_SECTION_PADDING);
+              }
+              const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
+              return sl ? renderDragGuide(sl.contentY) : null;
+            })()}
           </div>
         </div>
       </div>
@@ -869,7 +956,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
 
   return (
     <div
-      className={`absolute cursor-grab select-none group ${isDragging ? 'cursor-grabbing z-30 opacity-80' : 'z-10'}`}
+      className={`absolute cursor-grab select-none group ${isDragging ? 'cursor-grabbing z-30 opacity-50' : 'z-10'}`}
       style={{
         left: x,
         top: barY,
@@ -1161,7 +1248,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
 
     return (
       <div
-        className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30 opacity-80' : 'z-10'}`}
+        className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30 opacity-50' : 'z-10'}`}
         style={{
           left: x - style.size / 2,
           top: iconTop,
@@ -1214,7 +1301,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
 
   return (
     <div
-      className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30 opacity-80' : 'z-10'}`}
+      className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30 opacity-50' : 'z-10'}`}
       style={{
         left: x - style.size / 2,
         top: iconTop,
