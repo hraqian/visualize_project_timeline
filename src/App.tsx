@@ -107,13 +107,21 @@ function App() {
   }, []);
 
   const exportPNG = useCallback(async () => {
+    // If on Data view, switch to Timeline so the canvas is rendered
+    const wasOnData = activeView !== 'timeline';
+    if (wasOnData) {
+      setActiveView('timeline');
+      // Wait a frame for TimelineView to mount and render
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    }
     const dataUrl = await captureTimeline();
+    if (wasOnData) setActiveView('data');
     if (!dataUrl) return;
     const link = document.createElement('a');
     link.download = `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
     link.href = dataUrl;
     link.click();
-  }, [captureTimeline, projectName]);
+  }, [captureTimeline, projectName, activeView, setActiveView]);
 
   const exportPPTX = useCallback(async () => {
     const store = useProjectStore.getState();
@@ -291,7 +299,7 @@ function App() {
             />
           )}
           <ExportButton
-            disabled={!isTimeline}
+            disabled={false}
             onExportPNG={exportPNG}
             onExportPPTX={exportPPTX}
           />
