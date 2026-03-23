@@ -368,7 +368,9 @@ function drawTimescale(
     });
 
     // Cell labels
-    const cellWidthPx = cells.length > 0 ? cells[0].widthFrac * ctx.totalWidth : 0;
+    let repFrac = 0;
+    for (const cell of cells) { if (cell.widthFrac > repFrac) repFrac = cell.widthFrac; }
+    const cellWidthPx = repFrac * ctx.totalWidth;
     const baseFontSize = (tier.fontSizeAuto ?? true)
       ? computeAutoFontSize(cells, tier.fontFamily, tier.fontWeight, tier.fontStyle, cellWidthPx, 12)
       : tier.fontSize;

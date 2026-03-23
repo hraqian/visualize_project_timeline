@@ -2883,7 +2883,9 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                   {previewTierLabels.map(({ tier, cells }, tierIdx) => {
                     // Compute cell width for auto font sizing (preview uses percentage-based layout)
                     const previewBarWidth = 920; // matches BAR_WIDTH_PX used in previewTierLabels
-                    const cellWidthPx = cells.length > 0 ? cells[0].widthFrac * previewBarWidth : 0;
+                    let repFrac = 0;
+                    for (const cell of cells) { if (cell.widthFrac > repFrac) repFrac = cell.widthFrac; }
+                    const cellWidthPx = repFrac * previewBarWidth;
                     const effectiveFontSize = (tier.fontSizeAuto ?? true)
                       ? Math.min(computeAutoFontSize(cells, tier.fontFamily, tier.fontWeight, tier.fontStyle, cellWidthPx, 12), 12)
                       : Math.min(tier.fontSize, 12);

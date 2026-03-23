@@ -561,8 +561,12 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                     const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
                     const isSelected = selectedTierIndex === storeIndex;
 
-                    // Compute cell width in px (all cells are equal width)
-                    const cellWidthPx = cells.length > 0 ? cells[0].widthFrac * totalWidth : 0;
+                    // Compute cell width in px — use the widest interior cell (first cell may be partial/degenerate)
+                    let representativeFrac = 0;
+                    for (const cell of cells) {
+                      if (cell.widthFrac > representativeFrac) representativeFrac = cell.widthFrac;
+                    }
+                    const cellWidthPx = representativeFrac * totalWidth;
 
                     // Auto font sizing: pick optimal size to fit the longest label (first cell with prefix)
                     const effectiveFontSize = (tier.fontSizeAuto ?? true)
