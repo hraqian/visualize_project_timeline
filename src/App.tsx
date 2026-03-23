@@ -52,8 +52,15 @@ function App() {
   const [nameValue, setNameValue] = useState(projectName);
   const [showProjectManager, setShowProjectManager] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [saveFlash, setSaveFlash] = useState(false);
 
   const timelineRef = useRef<TimelineViewHandle>(null);
+
+  const handleSave = useCallback(async () => {
+    await saveProject();
+    setSaveFlash(true);
+    setTimeout(() => setSaveFlash(false), 1500);
+  }, [saveProject]);
 
   const commitName = useCallback(() => {
     const trimmed = nameValue.trim();
@@ -69,11 +76,11 @@ function App() {
       if (!meta) return;
       if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
       else if (e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
-      else if (e.key === 's') { e.preventDefault(); saveProject(); }
+      else if (e.key === 's') { e.preventDefault(); handleSave(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo, saveProject]);
+  }, [undo, redo, handleSave]);
 
   const handleAddTask = useCallback(() => {
     const targetSwimlane = swimlanes.length > 0
@@ -153,7 +160,7 @@ function App() {
         {/* Left: Save + Undo/Redo */}
         <div className="flex items-center gap-1 flex-1 min-w-0">
           <button
-            onClick={() => saveProject()}
+            onClick={handleSave}
             className="p-1.5 rounded text-white/70 hover:text-white hover:bg-white/15 transition-all"
             title="Save"
           >
@@ -205,7 +212,7 @@ function App() {
           >
             <span>{projectName}</span>
             <span className="text-xs font-normal text-white/60">
-              {isDirty ? '- Unsaved changes' : '- Saved'}
+              {saveFlash ? '- Saved!' : isDirty ? '- Unsaved changes' : '- Saved'}
             </span>
             <Pencil
               size={12}
