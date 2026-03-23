@@ -298,17 +298,21 @@ export function buildVisibleTierCells(
   }
 
   // Build cells — origin and end are aligned to unit boundaries so no partial cells
-  const cells: TierCell[] = [];
+  const rawCells: TierCell[] = [];
   for (let i = 0; i < labels.length; i += skipFactor) {
     const startFrac = Math.max(differenceInDays(labels[i].startDate, originDate) / totalDays, 0);
     const endIdx = Math.min(i + skipFactor, labels.length) - 1;
     const endFrac = Math.min((differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays, 1);
-    cells.push({
+    rawCells.push({
       label: labels[i].label,
       fraction: startFrac,
-      widthFrac: Math.max(endFrac - startFrac, 0.001),
+      widthFrac: endFrac - startFrac,
     });
   }
+
+  // Drop degenerate slivers (< 1% of a full cell) — these are alignment artifacts
+  const fullCellWidth = rawCells.length > 1 ? Math.max(...rawCells.map(c => c.widthFrac)) : 1;
+  const cells = rawCells.filter(c => c.widthFrac >= fullCellWidth * 0.01);
 
   // Prefix first visible label for sequential units (e.g., "Week 9", "Day 1")
   if (cells.length > 0 && (unit === 'week' || unit === 'day')) {
