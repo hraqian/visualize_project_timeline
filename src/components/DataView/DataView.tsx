@@ -320,7 +320,7 @@ export function DataView() {
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-32">Start</th>
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-32">End</th>
               {columnVisibility.percentComplete && (
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-24">% Complete</th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-28 whitespace-nowrap">% Complete</th>
               )}
               {columnVisibility.assignedTo && (
                 <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-36">Assigned To</th>
@@ -332,7 +332,7 @@ export function DataView() {
                 <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-36">Predecessors</th>
               )}
               <th className="w-10 px-2 py-2.5" />
-              <th className="px-1 py-2.5">
+              <th className="px-3 py-2.5">
                 <ColumnConfigButton
                   columnVisibility={columnVisibility}
                   onToggle={toggleColumn}
@@ -1308,7 +1308,7 @@ function ItemRow({
         </tr>
       )}
       <tr
-        className={`group/row transition-colors cursor-pointer border-b border-slate-100 ${
+        className={`group/row transition-colors cursor-pointer border-b border-slate-200 ${
           isChecked ? 'bg-indigo-50/60' : isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/80'
         } ${isItemDragging ? 'opacity-50' : ''}`}
         onClick={() => onSelectItem(item.id)}
@@ -1497,16 +1497,27 @@ function ItemRow({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span
-            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              setProgressValue(String(item.percentComplete));
-              setEditingProgress(true);
+            <div
+              className="flex items-center gap-1.5 cursor-pointer group/pct"
+              onClick={(e) => {
+                e.stopPropagation();
+                setProgressValue(String(item.percentComplete));
+                setEditingProgress(true);
               }}
             >
-              {item.percentComplete}%
-            </span>
+              <div className="w-10 h-1.5 rounded-full bg-slate-200 overflow-hidden shrink-0">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${item.percentComplete}%`,
+                    backgroundColor: item.percentComplete > 0 ? '#22c55e' : 'transparent',
+                  }}
+                />
+              </div>
+              <span className="text-[11px] text-slate-600 group-hover/pct:text-indigo-600 transition-colors">
+                {item.percentComplete}%
+              </span>
+            </div>
           )}
         </td>
       )}
@@ -1972,7 +1983,7 @@ function InlineAddRow({ onAdd }: { onAdd: (type: ItemType) => void }) {
   return (
     <button
       onClick={() => onAdd('task')}
-      className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-indigo-500 transition-colors py-0.5"
+      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-500 transition-colors py-0.5"
     >
       <Plus size={13} />
       Add task or milestone
