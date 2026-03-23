@@ -1337,7 +1337,7 @@ function SwimlaneGroup({
             />
             {editingName ? (
               <input
-                className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[15px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
+                className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[14px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
                 onFocus={(e) => e.target.select()}
@@ -1356,7 +1356,7 @@ function SwimlaneGroup({
               />
             ) : (
               <span
-                className="font-semibold text-[15px] text-slate-700 cursor-text rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:ring-1 hover:ring-slate-300 transition-all"
+                className="font-semibold text-[14px] text-slate-800 cursor-text rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:ring-1 hover:ring-slate-300 transition-all"
                 onClick={(e) => {
                   e.stopPropagation();
                   setEditingName(true);
