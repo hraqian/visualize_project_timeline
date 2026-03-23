@@ -1678,7 +1678,7 @@ function ItemRow({
       {/* Title */}
       <td
         ref={(el) => { cellRefs.current['title'] = el; }}
-        className={`pl-3 pr-4 py-3 ${focusedColumn === 'title' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+        className={`pl-3 pr-4 py-3 ${focusedColumn === 'title' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
       >
         <input
           ref={nameRef}
@@ -1696,7 +1696,7 @@ function ItemRow({
       {/* Type */}
       <td
         ref={(el) => { cellRefs.current['type'] = el; }}
-        className={`px-3 py-3 ${focusedColumn === 'type' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+        className={`px-3 py-3 ${focusedColumn === 'type' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
         tabIndex={focusedColumn === 'type' ? 0 : -1}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -1721,7 +1721,7 @@ function ItemRow({
       {/* Duration */}
       <td
         ref={(el) => { cellRefs.current['duration'] = el; }}
-        className={`px-3 py-3 ${focusedColumn === 'duration' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+        className={`px-3 py-3 ${focusedColumn === 'duration' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
         tabIndex={focusedColumn === 'duration' ? 0 : -1}
         onKeyDown={(e) => {
           if (!editingDuration) {
@@ -1791,7 +1791,7 @@ function ItemRow({
       {/* Start Date */}
       <td
         ref={(el) => { cellRefs.current['startDate'] = el; }}
-        className={`px-3 py-3 ${focusedColumn === 'startDate' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+        className={`px-3 py-3 ${focusedColumn === 'startDate' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
         tabIndex={focusedColumn === 'startDate' ? 0 : -1}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -1837,7 +1837,7 @@ function ItemRow({
       {/* End Date */}
       <td
         ref={(el) => { cellRefs.current['endDate'] = el; }}
-        className={`px-3 py-3 ${focusedColumn === 'endDate' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+        className={`px-3 py-3 ${focusedColumn === 'endDate' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
         tabIndex={focusedColumn === 'endDate' ? 0 : -1}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -1884,7 +1884,7 @@ function ItemRow({
       {columnVisibility.percentComplete && (
         <td
           ref={(el) => { cellRefs.current['percentComplete'] = el; }}
-          className={`px-3 py-3 ${focusedColumn === 'percentComplete' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+          className={`px-3 py-3 ${focusedColumn === 'percentComplete' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
           tabIndex={focusedColumn === 'percentComplete' ? 0 : -1}
           onKeyDown={(e) => {
             if (!editingProgress) {
@@ -1968,7 +1968,7 @@ function ItemRow({
       {columnVisibility.assignedTo && (
         <td
           ref={(el) => { cellRefs.current['assignedTo'] = el; }}
-          className={`px-3 py-3 ${focusedColumn === 'assignedTo' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+          className={`px-3 py-3 ${focusedColumn === 'assignedTo' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
           tabIndex={focusedColumn === 'assignedTo' ? 0 : -1}
           onKeyDown={(e) => {
             if (!editingAssigned) {
@@ -2051,7 +2051,7 @@ function ItemRow({
       {columnVisibility.status && (
          <td
           ref={(el) => { cellRefs.current['status'] = el; }}
-          className={`px-3 py-3 ${focusedColumn === 'status' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+          className={`px-3 py-3 ${focusedColumn === 'status' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
            tabIndex={focusedColumn === 'status' ? 0 : -1}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -2077,7 +2077,7 @@ function ItemRow({
       {columnVisibility.predecessors && (
         <td
           ref={(el) => { cellRefs.current['predecessors'] = el; }}
-          className={`px-3 py-3 ${focusedColumn === 'predecessors' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+          className={`px-3 py-3 ${focusedColumn === 'predecessors' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
           tabIndex={focusedColumn === 'predecessors' ? 0 : -1}
           onKeyDown={(e) => {
             if (!editingPredecessors) {
