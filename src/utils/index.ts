@@ -332,6 +332,7 @@ function getMeasureCtx(): CanvasRenderingContext2D | null {
 /**
  * Compute the optimal font size so that the longest label fits within cellWidthPx.
  * Uses canvas text measurement for accuracy.
+ * The font is capped so it doesn't exceed the row height (28px) — max ~22px.
  *
  * @param cells         The tier cells (first cell has the prefix, so it's usually longest)
  * @param fontFamily    CSS font family string
@@ -339,8 +340,6 @@ function getMeasureCtx(): CanvasRenderingContext2D | null {
  * @param fontStyle     'normal' | 'italic'
  * @param cellWidthPx   Width of a single cell in pixels
  * @param hPadding      Total horizontal padding inside the cell (left + right)
- * @param minSize       Minimum font size (default 7)
- * @param maxSize       Maximum font size (default 18)
  * @returns             Optimal font size in px
  */
 export function computeAutoFontSize(
@@ -350,31 +349,35 @@ export function computeAutoFontSize(
   fontStyle: 'normal' | 'italic',
   cellWidthPx: number,
   hPadding: number = 12,
-  minSize: number = 7,
-  maxSize: number = 18,
 ): number {
+  const MIN_SIZE = 7;
+  const MAX_SIZE = 22; // row is 28px; cap font so it fits vertically with some margin
   const ctx = getMeasureCtx();
   if (!ctx || cells.length === 0) return 12; // fallback
 
   const availableWidth = cellWidthPx - hPadding;
-  if (availableWidth <= 0) return minSize;
+  if (availableWidth <= 0) return MIN_SIZE;
 
-  // Find the longest label text (usually the first cell with prefix)
+  // Find the longest label by measuring each at a reference size
+  ctx.font = `${fontWeight} ${MAX_SIZE}px ${fontFamily}`;
   let longestLabel = '';
+  let longestWidth = 0;
   for (const cell of cells) {
-    if (cell.label.length > longestLabel.length) {
+    const w = ctx.measureText(cell.label).width;
+    if (w > longestWidth) {
+      longestWidth = w;
       longestLabel = cell.label;
     }
   }
 
   // Binary search for the largest font size that fits
-  let lo = minSize;
-  let hi = maxSize;
-  let best = minSize;
+  let lo = MIN_SIZE;
+  let hi = MAX_SIZE;
+  let best = MIN_SIZE;
 
   while (lo <= hi) {
     const mid = Math.round((lo + hi) / 2);
-    ctx.font = `${fontStyle} ${fontWeight} ${mid}px ${fontFamily}`;
+    ctx.font = `${fontWeight} ${mid}px ${fontFamily}`;
     const measured = ctx.measureText(longestLabel).width;
     if (measured <= availableWidth) {
       best = mid;
