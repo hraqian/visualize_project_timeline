@@ -15,20 +15,18 @@ const BAR_SHAPES: BarShape[] = [
   'pointed',
   'arrow-both',
   'notched',
-  'trapezoid',
 ];
 
 const BAR_SHAPE_LABELS: Record<string, string> = {
   square: 'Rectangle',
-  rounded: 'Rounded rectangle',
-  capsule: 'Capsule',
-  chevron: 'Chevron',
-  'double-chevron': 'Double chevron',
-  'arrow-right': 'Arrow',
-  pointed: 'Pointed',
-  'arrow-both': 'Double arrow',
+  rounded: 'Round rectangle',
+  capsule: 'Ellipse',
+  chevron: 'Pentagon',
+  'double-chevron': 'Chevron',
+  'arrow-right': 'Right arrow',
+  pointed: 'Double arrow',
+  'arrow-both': 'Modern',
   notched: 'Leaf',
-  trapezoid: 'Parallelogram',
 };
 
 const MILESTONE_ICONS: MilestoneIcon[] = [

@@ -120,15 +120,14 @@ const MILESTONE_ICONS: { id: MilestoneIcon; label: string }[] = [
 
 const BAR_SHAPES: { id: BarShape; label: string }[] = [
   { id: 'square', label: 'Rectangle' },
-  { id: 'rounded', label: 'Rounded rectangle' },
-  { id: 'capsule', label: 'Capsule' },
-  { id: 'chevron', label: 'Chevron' },
-  { id: 'double-chevron', label: 'Double chevron' },
-  { id: 'arrow-right', label: 'Arrow' },
-  { id: 'pointed', label: 'Pointed' },
-  { id: 'arrow-both', label: 'Double arrow' },
+  { id: 'rounded', label: 'Round rectangle' },
+  { id: 'capsule', label: 'Ellipse' },
+  { id: 'chevron', label: 'Pentagon' },
+  { id: 'double-chevron', label: 'Chevron' },
+  { id: 'arrow-right', label: 'Right arrow' },
+  { id: 'pointed', label: 'Double arrow' },
+  { id: 'arrow-both', label: 'Modern' },
   { id: 'notched', label: 'Leaf' },
-  { id: 'trapezoid', label: 'Parallelogram' },
 ];
 
 const LABEL_POSITIONS: { id: LabelPosition; label: string }[] = [
