@@ -1263,11 +1263,10 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
                   top: '50%',
                   transform: item.percentComplete <= 0
                     ? 'translateY(-50%)'
-                    : item.percentComplete >= 100
-                    ? 'translate(-100%, -50%)'
-                    : 'translate(-50%, -50%)',
+                    : 'translate(-100%, -50%)',
                   maxWidth: 'none',
                   paddingLeft: item.percentComplete <= 0 ? 4 : 0,
+                  paddingRight: item.percentComplete > 0 ? 4 : 0,
                 }
               : style.pctLabelPosition === 'above'
               ? {
