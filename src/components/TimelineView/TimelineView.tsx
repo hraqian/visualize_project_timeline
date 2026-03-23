@@ -584,7 +584,6 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                               fontStyle: tier.fontStyle,
                               textDecoration: tier.textDecoration,
                               justifyContent: 'flex-start',
-                              // Extra padding on first/last cells to clear container border-radius
                               paddingLeft: ci === 0 ? 8 : 4,
                               paddingRight: ci === cells.length - 1 ? 8 : 4,
                             }}

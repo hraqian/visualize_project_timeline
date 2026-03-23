@@ -68,14 +68,19 @@ export function getProjectRangePadded(
 ): { origin: string; totalDays: number; rangeEndDate: Date } {
   const range = getProjectRange(items);
   let padStart = startOfMonth(subDays(parseISO(range.start), 14));
-  let padEnd: Date;
 
-  // Resolve visible tier units and align origin to their boundaries
-  const projectSpan = differenceInDays(parseISO(range.end), parseISO(range.start));
+  // First pass: compute rough padEnd to get totalDays for resolveAutoUnit
+  const roughEndMonth = startOfMonth(parseISO(range.end));
+  const roughNumMonths = differenceInCalendarMonths(roughEndMonth, padStart) + 1;
+  const roughPadEnd = addMonths(padStart, roughNumMonths);
+  const roughTotalDays = differenceInDays(roughPadEnd, padStart);
+
+  // Resolve visible tier units using the padded span (same as TimelineView)
   const visibleUnits = timescale.tiers
     .filter((t) => t.visible)
-    .map((t) => t.unit === 'auto' ? resolveAutoUnit(projectSpan) : t.unit);
+    .map((t) => t.unit === 'auto' ? resolveAutoUnit(roughTotalDays) : t.unit);
 
+  // Align padStart backwards to the earliest unit boundary
   for (const unit of visibleUnits) {
     let aligned: Date;
     switch (unit) {
@@ -88,29 +93,28 @@ export function getProjectRangePadded(
       case 'year':
         aligned = startOfYear(padStart);
         break;
-      default: // day, month — padStart is already month-aligned
+      default:
         aligned = padStart;
     }
     if (aligned < padStart) padStart = aligned;
   }
 
-  // Compute end — start from at least the month after the last item
+  // Compute padEnd from the aligned padStart
   const endMonth = startOfMonth(parseISO(range.end));
   const numMonths = differenceInCalendarMonths(endMonth, padStart) + 1;
-  padEnd = addMonths(padStart, numMonths);
+  let padEnd = addMonths(padStart, numMonths);
 
-  // Extend padEnd to align to full unit boundaries for all visible tiers
+  // Extend padEnd forward to the next full unit boundary
   for (const unit of visibleUnits) {
     let aligned: Date;
     switch (unit) {
       case 'week': {
-        // Extend to the end of the week containing padEnd
         const weekStart = startOfWeek(padEnd, { weekStartsOn: 1 });
         aligned = weekStart < padEnd ? addDays(weekStart, 7) : padEnd;
         break;
       }
       case 'quarter':
-        aligned = startOfQuarter(addMonths(padEnd, 3)); // next quarter start
+        aligned = startOfQuarter(addMonths(padEnd, 3));
         if (aligned <= padEnd) aligned = startOfQuarter(addMonths(padEnd, 6));
         break;
       case 'year':
