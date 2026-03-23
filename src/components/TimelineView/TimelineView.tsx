@@ -503,7 +503,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
       >
         <div style={{
           width: totalWidth + leftCapWidth + rightCapWidth,
-          margin: '0 auto',
+          margin: '12px auto 0',
         }}>
         <div ref={exportRef} style={{
           width: totalWidth,
