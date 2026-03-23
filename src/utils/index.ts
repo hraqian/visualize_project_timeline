@@ -220,6 +220,7 @@ export function buildVisibleTierCells(
   }
 
   // Build cells with skip-factor grouping — clamp last cell to bar edge
+  // First cell is NOT left-clamped so it retains its full unit width (no partial units).
   const cells: TierCell[] = [];
   for (let i = 0; i < labels.length; i += skipFactor) {
     const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
@@ -230,17 +231,15 @@ export function buildVisibleTierCells(
     const clampedEnd = Math.min(endFrac, 1);
     cells.push({
       label: labels[i].label,
-      fraction: Math.max(startFrac, 0),
-      widthFrac: Math.max(clampedEnd - Math.max(startFrac, 0), 0.001),
+      fraction: startFrac,
+      widthFrac: Math.max(clampedEnd - startFrac, 0.001),
     });
   }
 
-  // Prefix all labels for sequential units so the context isn't lost when the first cell is clipped
+  // Prefix first visible label for sequential units
   if (cells.length > 0 && (unit === 'week' || unit === 'day')) {
     const prefix = unit === 'week' ? 'Week ' : 'Day ';
-    for (const cell of cells) {
-      cell.label = prefix + cell.label;
-    }
+    cells[0].label = prefix + cells[0].label;
   }
 
   return cells;
