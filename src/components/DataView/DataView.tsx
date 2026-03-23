@@ -1056,7 +1056,7 @@ function SwimlaneGroup({
         }}
       >
         <td className="pt-8 pb-2.5" colSpan={totalColumns}>
-          <div className="relative flex items-center gap-1.5 pl-5 pr-4">
+          <div className="relative flex items-center gap-2.5 pl-5 pr-4">
             {/* Grip handle — hover only, positioned absolutely so it doesn't shift layout */}
             <GripVertical
               size={14}
