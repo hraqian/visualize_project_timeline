@@ -1419,14 +1419,23 @@ function MilestoneShapeDropdown({
   onChange: (icon: MilestoneIcon) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const updatePos = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.right });
+  };
 
   useEffect(() => {
     if (!open) return;
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -1435,9 +1444,10 @@ function MilestoneShapeDropdown({
   const selectedIcon = MILESTONE_ICONS.find((i) => i.id === value);
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        ref={triggerRef}
+        onClick={() => { if (!open) updatePos(); setOpen(!open); }}
         className="w-full flex items-center gap-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-[var(--color-text)] hover:border-[var(--color-text-muted)] transition-colors"
       >
         <MilestoneIconComponent icon={value} size={16} color={color} />
@@ -1445,8 +1455,12 @@ function MilestoneShapeDropdown({
         <ChevronDown size={12} className={`text-[var(--color-text-muted)]`} />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-[var(--color-border)] rounded-lg shadow-xl p-2">
+      {open && createPortal(
+        <div
+          ref={popoverRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-100%)', zIndex: 9999 }}
+          className="bg-white border border-[var(--color-border)] rounded-lg shadow-xl p-2"
+        >
           <div className="grid grid-cols-6 gap-1">
             {MILESTONE_ICONS.map((ic) => (
               <button
@@ -1463,7 +1477,8 @@ function MilestoneShapeDropdown({
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -2490,30 +2505,46 @@ function TimescaleBarShapeIcon({ shape, size = 24, color = '#475569' }: { shape:
 
 function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarShape; onChange: (v: TimescaleBarShape) => void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const selected = TIMESCALE_BAR_SHAPES.find((s) => s.id === value) ?? TIMESCALE_BAR_SHAPES[1];
+
+  const updatePos = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.right });
+  };
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        ref={triggerRef}
+        onClick={() => { if (!open) updatePos(); setOpen(!open); }}
         className="w-full flex items-center gap-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none hover:border-[var(--color-text-muted)] transition-colors"
       >
         <TimescaleBarShapeIcon shape={value} size={20} />
         <span className="flex-1 text-left truncate font-medium">{selected.label}</span>
         <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
       </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg z-50 p-2 flex gap-1">
+      {open && createPortal(
+        <div
+          ref={popoverRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-100%)', zIndex: 9999 }}
+          className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg p-2 flex gap-1"
+        >
           {TIMESCALE_BAR_SHAPES.map((s) => (
             <button
               key={s.id}
@@ -2526,7 +2557,8 @@ function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarSha
               <TimescaleBarShapeIcon shape={s.id} size={28} />
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

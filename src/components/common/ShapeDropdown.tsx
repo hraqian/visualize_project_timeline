@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import type { BarShape } from '@/types';
 
@@ -88,27 +89,42 @@ const ICON_COLOR = '#475569'; // slate-600 — neutral dark for shape icons
 
 export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.right });
+  }, []);
 
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
     const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setIsOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [isOpen]);
 
+  const handleToggle = () => {
+    if (!isOpen) updatePos();
+    setIsOpen(!isOpen);
+  };
+
   const currentLabel = BAR_SHAPE_OPTIONS.find((s) => s.id === value)?.label ?? value;
 
   return (
-    <div className="relative" ref={dropdownRef}>
+    <div className="relative">
       {/* Trigger — small icon + name + chevron */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={triggerRef}
+        onClick={handleToggle}
         className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-text-muted)] transition-colors text-sm text-[var(--color-text)] w-full"
       >
         <ShapePreview shape={value} color={ICON_COLOR} width={18} height={10} />
@@ -116,10 +132,14 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
         <ChevronDown size={14} className="text-[var(--color-text-muted)] shrink-0" />
       </button>
 
-      {/* Dropdown — grid of shape icons */}
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl p-2">
-          <div className="grid grid-cols-6 gap-1">
+      {/* Dropdown — portal to body so it escapes overflow clipping */}
+      {isOpen && createPortal(
+        <div
+          ref={popoverRef}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-100%)', zIndex: 9999 }}
+          className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl p-2"
+        >
+          <div className="grid grid-cols-5 gap-1">
             {BAR_SHAPE_OPTIONS.map((shape) => (
               <button
                 key={shape.id}
@@ -138,7 +158,8 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
