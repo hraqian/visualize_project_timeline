@@ -200,6 +200,10 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
 
   const totalWidth = totalDays * zoom;
 
+  // Reserve horizontal space for end cap labels so they don't get clipped
+  const leftCapWidth = timescale.leftEndCap?.show ? (timescale.leftEndCap.fontSize ?? 16) * 3 + 12 : 0;
+  const rightCapWidth = timescale.rightEndCap?.show ? (timescale.rightEndCap.fontSize ?? 16) * 3 + 12 : 0;
+
   // Map item to x position
   const itemToX = useCallback(
     (date: string) => differenceInDays(parseISO(date), parseISO(origin)) * zoom,
@@ -497,7 +501,12 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
           setStylePaneSection(null);
         }}
       >
-        <div ref={exportRef} style={{ width: totalWidth, position: 'relative', margin: '0 auto' }}>
+        <div ref={exportRef} style={{
+          width: totalWidth,
+          position: 'relative',
+          marginLeft: leftCapWidth > 0 || rightCapWidth > 0 ? leftCapWidth : 'auto',
+          marginRight: leftCapWidth > 0 || rightCapWidth > 0 ? rightCapWidth : 'auto',
+        }}>
           {/* ─── "Above" milestones row (before sticky timescale header) ─── */}
           {aboveHeight > 0 && (
             <div className="relative" style={{ height: aboveHeight }}>
