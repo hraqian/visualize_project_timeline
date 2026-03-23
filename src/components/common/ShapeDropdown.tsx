@@ -22,30 +22,76 @@ export const BAR_SHAPE_OPTIONS: { id: BarShape; label: string }[] = [
 function getShapeStyle(shape: BarShape, width: number, height: number): React.CSSProperties {
   const insetPx = height * 0.4;
   const insetPct = (insetPx / width) * 100;
+  const smallInset = insetPct * 0.5;
 
   switch (shape) {
-    case 'rounded':
-      return { borderRadius: height / 2 };
     case 'square':
       return { borderRadius: 3 };
+    case 'rounded':
+      return { borderRadius: height * 0.3 };
     case 'capsule':
       return { borderRadius: height };
     case 'flat':
       return { borderRadius: 0 };
     case 'chevron':
+      // Pentagon: flat left, pointed right
       return { clipPath: `polygon(0% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, 0% 100%)` };
     case 'double-chevron':
-      return { clipPath: `polygon(${insetPct}% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${insetPct}% 100%, 0% 50%)` };
+      // Chevron: shallow V-notch left folding right, pointed right
+      return { clipPath: `polygon(0% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, 0% 100%, ${smallInset}% 50%)` };
     case 'arrow-right':
-      return { clipPath: `polygon(0% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, 0% 100%)` };
+      // Right arrow: flat left, narrow pointed right
+      return { clipPath: `polygon(0% 15%, ${100 - insetPct}% 15%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${100 - insetPct}% 85%, 0% 85%)` };
     case 'pointed':
-      return { clipPath: `polygon(${insetPct}% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${insetPct}% 100%, 0% 50%)` };
+      // Double arrow: banner arrow on both sides (mirror of arrow-right)
+      return { clipPath: `polygon(${insetPct}% 15%, ${100 - insetPct}% 15%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${100 - insetPct}% 85%, ${insetPct}% 85%, ${insetPct}% 100%, 0% 50%, ${insetPct}% 0%)` };
+    case 'arrow-both':
+      // Modern: parallelogram slanting right, all corners rounded
+      //   TL=(s,0)  TR=(w,0)  BR=(w-s,h)  BL=(0,h)
+      //   Angle between left/bottom and right/top edges ≈ 75°
+      { const s = height / Math.tan((75 * Math.PI) / 180); // ~h * 0.268
+        const r = Math.min(height * 0.3, s * 0.8);        // acute corners (TL, BR)
+        const rBig = r * 2.5;                              // obtuse corners (TR, BL) — rounder
+        const w = width, h = height;
+        const len = Math.sqrt(s * s + h * h);
+        const dx = (s / len) * r, dy = (h / len) * r;
+        const dxB = (s / len) * rBig, dyB = (h / len) * rBig;
+        return { clipPath: `path('`
+          + `M ${s + r} 0 `                                    // start after TL round
+          + `L ${w - rBig} 0 `                                 // top edge to before TR
+          + `Q ${w} 0 ${w - dxB} ${dyB} `                     // TR corner (rounder)
+          + `L ${w - s + dx} ${h - dy} `                        // right edge to before BR
+          + `Q ${w - s} ${h} ${w - s - r} ${h} `               // BR corner
+          + `L ${rBig} ${h} `                                   // bottom edge to before BL
+          + `Q 0 ${h} ${dxB} ${h - dyB} `                      // BL corner (rounder)
+          + `L ${s - dx} ${dy} `                                // left edge to before TL
+          + `Q ${s} 0 ${s + r} 0 `                              // TL corner
+          + `Z')` };
+      }
     case 'notched':
-      return { clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, ${insetPct}% 50%)` };
+      // Leaf: same parallelogram as Modern, but TR and BL corners much less rounded (nearly sharp)
+      // giving a "pulled" leaf-like appearance at those corners
+      { const s2 = height / Math.tan((75 * Math.PI) / 180);
+        const r2 = Math.min(height * 0.3, s2 * 0.8);         // TL, BR corners (full round)
+        const rSmall = r2 * 0.25;                              // TR, BL corners (nearly sharp)
+        const w2 = width, h2 = height;
+        const len2 = Math.sqrt(s2 * s2 + h2 * h2);
+        const dx2 = (s2 / len2) * r2, dy2 = (h2 / len2) * r2;
+        const dxS = (s2 / len2) * rSmall, dyS = (h2 / len2) * rSmall;
+        return { clipPath: `path('`
+          + `M ${s2 + r2} 0 `                                   // start after TL round
+          + `L ${w2 - rSmall} 0 `                               // top edge to before TR
+          + `Q ${w2} 0 ${w2 - dxS} ${dyS} `                    // TR corner (small round)
+          + `L ${w2 - s2 + dx2} ${h2 - dy2} `                   // right edge to before BR
+          + `Q ${w2 - s2} ${h2} ${w2 - s2 - r2} ${h2} `        // BR corner (full round)
+          + `L ${rSmall} ${h2} `                                 // bottom edge to before BL
+          + `Q 0 ${h2} ${dxS} ${h2 - dyS} `                    // BL corner (small round)
+          + `L ${s2 - dx2} ${dy2} `                              // left edge to before TL
+          + `Q ${s2} 0 ${s2 + r2} 0 `                           // TL corner (full round)
+          + `Z')` };
+      }
     case 'tab':
       return { clipPath: `polygon(0% 0%, 100% 0%, ${100 - insetPct}% 100%, ${insetPct}% 100%)` };
-    case 'arrow-both':
-      return { clipPath: `polygon(${insetPct}% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${insetPct}% 100%, 0% 50%)` };
     case 'trapezoid':
       return { clipPath: `polygon(${insetPct}% 0%, ${100 - insetPct}% 0%, 100% 100%, 0% 100%)` };
     default:

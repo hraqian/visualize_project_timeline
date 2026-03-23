@@ -69,19 +69,32 @@ function TaskShapePreview({ shape, color, size = 32 }: { shape: BarShape; color:
   const w = size;
   const h = size * 0.55;
   const inset = h * 0.35;
+  const smallInset = inset * 0.5;
+
+  // Parallelogram helpers for arrow-both and notched
+  const s = h / Math.tan((75 * Math.PI) / 180);
+  const r = Math.min(h * 0.3, s * 0.8);
+  const rBig = r * 2.5;
+  const len = Math.sqrt(s * s + h * h);
+  const dx = (s / len) * r, dy = (h / len) * r;
+  const dxB = (s / len) * rBig, dyB = (h / len) * rBig;
+  const rSmall = r * 0.25;
+  const dxS = (s / len) * rSmall, dyS = (h / len) * rSmall;
+
+  const rr = h * 0.3; // rounded rectangle corner radius
 
   const paths: Record<BarShape, string> = {
     square: `M1,1 H${w - 1} V${h - 1} H1 Z`,
-    rounded: `M${h / 3},1 H${w - h / 3} Q${w - 1},1 ${w - 1},${h / 2} Q${w - 1},${h - 1} ${w - h / 3},${h - 1} H${h / 3} Q1,${h - 1} 1,${h / 2} Q1,1 ${h / 3},1 Z`,
+    rounded: `M${rr},1 H${w - rr} Q${w - 1},1 ${w - 1},${rr} V${h - rr} Q${w - 1},${h - 1} ${w - rr},${h - 1} H${rr} Q1,${h - 1} 1,${h - rr} V${rr} Q1,1 ${rr},1 Z`,
     capsule: `M${h / 2},1 H${w - h / 2} A${h / 2 - 1},${h / 2 - 1} 0 0 1 ${w - h / 2},${h - 1} H${h / 2} A${h / 2 - 1},${h / 2 - 1} 0 0 1 ${h / 2},1 Z`,
     flat: `M1,1 H${w - 1} V${h - 1} H1 Z`,
     chevron: `M1,1 H${w - inset} L${w - 1},${h / 2} L${w - inset},${h - 1} H1 Z`,
-    'double-chevron': `M1,1 H${w - inset} L${w - 1},${h / 2} L${w - inset},${h - 1} H1 L${inset},${h / 2} Z`,
-    'arrow-right': `M1,1 H${w - inset} L${w - 1},${h / 2} L${w - inset},${h - 1} H1 Z`,
-    pointed: `M1,${h / 2} L${inset},1 H${w - inset} L${w - 1},${h / 2} L${w - inset},${h - 1} H${inset} Z`,
-    notched: `M1,1 H${w - 1} V${h - 1} H1 L${inset},${h / 2} Z`,
+    'double-chevron': `M1,1 H${w - inset} L${w - 1},${h / 2} L${w - inset},${h - 1} H1 L${smallInset},${h / 2} Z`,
+    'arrow-right': `M1,${h * 0.15} H${w - inset} V1 L${w - 1},${h / 2} L${w - inset},${h - 1} V${h * 0.85} H1 Z`,
+    pointed: `M${inset},${h * 0.15} H${w - inset} V1 L${w - 1},${h / 2} L${w - inset},${h - 1} V${h * 0.85} H${inset} V${h - 1} L1,${h / 2} L${inset},1 Z`,
+    'arrow-both': `M ${s + r} 0 L ${w - rBig} 0 Q ${w} 0 ${w - dxB} ${dyB} L ${w - s + dx} ${h - dy} Q ${w - s} ${h} ${w - s - r} ${h} L ${rBig} ${h} Q 0 ${h} ${dxB} ${h - dyB} L ${s - dx} ${dy} Q ${s} 0 ${s + r} 0 Z`,
+    notched: `M ${s + r} 0 L ${w - rSmall} 0 Q ${w} 0 ${w - dxS} ${dyS} L ${w - s + dx} ${h - dy} Q ${w - s} ${h} ${w - s - r} ${h} L ${rSmall} ${h} Q 0 ${h} ${dxS} ${h - dyS} L ${s - dx} ${dy} Q ${s} 0 ${s + r} 0 Z`,
     tab: `M1,1 H${w - 1} L${w - inset},${h - 1} H${inset} Z`,
-    'arrow-both': `M1,${h / 2} L${inset},1 H${w - inset} L${w - 1},${h / 2} L${w - inset},${h - 1} H${inset} Z`,
     trapezoid: `M${inset},1 H${w - inset} L${w - 1},${h - 1} H1 Z`,
   };
 

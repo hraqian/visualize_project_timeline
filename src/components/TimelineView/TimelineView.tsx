@@ -1060,16 +1060,17 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
 
   const insetPx = barHeight * 0.4;
   const insetPct = (insetPx / w) * 100;
+  const smallInset = insetPct * 0.5;
 
   let borderRadius = 0;
   let clipPath: string | undefined;
 
   switch (style.barShape) {
     case 'rounded':
-      borderRadius = barHeight / 2;
+      borderRadius = barHeight * 0.3;
       break;
     case 'square':
-      borderRadius = 4;
+      borderRadius = 3;
       break;
     case 'capsule':
       borderRadius = barHeight;
@@ -1078,22 +1079,56 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       clipPath = `polygon(0% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, 0% 100%)`;
       break;
     case 'double-chevron':
-      clipPath = `polygon(${insetPct}% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${insetPct}% 100%, 0% 50%)`;
+      clipPath = `polygon(0% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, 0% 100%, ${smallInset}% 50%)`;
       break;
     case 'arrow-right':
-      clipPath = `polygon(0% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, 0% 100%)`;
+      clipPath = `polygon(0% 15%, ${100 - insetPct}% 15%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${100 - insetPct}% 85%, 0% 85%)`;
       break;
     case 'pointed':
-      clipPath = `polygon(${insetPct}% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${insetPct}% 100%, 0% 50%)`;
+      clipPath = `polygon(${insetPct}% 15%, ${100 - insetPct}% 15%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${100 - insetPct}% 85%, ${insetPct}% 85%, ${insetPct}% 100%, 0% 50%, ${insetPct}% 0%)`;
       break;
-    case 'notched':
-      clipPath = `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, ${insetPct}% 50%)`;
+    case 'arrow-both': {
+      const s = barHeight / Math.tan((75 * Math.PI) / 180);
+      const r = Math.min(barHeight * 0.3, s * 0.8);
+      const rBig = r * 2.5;
+      const len = Math.sqrt(s * s + barHeight * barHeight);
+      const dx = (s / len) * r, dy = (barHeight / len) * r;
+      const dxB = (s / len) * rBig, dyB = (barHeight / len) * rBig;
+      clipPath = `path('`
+        + `M ${s + r} 0 `
+        + `L ${w - rBig} 0 `
+        + `Q ${w} 0 ${w - dxB} ${dyB} `
+        + `L ${w - s + dx} ${barHeight - dy} `
+        + `Q ${w - s} ${barHeight} ${w - s - r} ${barHeight} `
+        + `L ${rBig} ${barHeight} `
+        + `Q 0 ${barHeight} ${dxB} ${barHeight - dyB} `
+        + `L ${s - dx} ${dy} `
+        + `Q ${s} 0 ${s + r} 0 `
+        + `Z')`;
       break;
+    }
+    case 'notched': {
+      const s2 = barHeight / Math.tan((75 * Math.PI) / 180);
+      const r2 = Math.min(barHeight * 0.3, s2 * 0.8);
+      const rSmall = r2 * 0.25;
+      const len2 = Math.sqrt(s2 * s2 + barHeight * barHeight);
+      const dx2 = (s2 / len2) * r2, dy2 = (barHeight / len2) * r2;
+      const dxS = (s2 / len2) * rSmall, dyS = (barHeight / len2) * rSmall;
+      clipPath = `path('`
+        + `M ${s2 + r2} 0 `
+        + `L ${w - rSmall} 0 `
+        + `Q ${w} 0 ${w - dxS} ${dyS} `
+        + `L ${w - s2 + dx2} ${barHeight - dy2} `
+        + `Q ${w - s2} ${barHeight} ${w - s2 - r2} ${barHeight} `
+        + `L ${rSmall} ${barHeight} `
+        + `Q 0 ${barHeight} ${dxS} ${barHeight - dyS} `
+        + `L ${s2 - dx2} ${dy2} `
+        + `Q ${s2} 0 ${s2 + r2} 0 `
+        + `Z')`;
+      break;
+    }
     case 'tab':
       clipPath = `polygon(0% 0%, 100% 0%, ${100 - insetPct}% 100%, ${insetPct}% 100%)`;
-      break;
-    case 'arrow-both':
-      clipPath = `polygon(${insetPct}% 0%, ${100 - insetPct}% 0%, 100% 50%, ${100 - insetPct}% 100%, ${insetPct}% 100%, 0% 50%)`;
       break;
     case 'trapezoid':
       clipPath = `polygon(${insetPct}% 0%, ${100 - insetPct}% 0%, 100% 100%, 0% 100%)`;

@@ -549,8 +549,8 @@ function drawTaskBar(
   let rectRadius = 0.02;
   const shape = style.barShape;
   if (shape === 'capsule') rectRadius = h / 2;
-  else if (shape === 'rounded') rectRadius = Math.min(0.06, h / 2);
-  else if (shape === 'flat' || shape === 'square') rectRadius = 0;
+  else if (shape === 'rounded') rectRadius = Math.min(0.04, h * 0.3);
+  else if (shape === 'flat' || shape === 'square') rectRadius = 0.02;
 
   // Bar background (light fill)
   const { color: barColor } = parseHexAlpha(style.color);
