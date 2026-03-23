@@ -161,8 +161,8 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 36,
-                  height: 36,
+                  width: 29,
+                  height: 29,
                   borderRadius: 6,
                   border: 'none',
                   cursor: 'pointer',
@@ -172,7 +172,7 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
                 onMouseEnter={(e) => { if (value !== shape.id) e.currentTarget.style.background = '#f1f5f9'; }}
                 onMouseLeave={(e) => { if (value !== shape.id) e.currentTarget.style.background = 'transparent'; }}
               >
-                <ShapePreview shape={shape.id} color={value === shape.id ? '#1e293b' : ICON_COLOR} width={24} height={12} />
+                <ShapePreview shape={shape.id} color={value === shape.id ? '#1e293b' : ICON_COLOR} width={19} height={10} />
               </button>
             ))}
           </div>
