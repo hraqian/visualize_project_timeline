@@ -89,7 +89,7 @@ function DependencyIcon({ size = 16 }: { size?: number }) {
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
   // Maps to same geometry as task bar shapes, but uses CSS-only (no pixel dimensions available)
   switch (shape) {
-    case 'rectangle': return { borderRadius: 3 };
+    case 'rectangle': return { borderRadius: 0 };
     case 'rounded': return { borderRadius: 6 };
     case 'ellipse': return { borderRadius: '9999px' };
     // modern & leaf are parallelograms — approximate with skewX transform on the container
