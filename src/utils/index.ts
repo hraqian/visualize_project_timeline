@@ -59,9 +59,8 @@ export function getDuration(item: ProjectItem): number {
 }
 
 /**
- * Compute padded project range with origin aligned to the earliest unit
- * boundary across all visible timescale tiers, so no tier ever shows a
- * partial first cell.
+ * Compute padded project range with origin and end aligned to full unit
+ * boundaries across all visible timescale tiers, so no tier shows partial cells.
  */
 export function getProjectRangePadded(
   items: ProjectItem[],
@@ -69,6 +68,7 @@ export function getProjectRangePadded(
 ): { origin: string; totalDays: number; rangeEndDate: Date } {
   const range = getProjectRange(items);
   let padStart = startOfMonth(subDays(parseISO(range.start), 14));
+  let padEnd: Date;
 
   // Resolve visible tier units and align origin to their boundaries
   const projectSpan = differenceInDays(parseISO(range.end), parseISO(range.start));
@@ -94,9 +94,35 @@ export function getProjectRangePadded(
     if (aligned < padStart) padStart = aligned;
   }
 
+  // Compute end — start from at least the month after the last item
   const endMonth = startOfMonth(parseISO(range.end));
   const numMonths = differenceInCalendarMonths(endMonth, padStart) + 1;
-  const padEnd = addMonths(padStart, numMonths);
+  padEnd = addMonths(padStart, numMonths);
+
+  // Extend padEnd to align to full unit boundaries for all visible tiers
+  for (const unit of visibleUnits) {
+    let aligned: Date;
+    switch (unit) {
+      case 'week': {
+        // Extend to the end of the week containing padEnd
+        const weekStart = startOfWeek(padEnd, { weekStartsOn: 1 });
+        aligned = weekStart < padEnd ? addDays(weekStart, 7) : padEnd;
+        break;
+      }
+      case 'quarter':
+        aligned = startOfQuarter(addMonths(padEnd, 3)); // next quarter start
+        if (aligned <= padEnd) aligned = startOfQuarter(addMonths(padEnd, 6));
+        break;
+      case 'year':
+        aligned = startOfYear(addMonths(padEnd, 12));
+        if (aligned <= padEnd) aligned = startOfYear(addMonths(padEnd, 24));
+        break;
+      default:
+        aligned = padEnd;
+    }
+    if (aligned > padEnd) padEnd = aligned;
+  }
+
   const total = differenceInDays(padEnd, padStart);
   return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: subDays(padEnd, 1) };
 }
@@ -250,10 +276,12 @@ export function buildVisibleTierCells(
   totalDays: number,
   barWidthPx: number,
 ): TierCell[] {
+  if (labels.length === 0) return [];
+
   const minLabelWidth: Record<string, number> = { day: 60, week: 70, month: 50, quarter: 50, year: 50 };
   const minW = minLabelWidth[unit] ?? 40;
 
-  // Calculate skip factor using a full interior cell (not the first, which may be partial)
+  // Calculate skip factor using a full interior cell
   let skipFactor = 1;
   if (labels.length > 1) {
     const refIdx = Math.min(1, labels.length - 1);
@@ -265,20 +293,16 @@ export function buildVisibleTierCells(
     }
   }
 
-  // Build cells with skip-factor grouping — clamp to bar edges
+  // Build cells — origin and end are aligned to unit boundaries so no partial cells
   const cells: TierCell[] = [];
   for (let i = 0; i < labels.length; i += skipFactor) {
-    const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
+    const startFrac = Math.max(differenceInDays(labels[i].startDate, originDate) / totalDays, 0);
     const endIdx = Math.min(i + skipFactor, labels.length) - 1;
-    const endFrac = (differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays;
-    if (endFrac <= 0) continue; // entirely before the visible range
-    if (startFrac >= 1) break;  // past the visible range
-    const clampedStart = Math.max(startFrac, 0);
-    const clampedEnd = Math.min(endFrac, 1);
+    const endFrac = Math.min((differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays, 1);
     cells.push({
       label: labels[i].label,
-      fraction: clampedStart,
-      widthFrac: Math.max(clampedEnd - clampedStart, 0.001),
+      fraction: startFrac,
+      widthFrac: Math.max(endFrac - startFrac, 0.001),
     });
   }
 
