@@ -191,7 +191,7 @@ export function StylePane() {
         setMainTab('items');
       }
     }
-  }, [stylePaneSection]);
+  }, [stylePaneSection, selectedItemId, selectedSwimlaneId]);
 
 
 
