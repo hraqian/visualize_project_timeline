@@ -872,7 +872,7 @@ function IndependentItemsGroup({
 
       {/* Add row for independent items */}
       <tr>
-        <td colSpan={totalColumns} className="pl-6 pr-4 py-1.5">
+        <td colSpan={totalColumns} className="pl-14 pr-4 py-1.5">
           <InlineAddRow onAdd={(type) => onAddItem(type)} />
         </td>
       </tr>
@@ -1315,6 +1315,9 @@ function ItemRow({
           className="w-full bg-transparent border-none outline-none text-xs text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-indigo-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
           value={item.name}
           onChange={(e) => onUpdateItem(item.id, { name: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+          }}
           onClick={(e) => e.stopPropagation()}
         />
       </td>
