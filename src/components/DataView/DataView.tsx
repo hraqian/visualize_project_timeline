@@ -91,7 +91,7 @@ function Checkbox({
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onChange(); }}
-      className={`w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
+      className={`w-[18px] h-[18px] border-2 flex items-center justify-center transition-colors shrink-0 ${
         checked || indeterminate
           ? 'bg-slate-700 border-slate-700 text-white'
           : 'border-slate-300 hover:border-slate-400 bg-white'
@@ -1062,7 +1062,7 @@ function SwimlaneGroup({
               size={14}
               className="absolute left-1 text-slate-300 opacity-0 group-hover/swimlane:opacity-100 transition-opacity cursor-grab"
             />
-            <div className="rounded-sm shrink-0" style={{ width: '12px', height: '18px', backgroundColor: swimlane.color }} />
+            <div className="shrink-0" style={{ width: '12px', height: '18px', backgroundColor: swimlane.color }} />
             {editingName ? (
               <input
                 className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[15px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
