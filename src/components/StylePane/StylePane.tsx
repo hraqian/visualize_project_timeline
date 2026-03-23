@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { AdvancedColorPicker } from '@/components/common/AdvancedColorPicker';
-import { ShapeDropdown, ShapePreview } from '@/components/common/ShapeDropdown';
+import { ShapeDropdown, ShapePreview, getShapeStyle } from '@/components/common/ShapeDropdown';
 import { SizeControl } from '@/components/common/SizeControl';
 import { SpacingControl } from '@/components/common/SpacingControl';
 import { FontFamilyDropdown, FontSizeDropdown } from '@/components/common/FontDropdowns';
@@ -87,12 +87,14 @@ function DependencyIcon({ size = 16 }: { size?: number }) {
 }
 
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
+  // Maps to same geometry as task bar shapes, but uses CSS-only (no pixel dimensions available)
   switch (shape) {
-    case 'rectangle': return {};
-    case 'rounded': return { borderRadius: '6px' };
-    case 'leaf': return { borderRadius: '0 9999px 9999px 0' };
+    case 'rectangle': return { borderRadius: 3 };
+    case 'rounded': return { borderRadius: '20%' };
     case 'ellipse': return { borderRadius: '9999px' };
-    case 'modern': return { borderRadius: '4px 12px 4px 12px' };
+    // modern & leaf are parallelograms — approximate with skewX transform on the container
+    case 'modern': return { borderRadius: 6, transform: 'skewX(-5deg)' };
+    case 'leaf': return { borderRadius: '6px 2px 6px 2px', transform: 'skewX(-5deg)' };
     case 'slant': return { clipPath: 'polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%)' };
   }
 }
@@ -2465,73 +2467,38 @@ function EndCapSection({ side }: { side: 'left' | 'right' }) {
 
 // ─── Timescale Bar Shape Dropdown ────────────────────────────────────────────
 
+// Map timescale bar shapes to task bar shape IDs for icon rendering
+const TIMESCALE_TO_BAR_SHAPE: Record<TimescaleBarShape, import('@/types').BarShape> = {
+  rectangle: 'square',
+  rounded: 'rounded',
+  leaf: 'notched',
+  ellipse: 'capsule',
+  modern: 'arrow-both',
+  slant: 'square', // backward compat fallback
+};
+
 const TIMESCALE_BAR_SHAPES: { id: TimescaleBarShape; label: string }[] = [
   { id: 'rectangle', label: 'Rectangle' },
   { id: 'rounded', label: 'Rounded rectangle' },
-  { id: 'slant', label: 'Slant' },
-  { id: 'ellipse', label: 'Ellipse' },
   { id: 'leaf', label: 'Leaf' },
+  { id: 'ellipse', label: 'Ellipse' },
   { id: 'modern', label: 'Modern' },
 ];
 
-function TimescaleBarShapeIcon({ shape, size = 24, color = '#475569' }: { shape: TimescaleBarShape; size?: number; color?: string }) {
-  const w = size;
-  const h = size * 0.6;
-  switch (shape) {
-    case 'rectangle':
-      return (
-        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-          <rect x={1} y={2} width={w - 2} height={h - 4} rx={0} fill={color} />
-        </svg>
-      );
-    case 'rounded':
-      return (
-        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-          <rect x={1} y={2} width={w - 2} height={h - 4} rx={3} fill={color} />
-        </svg>
-      );
-    case 'leaf':
-      return (
-        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-          <rect x={1} y={2} width={w - 2} height={h - 4} rx={0} fill={color} style={{ borderRadius: `0 ${h * 0.35}px ${h * 0.35}px 0` }} />
-          <path d={`M1,2 h${w - 2 - h * 0.35} q${h * 0.35},0 ${h * 0.35},${(h - 4) / 2} q0,${(h - 4) / 2} -${h * 0.35},${(h - 4) / 2} H1 V2 Z`} fill={color} />
-        </svg>
-      );
-    case 'ellipse':
-      return (
-        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-          <rect x={1} y={2} width={w - 2} height={h - 4} rx={(h - 4) / 2} fill={color} />
-        </svg>
-      );
-    case 'modern':
-      return (
-        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-          <path d={`M${3},${2} h${w - 8} l${2},${(h - 4) / 2} l-${2},${(h - 4) / 2} H${3} l${2},-${(h - 4) / 2} l-${2},-${(h - 4) / 2} Z`} fill={color} />
-        </svg>
-      );
-    case 'slant': {
-      const inset = (h - 4) * 0.3;
-      return (
-        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-          <path d={`M${1 + inset},2 H${w - 1} L${w - 1 - inset},${h - 2} H1 Z`} fill={color} />
-        </svg>
-      );
-    }
-  }
-}
+const TIMESCALE_ICON_COLOR = '#475569';
 
 function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarShape; onChange: (v: TimescaleBarShape) => void }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
-  const selected = TIMESCALE_BAR_SHAPES.find((s) => s.id === value) ?? TIMESCALE_BAR_SHAPES[1];
+  const selected = TIMESCALE_BAR_SHAPES.find((s) => s.id === value) ?? TIMESCALE_BAR_SHAPES[0];
 
-  const updatePos = () => {
+  const updatePos = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 4, left: rect.right });
-  };
+    setPos({ top: rect.bottom + 4, left: rect.left });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -2545,16 +2512,22 @@ function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarSha
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const handleToggle = () => {
+    if (!open) updatePos();
+    setOpen(!open);
+  };
+
   return (
     <div className="relative">
       <button
         ref={triggerRef}
-        onClick={() => { if (!open) updatePos(); setOpen(!open); }}
-        className="w-full flex items-center gap-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none hover:border-[var(--color-text-muted)] transition-colors"
+        onClick={handleToggle}
+        className="flex items-center gap-1.5 px-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-text-muted)] transition-colors text-[var(--color-text)] w-full"
+        style={{ height: 28, fontSize: 14 }}
       >
-        <TimescaleBarShapeIcon shape={value} size={20} />
-        <span className="flex-1 text-left truncate font-medium">{selected.label}</span>
-        <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
+        <ShapePreview shape={TIMESCALE_TO_BAR_SHAPE[value]} color={TIMESCALE_ICON_COLOR} width={14} height={8} />
+        <span className="flex-1 text-left font-medium">{selected.label}</span>
+        <ChevronDown size={10} className="text-[var(--color-text-muted)] shrink-0" />
       </button>
       {open && createPortal(
         <div
@@ -2563,35 +2536,38 @@ function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarSha
             position: 'fixed',
             top: pos.top,
             left: pos.left,
-            transform: 'translateX(-100%)',
             zIndex: 9999,
             background: '#ffffff',
             border: '1px solid #cbd5e1',
             borderRadius: 8,
             boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
             padding: 8,
-            display: 'flex',
-            gap: 4,
           }}
         >
-          {TIMESCALE_BAR_SHAPES.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => { onChange(s.id); setOpen(false); }}
-              style={{
-                padding: 6,
-                borderRadius: 6,
-                border: 'none',
-                cursor: 'pointer',
-                background: value === s.id ? '#e2e8f0' : 'transparent',
-              }}
-              title={s.label}
-              onMouseEnter={(e) => { if (value !== s.id) e.currentTarget.style.background = '#f1f5f9'; }}
-              onMouseLeave={(e) => { if (value !== s.id) e.currentTarget.style.background = 'transparent'; }}
-            >
-              <TimescaleBarShapeIcon shape={s.id} size={28} />
-            </button>
-          ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
+            {TIMESCALE_BAR_SHAPES.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => { onChange(s.id); setOpen(false); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 29,
+                  height: 29,
+                  borderRadius: 6,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: value === s.id ? '#e2e8f0' : 'transparent',
+                }}
+                title={s.label}
+                onMouseEnter={(e) => { if (value !== s.id) e.currentTarget.style.background = '#f1f5f9'; }}
+                onMouseLeave={(e) => { if (value !== s.id) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <ShapePreview shape={TIMESCALE_TO_BAR_SHAPE[s.id]} color={value === s.id ? '#1e293b' : TIMESCALE_ICON_COLOR} width={19} height={10} />
+              </button>
+            ))}
+          </div>
         </div>,
         document.body,
       )}

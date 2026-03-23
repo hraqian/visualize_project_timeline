@@ -19,7 +19,7 @@ export const BAR_SHAPE_OPTIONS: { id: BarShape; label: string }[] = [
 
 // ─── Shape preview rendering ─────────────────────────────────────────────────
 
-function getShapeStyle(shape: BarShape, width: number, height: number): React.CSSProperties {
+export function getShapeStyle(shape: BarShape, width: number, height: number): React.CSSProperties {
   const insetPx = height * 0.4;
   const insetPct = (insetPx / width) * 100;
   const smallInset = insetPct * 0.5;
