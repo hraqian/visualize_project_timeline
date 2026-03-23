@@ -96,7 +96,7 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
   const updatePos = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    setPos({ top: rect.bottom + 4, left: rect.right });
+    setPos({ top: rect.bottom + 4, left: rect.left });
   }, []);
 
   // Close on outside click
@@ -136,10 +136,19 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
       {isOpen && createPortal(
         <div
           ref={popoverRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-100%)', zIndex: 9999 }}
-          className="bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl p-2"
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            zIndex: 9999,
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: 8,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            padding: 8,
+          }}
         >
-          <div className="grid grid-cols-5 gap-1">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4 }}>
             {BAR_SHAPE_OPTIONS.map((shape) => (
               <button
                 key={shape.id}
@@ -147,12 +156,20 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
                   onChange(shape.id);
                   setIsOpen(false);
                 }}
-                className={`flex items-center justify-center w-9 h-9 rounded-md transition-colors ${
-                  value === shape.id
-                    ? 'bg-slate-200'
-                    : 'hover:bg-[var(--color-surface-hover)]'
-                }`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 6,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: value === shape.id ? '#e2e8f0' : 'transparent',
+                }}
                 title={shape.label}
+                onMouseEnter={(e) => { if (value !== shape.id) e.currentTarget.style.background = '#f1f5f9'; }}
+                onMouseLeave={(e) => { if (value !== shape.id) e.currentTarget.style.background = 'transparent'; }}
               >
                 <ShapePreview shape={shape.id} color={value === shape.id ? '#1e293b' : ICON_COLOR} width={24} height={12} />
               </button>

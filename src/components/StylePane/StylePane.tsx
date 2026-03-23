@@ -1458,20 +1458,38 @@ function MilestoneShapeDropdown({
       {open && createPortal(
         <div
           ref={popoverRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-100%)', zIndex: 9999 }}
-          className="bg-white border border-[var(--color-border)] rounded-lg shadow-xl p-2"
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            transform: 'translateX(-100%)',
+            zIndex: 9999,
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: 8,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            padding: 8,
+          }}
         >
-          <div className="grid grid-cols-6 gap-1">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4 }}>
             {MILESTONE_ICONS.map((ic) => (
               <button
                 key={ic.id}
                 onClick={() => { onChange(ic.id); setOpen(false); }}
-                className={`flex items-center justify-center w-9 h-9 rounded-md transition-colors ${
-                  value === ic.id
-                    ? 'bg-slate-200'
-                    : 'hover:bg-[var(--color-surface-hover)]'
-                }`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 36,
+                  height: 36,
+                  borderRadius: 6,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: value === ic.id ? '#e2e8f0' : 'transparent',
+                }}
                 title={ic.label}
+                onMouseEnter={(e) => { if (value !== ic.id) e.currentTarget.style.background = '#f1f5f9'; }}
+                onMouseLeave={(e) => { if (value !== ic.id) e.currentTarget.style.background = 'transparent'; }}
               >
                 <MilestoneIconComponent icon={ic.id} size={18} color={value === ic.id ? '#1e293b' : '#475569'} />
               </button>
@@ -2542,17 +2560,35 @@ function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarSha
       {open && createPortal(
         <div
           ref={popoverRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-100%)', zIndex: 9999 }}
-          className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg p-2 flex gap-1"
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            transform: 'translateX(-100%)',
+            zIndex: 9999,
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: 8,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            padding: 8,
+            display: 'flex',
+            gap: 4,
+          }}
         >
           {TIMESCALE_BAR_SHAPES.map((s) => (
             <button
               key={s.id}
               onClick={() => { onChange(s.id); setOpen(false); }}
-              className={`p-1.5 rounded transition-colors ${
-                value === s.id ? 'bg-[var(--color-bg-tertiary)]' : 'hover:bg-[var(--color-surface-hover)]'
-              }`}
+              style={{
+                padding: 6,
+                borderRadius: 6,
+                border: 'none',
+                cursor: 'pointer',
+                background: value === s.id ? '#e2e8f0' : 'transparent',
+              }}
               title={s.label}
+              onMouseEnter={(e) => { if (value !== s.id) e.currentTarget.style.background = '#f1f5f9'; }}
+              onMouseLeave={(e) => { if (value !== s.id) e.currentTarget.style.background = 'transparent'; }}
             >
               <TimescaleBarShapeIcon shape={s.id} size={28} />
             </button>
