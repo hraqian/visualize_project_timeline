@@ -1258,7 +1258,17 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
             ...(style.pctLabelPosition === 'left'
               ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
               : style.pctLabelPosition === 'center'
-              ? { left: `${item.percentComplete}%`, top: '50%', transform: 'translate(-50%, -50%)', maxWidth: 'none' }
+              ? {
+                  left: `${item.percentComplete}%`,
+                  top: '50%',
+                  transform: item.percentComplete <= 0
+                    ? 'translateY(-50%)'
+                    : item.percentComplete >= 100
+                    ? 'translate(-100%, -50%)'
+                    : 'translate(-50%, -50%)',
+                  maxWidth: 'none',
+                  paddingLeft: item.percentComplete <= 0 ? 4 : 0,
+                }
               : style.pctLabelPosition === 'above'
               ? {
                   left: 0,
