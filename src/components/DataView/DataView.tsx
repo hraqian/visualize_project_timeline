@@ -1062,6 +1062,11 @@ function SwimlaneGroup({
               size={14}
               className="absolute left-1 text-slate-300 opacity-0 group-hover/swimlane:opacity-100 transition-opacity cursor-grab"
             />
+            {/* Pencil for color editing — hover only */}
+            <SwimlaneColorPicker
+              currentColor={swimlane.color}
+              onChange={(color) => onUpdateSwimlane(swimlane.id, { color })}
+            />
             <div className="shrink-0" style={{ width: '12px', height: '18px', backgroundColor: swimlane.color }} />
             {editingName ? (
               <input
@@ -1083,26 +1088,15 @@ function SwimlaneGroup({
                 autoFocus
               />
             ) : (
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="font-semibold text-[15px] text-slate-700"
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    setEditingName(true);
-                  }}
-                >
-                  {swimlane.name}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingName(true);
-                  }}
-                  className="text-slate-300 opacity-0 group-hover/swimlane:opacity-100 hover:text-slate-500 transition-all shrink-0"
-                >
-                  <Pencil size={13} />
-                </button>
-              </div>
+              <span
+                className="font-semibold text-[15px] text-slate-700 cursor-text"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingName(true);
+                }}
+              >
+                {swimlane.name}
+              </span>
             )}
             {/* Collapse/Expand toggle — always visible */}
             <Tooltip label={isCollapsed ? 'Expand' : 'Collapse'}>
@@ -1847,6 +1841,86 @@ function SwimlaneMoreMenu({
               {mi.label}
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Swimlane Color Picker ───────────────────────────────────────────────────
+
+function SwimlaneColorPicker({
+  currentColor,
+  onChange,
+}: {
+  currentColor: string;
+  onChange: (color: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [flipUp, setFlipUp] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const menuHeight = 180;
+      setFlipUp(rect.bottom + menuHeight > window.innerHeight);
+    }
+    setOpen(!open);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        ref={btnRef}
+        onClick={handleToggle}
+        className="text-slate-300 opacity-0 group-hover/swimlane:opacity-100 hover:text-slate-500 transition-all shrink-0 p-0.5"
+      >
+        <Pencil size={13} />
+      </button>
+
+      {open && (
+        <div
+          className={`absolute left-0 ${flipUp ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white border border-slate-200 rounded-lg shadow-lg z-40 p-3 w-[196px]`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-[12px] font-medium text-slate-500 mb-2">Choose color</div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {PRESET_COLORS.map((color) => (
+              <button
+                key={color}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(color);
+                }}
+                className="w-9 h-9 rounded-md flex items-center justify-center hover:scale-110 transition-transform"
+                style={{ backgroundColor: color }}
+              >
+                {color === currentColor && (
+                  <Check size={14} className="text-white" />
+                )}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+            }}
+            className="mt-2.5 w-full text-center text-[12px] font-medium text-slate-500 hover:text-slate-700 py-1 rounded hover:bg-slate-50 transition-colors"
+          >
+            Done
+          </button>
         </div>
       )}
     </div>
