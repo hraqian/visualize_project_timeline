@@ -182,7 +182,7 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
 
                   {/* Dependency type dropdown */}
                   <select
-                    className="text-xs px-1.5 py-1 border border-slate-200 rounded bg-white text-slate-600 font-mono cursor-pointer hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    className="text-xs px-1.5 py-1 border border-slate-200 rounded bg-white text-slate-600 font-mono cursor-pointer hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-400"
                     value={dep.type}
                     onChange={(e) => updateDep(dep.fromId, { type: e.target.value as DependencyType })}
                   >
@@ -204,7 +204,7 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
                   <button
                     className={`p-1 rounded transition-all ${
                       dep.visible
-                        ? 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'
+                        ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-50'
                         : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
                     }`}
                     onClick={() => updateDep(dep.fromId, { visible: !dep.visible })}
@@ -258,7 +258,7 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
                     return (
                       <button
                         key={ai.id}
-                        className="w-full text-left px-3 py-2 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center gap-2"
+                        className="w-full text-left px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors flex items-center gap-2"
                         onClick={() => addDep(ai.id)}
                       >
                         <span className="text-slate-400 font-mono w-5 text-right shrink-0">{rn}.</span>
@@ -284,7 +284,7 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
           <button
             onClick={handleApply}
             className="px-4 py-1.5 text-xs font-medium text-white rounded-lg transition-all"
-            style={{ backgroundColor: '#6366f1' }}
+            style={{ backgroundColor: '#334155' }}
           >
             Apply
           </button>
@@ -312,7 +312,7 @@ function LagInput({ value, onChange }: { value: string; onChange: (val: string) 
     return (
       <input
         type="text"
-        className="w-14 text-xs px-1.5 py-1 border border-indigo-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-400 text-slate-600 font-mono text-center"
+        className="w-14 text-xs px-1.5 py-1 border border-slate-300 rounded bg-white outline-none focus:ring-1 focus:ring-slate-400 text-slate-600 font-mono text-center"
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         onBlur={commit}

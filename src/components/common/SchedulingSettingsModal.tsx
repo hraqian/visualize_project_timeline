@@ -133,7 +133,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
           <div className="px-6 py-4 border-t border-slate-200 shrink-0 flex justify-end">
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 transition-colors"
             >
               Done
             </button>
@@ -180,7 +180,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                 onChange={() => {
                   if (!isAutomatic) setSchedulingMode('automatic-flexible');
                 }}
-                className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                className="w-4 h-4 mt-0.5 accent-[#1e293b]"
               />
               <div>
                 <span className="text-sm text-slate-800 font-semibold">Automatic</span>
@@ -201,7 +201,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                       name="ssm-autoSubMode"
                       checked={schedulingMode === 'automatic-flexible'}
                       onChange={() => setSchedulingMode('automatic-flexible')}
-                      className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                      className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                     />
                     <span className="text-sm text-slate-700">
                       <span className="font-semibold">Flexible</span>
@@ -222,7 +222,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                             name="ssm-conflictMode"
                             checked={conflictMode === 'dont-allow'}
                             onChange={() => setConflictMode('dont-allow')}
-                            className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                            className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                           />
                           <span className="text-sm text-slate-600">
                             Don't allow conflicts{' '}
@@ -237,7 +237,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                             name="ssm-conflictMode"
                             checked={conflictMode === 'allow-exception'}
                             onChange={() => setConflictMode('allow-exception')}
-                            className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                            className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                           />
                           <span className="text-sm text-slate-600">
                             Allow conflicts as an exception{' '}
@@ -252,7 +252,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                             name="ssm-conflictMode"
                             checked={conflictMode === 'ask'}
                             onChange={() => setConflictMode('ask')}
-                            className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                            className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                           />
                           <span className="text-sm text-slate-600">
                             Ask me what to do every time
@@ -270,7 +270,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                     name="ssm-autoSubMode"
                     checked={schedulingMode === 'automatic-strict'}
                     onChange={() => setSchedulingMode('automatic-strict')}
-                    className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                    className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                   />
                   <span className="text-sm text-slate-700">
                     <span className="font-semibold">Strict</span>
@@ -292,7 +292,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                 name="ssm-topMode"
                 checked={schedulingMode === 'manual'}
                 onChange={() => setSchedulingMode('manual')}
-                className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                className="w-4 h-4 mt-0.5 accent-[#1e293b]"
               />
               <div>
                 <span className="text-sm text-slate-800 font-semibold">Manual</span>
@@ -342,7 +342,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
               type="checkbox"
               checked={rememberForFuture}
               onChange={(e) => setRememberForFuture(e.target.checked)}
-              className="w-4 h-4 accent-[#4f46e5] rounded"
+              className="w-4 h-4 accent-[#1e293b] rounded"
             />
             <span className="text-sm text-slate-600">
               Remember these settings for future timelines too
@@ -359,7 +359,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 transition-colors"
             >
               Save
             </button>

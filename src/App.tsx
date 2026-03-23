@@ -156,7 +156,7 @@ function App() {
   return (
     <div className="h-full flex flex-col bg-[var(--color-bg)]">
       {/* ─── Row 1: Project title banner ─── */}
-      <div className="flex items-center h-11 bg-[#4f46e5] shrink-0 px-3">
+      <div className="flex items-center h-11 bg-[#1e293b] shrink-0 px-3">
         {/* Left: Save + Undo/Redo */}
         <div className="flex items-center gap-1 flex-1 min-w-0">
           <button
@@ -280,11 +280,11 @@ function App() {
                 }}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-white text-[#4f46e5] shadow-sm border border-[var(--color-border)]'
+                    ? 'bg-white text-[#1e293b] shadow-sm border border-[var(--color-border)]'
                     : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
                 }`}
               >
-                <Icon size={16} className={isActive ? 'text-[#4f46e5]' : ''} />
+                <Icon size={16} className={isActive ? 'text-[#1e293b]' : ''} />
                 {v.label}
               </button>
             );
@@ -430,7 +430,7 @@ function DependenciesDropdown({
         onClick={() => setOpen(!open)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
           showDependencies
-            ? 'text-[#4f46e5] border-[#4f46e5]/30 bg-indigo-50 hover:bg-indigo-100'
+            ? 'text-[#1e293b] border-[#1e293b]/30 bg-slate-50 hover:bg-slate-100'
             : 'text-[var(--color-text-secondary)] border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
         }`}
       >

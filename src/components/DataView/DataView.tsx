@@ -706,7 +706,7 @@ export function DataView() {
               <td colSpan={totalColumns} className="pt-7 pb-4 pl-6 pr-4">
                 <button
                   onClick={handleAddSwimlane}
-                  className="flex items-center gap-1.5 text-sm font-medium text-slate-500 border border-slate-300 rounded-md px-3 py-1.5 hover:border-indigo-400 hover:text-indigo-600 transition-all"
+                  className="flex items-center gap-1.5 text-sm font-medium text-slate-500 border border-slate-300 rounded-md px-3 py-1.5 hover:border-slate-400 hover:text-slate-800 transition-all"
                 >
                   <Plus size={14} />
                   Add Swimlane
@@ -880,7 +880,7 @@ function ColumnConfigButton({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 px-2 py-1 rounded border border-slate-200 text-xs font-medium text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors whitespace-nowrap"
+        className="flex items-center gap-1 px-2 py-1 rounded border border-slate-200 text-xs font-medium text-slate-400 hover:text-slate-800 hover:border-slate-300 transition-colors whitespace-nowrap"
       >
         <Plus size={12} />
         Add column
@@ -949,14 +949,14 @@ export function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlan
       <div className="flex">
         <button
           onClick={() => onAdd(defaultAction)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-md text-xs font-medium bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-indigo-200"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-md text-xs font-medium bg-slate-50 text-slate-800 hover:bg-slate-100 transition-all border border-slate-200"
         >
           <Plus size={14} />
           {labels[defaultAction]}
         </button>
         <button
           onClick={() => setOpen(!open)}
-          className="px-1.5 py-1.5 rounded-r-md text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-l-0 border-indigo-200"
+          className="px-1.5 py-1.5 rounded-r-md text-xs bg-slate-50 text-slate-800 hover:bg-slate-100 transition-all border border-l-0 border-slate-200"
         >
           <ChevronDown size={12} />
         </button>
@@ -972,7 +972,7 @@ export function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlan
                 setOpen(false);
               }}
               className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors ${
-                defaultAction === type ? 'text-indigo-600 font-medium' : 'text-slate-500'
+                defaultAction === type ? 'text-slate-800 font-medium' : 'text-slate-500'
               }`}
             >
               {labels[type]}
@@ -1080,7 +1080,7 @@ function IndependentItemsGroup({
         >
           <td colSpan={totalColumns} className="py-2">
             <div className={`mx-4 rounded-lg border-2 border-dashed py-3 text-center text-xs transition-colors ${
-              dropTarget?.swimlaneId === null ? 'border-indigo-400 bg-indigo-50 text-indigo-500' : 'border-slate-300 text-slate-400'
+              dropTarget?.swimlaneId === null ? 'border-slate-400 bg-slate-50 text-slate-700' : 'border-slate-300 text-slate-400'
             }`}>
               Drop here to remove from swimlane
             </div>
@@ -1290,14 +1290,14 @@ function SwimlaneGroup({
       {isDropTarget && (
         <tr>
           <td colSpan={totalColumns} className="p-0">
-            <div className="h-0.5 bg-indigo-500 rounded-full" />
+            <div className="h-0.5 bg-slate-500 rounded-full" />
           </td>
         </tr>
       )}
 
       {/* Swimlane Header Row */}
       <tr
-        className={`group/swimlane cursor-pointer hover:bg-slate-50 transition-colors ${isDragging ? 'opacity-50' : ''} ${dragItemId && !isDragging ? 'ring-1 ring-inset ring-indigo-200' : ''}`}
+        className={`group/swimlane cursor-pointer hover:bg-slate-50 transition-colors ${isDragging ? 'opacity-50' : ''} ${dragItemId && !isDragging ? 'ring-1 ring-inset ring-slate-200' : ''}`}
         onClick={onToggleCollapse}
         draggable
         onDragStart={(e) => {
@@ -1337,7 +1337,7 @@ function SwimlaneGroup({
             />
             {editingName ? (
               <input
-                className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[14px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
+                className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[14px] font-semibold text-slate-800 outline-none focus:border-slate-700"
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
                 onFocus={(e) => e.target.select()}
@@ -1634,13 +1634,13 @@ function ItemRow({
       {isItemDropTarget && (
         <tr>
           <td colSpan={100} className="p-0">
-            <div className="h-0.5 bg-indigo-500 rounded-full" />
+            <div className="h-0.5 bg-slate-500 rounded-full" />
           </td>
         </tr>
       )}
       <tr
         className={`group/row transition-colors cursor-pointer [&>td]:border-b [&>td]:border-slate-100 ${
-          isChecked ? 'bg-indigo-50/60' : isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/80'
+          isChecked ? 'bg-slate-50/60' : isSelected ? 'bg-slate-50/40' : 'hover:bg-slate-50/80'
         } ${isItemDragging ? 'opacity-50' : ''}`}
         onClick={() => onSelectItem(item.id)}
         draggable
@@ -1678,11 +1678,11 @@ function ItemRow({
       {/* Title */}
       <td
         ref={(el) => { cellRefs.current['title'] = el; }}
-        className={`pl-3 pr-4 py-3 ${focusedColumn === 'title' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
+        className={`pl-3 pr-4 py-3 ${focusedColumn === 'title' ? 'ring-2 ring-inset ring-slate-300' : ''}`}
       >
         <input
           ref={nameRef}
-          className="w-full bg-transparent border-none outline-none text-[13px] text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-indigo-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
+          className="w-full bg-transparent border-none outline-none text-[13px] text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-slate-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
           value={item.name}
           onChange={(e) => onUpdateItem(item.id, { name: e.target.value })}
           onKeyDown={(e) => {
@@ -1696,7 +1696,7 @@ function ItemRow({
       {/* Type */}
       <td
         ref={(el) => { cellRefs.current['type'] = el; }}
-        className={`px-3 py-3 ${focusedColumn === 'type' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
+        className={`px-3 py-3 ${focusedColumn === 'type' ? 'ring-2 ring-inset ring-slate-300' : ''}`}
         tabIndex={focusedColumn === 'type' ? 0 : -1}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -1721,7 +1721,7 @@ function ItemRow({
       {/* Duration */}
       <td
         ref={(el) => { cellRefs.current['duration'] = el; }}
-        className={`px-3 py-3 ${focusedColumn === 'duration' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
+        className={`px-3 py-3 ${focusedColumn === 'duration' ? 'ring-2 ring-inset ring-slate-300' : ''}`}
         tabIndex={focusedColumn === 'duration' ? 0 : -1}
         onKeyDown={(e) => {
           if (!editingDuration) {
@@ -1740,7 +1740,7 @@ function ItemRow({
         {editingDuration ? (
           <input
             type="number"
-            className="w-16 bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-indigo-500"
+            className="w-16 bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-slate-700"
             value={durationValue}
             min={0}
             autoFocus
@@ -1774,7 +1774,7 @@ function ItemRow({
           />
         ) : (
           <span
-            className="text-[12px] text-slate-700 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[12px] text-slate-700 tabular-nums cursor-pointer hover:text-slate-800 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               setDurationValue(String(duration));
@@ -1791,7 +1791,7 @@ function ItemRow({
       {/* Start Date */}
       <td
         ref={(el) => { cellRefs.current['startDate'] = el; }}
-        className={`px-3 py-3 ${focusedColumn === 'startDate' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
+        className={`px-3 py-3 ${focusedColumn === 'startDate' ? 'ring-2 ring-inset ring-slate-300' : ''}`}
         tabIndex={focusedColumn === 'startDate' ? 0 : -1}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -1805,7 +1805,7 @@ function ItemRow({
       >
         <div className="relative flex items-center gap-1.5">
           <span
-            className="text-[12px] text-slate-700 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[12px] text-slate-700 tabular-nums cursor-pointer hover:text-slate-800 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               onCellFocus('startDate');
@@ -1837,7 +1837,7 @@ function ItemRow({
       {/* End Date */}
       <td
         ref={(el) => { cellRefs.current['endDate'] = el; }}
-        className={`px-3 py-3 ${focusedColumn === 'endDate' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
+        className={`px-3 py-3 ${focusedColumn === 'endDate' ? 'ring-2 ring-inset ring-slate-300' : ''}`}
         tabIndex={focusedColumn === 'endDate' ? 0 : -1}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
@@ -1851,7 +1851,7 @@ function ItemRow({
       >
          <div className="relative flex items-center gap-1.5">
           <span
-            className="text-[12px] text-slate-700 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[12px] text-slate-700 tabular-nums cursor-pointer hover:text-slate-800 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               onCellFocus('endDate');
@@ -1884,7 +1884,7 @@ function ItemRow({
       {columnVisibility.percentComplete && (
         <td
           ref={(el) => { cellRefs.current['percentComplete'] = el; }}
-          className={`px-3 py-3 ${focusedColumn === 'percentComplete' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
+          className={`px-3 py-3 ${focusedColumn === 'percentComplete' ? 'ring-2 ring-inset ring-slate-300' : ''}`}
           tabIndex={focusedColumn === 'percentComplete' ? 0 : -1}
           onKeyDown={(e) => {
             if (!editingProgress) {
@@ -1903,7 +1903,7 @@ function ItemRow({
           {editingProgress ? (
             <input
               type="number"
-              className="w-14 bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-indigo-500"
+              className="w-14 bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-slate-700"
               value={progressValue}
               min={0}
               max={100}
@@ -1956,7 +1956,7 @@ function ItemRow({
                   }}
                 />
               </div>
-              <span className="text-[12px] text-slate-700 tabular-nums group-hover/pct:text-indigo-600 transition-colors">
+              <span className="text-[12px] text-slate-700 tabular-nums group-hover/pct:text-slate-800 transition-colors">
                 {item.percentComplete}%
               </span>
             </div>
@@ -1968,7 +1968,7 @@ function ItemRow({
       {columnVisibility.assignedTo && (
         <td
           ref={(el) => { cellRefs.current['assignedTo'] = el; }}
-          className={`px-3 py-3 ${focusedColumn === 'assignedTo' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
+          className={`px-3 py-3 ${focusedColumn === 'assignedTo' ? 'ring-2 ring-inset ring-slate-300' : ''}`}
           tabIndex={focusedColumn === 'assignedTo' ? 0 : -1}
           onKeyDown={(e) => {
             if (!editingAssigned) {
@@ -1986,7 +1986,7 @@ function ItemRow({
         >
           {editingAssigned ? (
             <input
-              className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-indigo-500"
+              className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-slate-700"
               value={assignedValue}
               placeholder="Type a name..."
               autoFocus
@@ -2018,7 +2018,7 @@ function ItemRow({
             />
           ) : item.assignedTo ? (
             <span
-            className="text-[12px] text-slate-700 cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[12px] text-slate-700 cursor-pointer hover:text-slate-800 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               setAssignedValue(item.assignedTo);
@@ -2051,7 +2051,7 @@ function ItemRow({
       {columnVisibility.status && (
          <td
           ref={(el) => { cellRefs.current['status'] = el; }}
-          className={`px-3 py-3 ${focusedColumn === 'status' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
+          className={`px-3 py-3 ${focusedColumn === 'status' ? 'ring-2 ring-inset ring-slate-300' : ''}`}
            tabIndex={focusedColumn === 'status' ? 0 : -1}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -2077,7 +2077,7 @@ function ItemRow({
       {columnVisibility.predecessors && (
         <td
           ref={(el) => { cellRefs.current['predecessors'] = el; }}
-          className={`px-3 py-3 ${focusedColumn === 'predecessors' ? 'ring-2 ring-inset ring-indigo-300' : ''}`}
+          className={`px-3 py-3 ${focusedColumn === 'predecessors' ? 'ring-2 ring-inset ring-slate-300' : ''}`}
           tabIndex={focusedColumn === 'predecessors' ? 0 : -1}
           onKeyDown={(e) => {
             if (!editingPredecessors) {
@@ -2101,7 +2101,7 @@ function ItemRow({
                   className={`w-full text-xs px-1.5 py-0.5 border rounded bg-white outline-none focus:ring-1 text-slate-700 font-mono ${
                     predecessorsWarnings.length > 0
                       ? 'border-amber-400 focus:ring-amber-300'
-                      : 'border-indigo-300 focus:ring-indigo-400'
+                      : 'border-slate-300 focus:ring-slate-400'
                   }`}
                   value={predecessorsValue}
                   onChange={(e) => setPredecessorsValue(e.target.value)}
@@ -2171,7 +2171,7 @@ function ItemRow({
                   {predecessorsShorthand || '\u2014'}
                 </span>
                 <button
-                  className="p-0.5 rounded text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-all shrink-0 opacity-0 group-hover/row:opacity-100"
+                  className="p-0.5 rounded text-slate-300 hover:text-slate-700 hover:bg-slate-50 transition-all shrink-0 opacity-0 group-hover/row:opacity-100"
                   onClick={(e) => {
                     e.stopPropagation();
                     onOpenDependencyEditor(item.id);
@@ -2592,7 +2592,7 @@ function StatusCell({
 
 function InlineAddRow() {
   return (
-    <span className="flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-indigo-500 transition-colors py-0.5 pointer-events-none select-none">
+    <span className="flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-slate-700 transition-colors py-0.5 pointer-events-none select-none">
       <Plus size={13} />
       Add task or milestone
     </span>

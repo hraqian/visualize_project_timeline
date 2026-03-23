@@ -110,7 +110,7 @@ export function ProjectManagerModal({ onClose }: Props) {
         <div className="px-5 py-3 border-b border-[var(--color-border)] flex items-center gap-2">
           <button
             onClick={handleNew}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-white bg-[#4f46e5] hover:bg-[#4338ca] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-white bg-[#1e293b] hover:bg-[#0f172a] transition-colors"
           >
             <Plus size={14} />
             New Project
@@ -145,7 +145,7 @@ export function ProjectManagerModal({ onClose }: Props) {
                         <div className="text-sm font-medium text-[var(--color-text)] truncate">
                           {p.name}
                           {isCurrent && (
-                            <span className="ml-2 text-[10px] font-normal text-[#4f46e5] bg-[#4f46e5]/10 px-1.5 py-0.5 rounded">
+                            <span className="ml-2 text-[10px] font-normal text-[#1e293b] bg-[#1e293b]/10 px-1.5 py-0.5 rounded">
                               Current
                             </span>
                           )}
@@ -158,7 +158,7 @@ export function ProjectManagerModal({ onClose }: Props) {
                         {!isCurrent && (
                           <button
                             onClick={() => handleLoad(p.id)}
-                            className="px-2.5 py-1 rounded text-xs font-medium text-[#4f46e5] hover:bg-[#4f46e5]/10 transition-colors"
+                            className="px-2.5 py-1 rounded text-xs font-medium text-[#1e293b] hover:bg-[#1e293b]/10 transition-colors"
                           >
                             Open
                           </button>

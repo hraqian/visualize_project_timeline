@@ -63,7 +63,7 @@ export function SettingsModal({ onClose }: Props) {
                 onClick={() => setActiveSection(s.id)}
                 className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeSection === s.id
-                    ? 'bg-white text-[#4f46e5] shadow-sm border border-slate-200'
+                    ? 'bg-white text-[#1e293b] shadow-sm border border-slate-200'
                     : 'text-slate-600 hover:bg-white/60 hover:text-slate-800'
                 }`}
               >
@@ -98,7 +98,7 @@ export function SettingsModal({ onClose }: Props) {
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 rounded-md text-sm font-medium text-white bg-[#4f46e5] hover:bg-[#4338ca] transition-all"
+            className="px-4 py-2 rounded-md text-sm font-medium text-white bg-[#1e293b] hover:bg-[#0f172a] transition-all"
           >
             Save
           </button>
@@ -127,7 +127,7 @@ function GeneralSection() {
                 name="dateFormat"
                 value="us"
                 defaultChecked
-                className="w-3.5 h-3.5 text-[#4f46e5] accent-[#4f46e5]"
+                className="w-3.5 h-3.5 text-[#1e293b] accent-[#1e293b]"
               />
               <span className="text-sm text-slate-700">US (MM/dd/yyyy)</span>
             </label>
@@ -136,7 +136,7 @@ function GeneralSection() {
                 type="radio"
                 name="dateFormat"
                 value="international"
-                className="w-3.5 h-3.5 text-[#4f46e5] accent-[#4f46e5]"
+                className="w-3.5 h-3.5 text-[#1e293b] accent-[#1e293b]"
               />
               <span className="text-sm text-slate-700">International (dd/MM/yyyy)</span>
             </label>
@@ -154,7 +154,7 @@ function GeneralSection() {
                   <input
                     type="checkbox"
                     defaultChecked={isWeekday}
-                    className="w-3.5 h-3.5 rounded accent-[#4f46e5]"
+                    className="w-3.5 h-3.5 rounded accent-[#1e293b]"
                   />
                   <span className="text-sm text-slate-700">{day}</span>
                 </label>
@@ -221,7 +221,7 @@ function DependenciesSection({
               name="topMode"
               checked={isAutomatic}
               onChange={() => { if (!isAutomatic) setSchedulingMode('automatic-flexible'); }}
-              className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+              className="w-4 h-4 mt-0.5 accent-[#1e293b]"
             />
             <div>
               <span className="text-sm text-slate-800 font-semibold">Automatic</span>
@@ -242,7 +242,7 @@ function DependenciesSection({
                     name="autoSubMode"
                     checked={schedulingMode === 'automatic-flexible'}
                     onChange={() => setSchedulingMode('automatic-flexible')}
-                    className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                    className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                   />
                   <span className="text-sm text-slate-700">
                     <span className="font-semibold">Flexible</span>
@@ -263,7 +263,7 @@ function DependenciesSection({
                           name="conflictMode"
                           checked={conflictMode === 'dont-allow'}
                           onChange={() => setConflictMode('dont-allow')}
-                          className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                          className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                         />
                         <span className="text-sm text-slate-600">
                           Don't allow conflicts <span className="text-slate-400">(Reschedule that item to comply with the dependency rules)</span>
@@ -275,7 +275,7 @@ function DependenciesSection({
                           name="conflictMode"
                           checked={conflictMode === 'allow-exception'}
                           onChange={() => setConflictMode('allow-exception')}
-                          className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                          className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                         />
                         <span className="text-sm text-slate-600">
                           Allow conflicts as an exception <span className="text-slate-400">(Keep that item in its conflicting position)</span>
@@ -287,7 +287,7 @@ function DependenciesSection({
                           name="conflictMode"
                           checked={conflictMode === 'ask'}
                           onChange={() => setConflictMode('ask')}
-                          className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                          className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                         />
                         <span className="text-sm text-slate-600">Ask me what to do every time</span>
                       </label>
@@ -303,7 +303,7 @@ function DependenciesSection({
                   name="autoSubMode"
                   checked={schedulingMode === 'automatic-strict'}
                   onChange={() => setSchedulingMode('automatic-strict')}
-                  className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+                  className="w-4 h-4 mt-0.5 accent-[#1e293b]"
                 />
                 <span className="text-sm text-slate-700">
                   <span className="font-semibold">Strict</span>
@@ -322,7 +322,7 @@ function DependenciesSection({
               name="topMode"
               checked={schedulingMode === 'manual'}
               onChange={() => setSchedulingMode('manual')}
-              className="w-4 h-4 mt-0.5 accent-[#4f46e5]"
+              className="w-4 h-4 mt-0.5 accent-[#1e293b]"
             />
             <div>
               <span className="text-sm text-slate-800 font-semibold">Manual</span>

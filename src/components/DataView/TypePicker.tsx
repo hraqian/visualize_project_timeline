@@ -40,7 +40,7 @@ const MILESTONE_ICONS: MilestoneIcon[] = [
 ];
 
 const COLOR_SWATCHES = [
-  '#6366f1', // indigo
+  '#334155', // slate
   '#22c55e', // green
   '#ef4444', // red
   '#78716c', // stone

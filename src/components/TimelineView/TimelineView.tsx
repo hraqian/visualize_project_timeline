@@ -720,7 +720,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                   {/* Colored swimlane badge on left edge */}
                   <div
                     className={`absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md tracking-wide z-[6] cursor-pointer transition-shadow ${
-                      selectedSwimlaneId === swimlane.id ? 'ring-2 ring-offset-1 ring-indigo-500' : ''
+                      selectedSwimlaneId === swimlane.id ? 'ring-2 ring-offset-1 ring-slate-700' : ''
                     }`}
                     style={{
                       width: SWIMLANE_BADGE_WIDTH,

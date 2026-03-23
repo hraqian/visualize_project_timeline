@@ -372,7 +372,7 @@ function PopoverContent({
                   onChange={(e) => setHexInput(e.target.value)}
                   onBlur={() => handleHexSubmit(hexInput)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleHexSubmit(hexInput); }}
-                  className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-[11px] text-[var(--color-text)] font-mono outline-none focus:border-indigo-500"
+                  className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-[11px] text-[var(--color-text)] font-mono outline-none focus:border-slate-700"
                 />
               </div>
               <RgbInput label="R" value={rgb[0]} onChange={(v) => handleRgbChange(v, rgb[1], rgb[2])} />
@@ -409,7 +409,7 @@ function RgbInput({
           const v = Math.max(0, Math.min(255, parseInt(e.target.value) || 0));
           onChange(v);
         }}
-        className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-1.5 py-1 text-[11px] text-[var(--color-text)] font-mono outline-none focus:border-indigo-500 text-center"
+        className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-1.5 py-1 text-[11px] text-[var(--color-text)] font-mono outline-none focus:border-slate-700 text-center"
       />
     </div>
   );

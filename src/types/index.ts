@@ -218,7 +218,7 @@ export const DEFAULT_SWIMLANE_STYLE = {
   titleFontWeight: 600,
   titleFontStyle: 'normal' as const,
   titleTextDecoration: 'none' as const,
-  headerColor: '#6366f1',
+  headerColor: '#334155',
   headerTransparency: 0,
   bodyColor: '#d1d5db',
   bodyTransparency: 80,
@@ -416,7 +416,7 @@ export const FONT_WEIGHTS = [
 
 export const DEFAULT_TASK_STYLE: TaskStyle = {
   barShape: 'rounded',
-  color: '#6366f1',
+  color: '#334155',
   thickness: 32,
   spacing: 8,
   // Show/hide toggles
@@ -501,7 +501,7 @@ export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {
 };
 
 export const PRESET_COLORS = [
-  '#6366f1', // indigo
+  '#334155', // slate
   '#8b5cf6', // violet
   '#ec4899', // pink
   '#ef4444', // red

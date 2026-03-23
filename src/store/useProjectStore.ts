@@ -42,7 +42,7 @@ function applyLagAdjustments(deps: Dependency[], adjustments: DependencyLagAdjus
 
 function createSampleData(): Pick<ProjectState, 'items' | 'swimlanes' | 'dependencies'> {
   const swimlanes: Swimlane[] = [
-    { id: 's1', name: 'Planning', color: '#6366f1', order: 0, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#6366f1' },
+    { id: 's1', name: 'Planning', color: '#334155', order: 0, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#334155' },
     { id: 's2', name: 'Design', color: '#8b5cf6', order: 1, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#8b5cf6' },
     { id: 's3', name: 'Development', color: '#3b82f6', order: 2, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#3b82f6' },
     { id: 's4', name: 'Testing & Launch', color: '#22c55e', order: 3, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#22c55e' },
@@ -60,7 +60,7 @@ function createSampleData(): Pick<ProjectState, 'items' | 'swimlanes' | 'depende
       id: 'i2', name: 'Requirements Gathering', type: 'task',
       startDate: '2026-04-02', endDate: '2026-04-18',
       percentComplete: 80, statusId: 'on-track', assignedTo: 'Sarah Kim', visible: true, swimlaneId: 's1', row: 0,
-      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#6366f1' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
+      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#334155' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
       dependsOn: ['i1'], isCriticalPath: false,
     },
     {
@@ -687,7 +687,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   addSwimlane: (name) => {
     const state = get();
     const maxOrder = Math.max(...state.swimlanes.map((s) => s.order), -1);
-    const colors = ['#6366f1', '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
+    const colors = ['#334155', '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
     const chosenColor = colors[state.swimlanes.length % colors.length];
     const newId = uuid();
     set((st) => ({
@@ -712,7 +712,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     const sorted = [...state.swimlanes].sort((a, b) => a.order - b.order);
     const refIndex = sorted.findIndex((s) => s.id === referenceId);
     if (refIndex === -1) return;
-    const colors = ['#6366f1', '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
+    const colors = ['#334155', '#8b5cf6', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#ec4899'];
     const chosenColor = colors[state.swimlanes.length % colors.length];
     const newSwimlane: Swimlane = {
       id: uuid(),

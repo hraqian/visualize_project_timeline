@@ -37,7 +37,7 @@ export function SizeControl({
             onClick={() => onChange(preset.value)}
             className={`px-2.5 py-1 text-xs font-medium transition-colors ${
               activePreset?.label === preset.label
-                ? 'bg-indigo-500/15 text-indigo-600'
+                ? 'bg-slate-700/15 text-slate-800'
                 : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]'
             } ${preset !== presets[0] ? 'border-l border-[var(--color-border)]' : ''}`}
           >

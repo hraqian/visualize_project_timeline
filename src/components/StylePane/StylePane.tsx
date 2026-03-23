@@ -227,13 +227,13 @@ export function StylePane() {
       {/* ─── Header with main tabs ─── */}
       <div className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)] shrink-0">
         <div className="flex items-center h-10 px-3">
-          <Paintbrush size={14} className="text-indigo-500 mr-2 shrink-0" />
+          <Paintbrush size={14} className="text-slate-700 mr-2 shrink-0" />
           <div className="flex items-center gap-0.5 flex-1">
             <button
               onClick={() => setMainTab('items')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                 mainTab === 'items'
-                  ? 'bg-indigo-500/15 text-indigo-600'
+                  ? 'bg-slate-700/15 text-slate-800'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
@@ -243,7 +243,7 @@ export function StylePane() {
               onClick={() => setMainTab('timescale')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                 mainTab === 'timescale'
-                  ? 'bg-indigo-500/15 text-indigo-600'
+                  ? 'bg-slate-700/15 text-slate-800'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
@@ -253,7 +253,7 @@ export function StylePane() {
               onClick={() => setMainTab('design')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                 mainTab === 'design'
-                  ? 'bg-indigo-500/15 text-indigo-600'
+                  ? 'bg-slate-700/15 text-slate-800'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
               }`}
             >
@@ -452,7 +452,7 @@ function DependencyLinkControls() {
           onClick={() => setDepSubTab('link')}
           className={`px-3 py-1.5 text-xs font-medium transition-all border-b-2 ${
             depSubTab === 'link'
-              ? 'border-indigo-500 text-indigo-600'
+              ? 'border-slate-700 text-slate-800'
               : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
           }`}
         >
@@ -462,7 +462,7 @@ function DependencyLinkControls() {
           onClick={() => setDepSubTab('critical-path')}
           className={`px-3 py-1.5 text-xs font-medium transition-all border-b-2 ${
             depSubTab === 'critical-path'
-              ? 'border-indigo-500 text-indigo-600'
+              ? 'border-slate-700 text-slate-800'
               : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
           }`}
         >
@@ -491,7 +491,7 @@ function DependencyLinkControls() {
             {/* Color */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--color-text-muted)]">Color</span>
-              <div className="w-6 h-6 rounded border border-[var(--color-border)] bg-[#6366f1] cursor-not-allowed" title="Coming soon" />
+              <div className="w-6 h-6 rounded border border-[var(--color-border)] bg-[#334155] cursor-not-allowed" title="Coming soon" />
             </div>
 
             {/* Transparency */}
@@ -1977,7 +1977,7 @@ function SwimlaneStyleControls({
                     max={100}
                     value={swimlane.headerTransparency}
                     onChange={(e) => updateSwimlane(swimlane.id, { headerTransparency: Number(e.target.value) })}
-                    className="flex-1 h-1.5 accent-indigo-500 cursor-pointer"
+                    className="flex-1 h-1.5 accent-slate-700 cursor-pointer"
                   />
                   <span className="text-xs text-[var(--color-text-secondary)] w-8 text-right tabular-nums">{swimlane.headerTransparency}%</span>
                 </div>
@@ -2009,7 +2009,7 @@ function SwimlaneStyleControls({
                     max={100}
                     value={swimlane.bodyTransparency}
                     onChange={(e) => updateSwimlane(swimlane.id, { bodyTransparency: Number(e.target.value) })}
-                    className="flex-1 h-1.5 accent-indigo-500 cursor-pointer"
+                    className="flex-1 h-1.5 accent-slate-700 cursor-pointer"
                   />
                   <span className="text-xs text-[var(--color-text-secondary)] w-8 text-right tabular-nums">{swimlane.bodyTransparency}%</span>
                 </div>
@@ -2195,9 +2195,9 @@ function TodayMarkerSection() {
             title="Below timescale"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="2" width="12" height="3" rx="0.5" fill={position === 'below' ? '#6366f1' : '#94a3b8'} opacity="0.5" />
-              <line x1="8" y1="5" x2="8" y2="14" stroke={position === 'below' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" />
-              <path d="M5.5 11.5L8 14L10.5 11.5" stroke={position === 'below' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="2" y="2" width="12" height="3" rx="0.5" fill={position === 'below' ? '#334155' : '#94a3b8'} opacity="0.5" />
+              <line x1="8" y1="5" x2="8" y2="14" stroke={position === 'below' ? '#334155' : '#94a3b8'} strokeWidth="1.5" />
+              <path d="M5.5 11.5L8 14L10.5 11.5" stroke={position === 'below' ? '#334155' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           {/* Above timescale */}
@@ -2211,9 +2211,9 @@ function TodayMarkerSection() {
             title="Above timescale"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="11" width="12" height="3" rx="0.5" fill={position === 'above' ? '#6366f1' : '#94a3b8'} opacity="0.5" />
-              <line x1="8" y1="11" x2="8" y2="2" stroke={position === 'above' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" />
-              <path d="M5.5 4.5L8 2L10.5 4.5" stroke={position === 'above' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="2" y="11" width="12" height="3" rx="0.5" fill={position === 'above' ? '#334155' : '#94a3b8'} opacity="0.5" />
+              <line x1="8" y1="11" x2="8" y2="2" stroke={position === 'above' ? '#334155' : '#94a3b8'} strokeWidth="1.5" />
+              <path d="M5.5 4.5L8 2L10.5 4.5" stroke={position === 'above' ? '#334155' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           {/* Auto-adjust button */}
@@ -2304,9 +2304,9 @@ function ElapsedTimeSection() {
             title="Below timescale"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="2" width="12" height="3" rx="0.5" fill={position === 'below' ? '#6366f1' : '#94a3b8'} opacity="0.5" />
-              <line x1="8" y1="5" x2="8" y2="14" stroke={position === 'below' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" />
-              <path d="M5.5 11.5L8 14L10.5 11.5" stroke={position === 'below' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="2" y="2" width="12" height="3" rx="0.5" fill={position === 'below' ? '#334155' : '#94a3b8'} opacity="0.5" />
+              <line x1="8" y1="5" x2="8" y2="14" stroke={position === 'below' ? '#334155' : '#94a3b8'} strokeWidth="1.5" />
+              <path d="M5.5 11.5L8 14L10.5 11.5" stroke={position === 'below' ? '#334155' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           {/* Above timescale */}
@@ -2320,9 +2320,9 @@ function ElapsedTimeSection() {
             title="Above timescale"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="11" width="12" height="3" rx="0.5" fill={position === 'above' ? '#6366f1' : '#94a3b8'} opacity="0.5" />
-              <line x1="8" y1="11" x2="8" y2="2" stroke={position === 'above' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" />
-              <path d="M5.5 4.5L8 2L10.5 4.5" stroke={position === 'above' ? '#6366f1' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="2" y="11" width="12" height="3" rx="0.5" fill={position === 'above' ? '#334155' : '#94a3b8'} opacity="0.5" />
+              <line x1="8" y1="11" x2="8" y2="2" stroke={position === 'above' ? '#334155' : '#94a3b8'} strokeWidth="1.5" />
+              <path d="M5.5 4.5L8 2L10.5 4.5" stroke={position === 'above' ? '#334155' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           {/* Auto-adjust button */}
@@ -2588,7 +2588,7 @@ function ScaleSection() {
               Unit type
             </label>
             <select
-              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors"
               value={tier.unit}
               onChange={(e) => handleUnitChange(e.target.value)}
             >
@@ -2605,7 +2605,7 @@ function ScaleSection() {
               Format
             </label>
             <select
-              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors"
+              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors"
               value={tier.format}
               onChange={(e) => updateTier(activeTierStoreIndex, { format: e.target.value as TierFormat })}
             >
@@ -2623,7 +2623,7 @@ function ScaleSection() {
           type="checkbox"
           checked={tier.separators}
           onChange={(e) => updateTier(activeTierStoreIndex, { separators: e.target.checked })}
-          className="accent-indigo-500 w-4 h-4"
+          className="accent-slate-700 w-4 h-4"
         />
         <span className="font-medium">Separators</span>
       </label>
@@ -3462,7 +3462,7 @@ function ApplyToAllBox({
       <button
         ref={triggerRef}
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-indigo-600 transition-colors"
+        className="flex items-center gap-2 w-full text-left text-xs font-medium text-[var(--color-text)] hover:text-slate-800 transition-colors"
       >
         <Paintbrush size={13} className="text-[var(--color-text-muted)]" />
         <span className="flex-1">{label}</span>
@@ -3493,7 +3493,7 @@ function ApplyToAllBox({
                   type="checkbox"
                   checked={excludeSwimlanes ?? false}
                   onChange={(e) => setExcludeSwimlanes(e.target.checked)}
-                  className="accent-indigo-500"
+                  className="accent-slate-700"
                 />
                 <span>Exclude swimlanes</span>
                 <span title="Exclude items placed inside swimlanes">
@@ -3506,7 +3506,7 @@ function ApplyToAllBox({
                   type="checkbox"
                   checked={onlyInSwimlane ?? false}
                   onChange={(e) => setOnlyInSwimlane(e.target.checked)}
-                  className="accent-indigo-500"
+                  className="accent-slate-700"
                 />
                 <span>Only in this swimlane</span>
                 <span title="Only apply to items in the same swimlane">
@@ -3800,7 +3800,7 @@ function ConnectorThicknessDropdown({
 }) {
   return (
     <select
-      className="w-full h-9 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+      className="w-full h-9 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors cursor-pointer"
       value={value}
       onChange={(e) => onChange(e.target.value as ConnectorThickness)}
     >
@@ -3831,7 +3831,7 @@ function OutlineThicknessDropdown({
 }) {
   return (
     <select
-      className="w-full h-9 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 text-sm text-[var(--color-text)] outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+      className="w-full h-9 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors cursor-pointer"
       value={value}
       onChange={(e) => onChange(e.target.value as OutlineThickness)}
     >
@@ -4144,7 +4144,7 @@ const SWIMLANE_SPACING_PRESETS = [
 ];
 
 function SwimlaneSpacingIcon({ gap, active }: { gap: number; active: boolean }) {
-  const color = active ? '#6366f1' : 'currentColor';
+  const color = active ? '#334155' : 'currentColor';
   const cy = 4; // vertical center
   return (
     <svg width={20} height={20} viewBox="-2 -2 12 12" fill="none">
@@ -4243,7 +4243,7 @@ function DesignTabContent({
               key={opt.value}
               className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
                 taskLayout === opt.value
-                  ? 'border-indigo-400 bg-indigo-500/5'
+                  ? 'border-slate-400 bg-slate-700/5'
                   : 'border-[var(--color-border)] hover:border-[var(--color-text-muted)]'
               }`}
             >
@@ -4253,7 +4253,7 @@ function DesignTabContent({
                 value={opt.value}
                 checked={taskLayout === opt.value}
                 onChange={() => setTaskLayout(opt.value)}
-                className="mt-0.5 accent-indigo-500"
+                className="mt-0.5 accent-slate-700"
               />
               <div>
                 <div className="text-xs font-medium text-[var(--color-text)]">{opt.label}</div>
