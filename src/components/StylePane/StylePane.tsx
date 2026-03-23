@@ -2900,9 +2900,11 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                             fontStyle: tier.fontStyle,
                             textDecoration: tier.textDecoration,
                             justifyContent: 'flex-start',
+                            paddingLeft: ci === 0 ? 8 : 4,
+                            paddingRight: ci === cells.length - 1 ? 8 : 4,
                           }}
                         >
-                          <span className="truncate px-1">{cell.label}</span>
+                          <span className="truncate">{cell.label}</span>
                         </div>
                       ))}
                     </div>
