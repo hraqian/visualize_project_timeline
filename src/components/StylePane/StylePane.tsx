@@ -93,6 +93,7 @@ function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSPropertie
     case 'leaf': return { borderRadius: '0 9999px 9999px 0' };
     case 'ellipse': return { borderRadius: '9999px' };
     case 'modern': return { borderRadius: '4px 12px 4px 12px' };
+    case 'slant': return { clipPath: 'polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%)' };
   }
 }
 
@@ -110,7 +111,7 @@ const MILESTONE_ICONS: { id: MilestoneIcon; label: string }[] = [
   { id: 'chevron-right', label: 'Chevron right' },
   { id: 'triangle', label: 'Triangle up' },
   { id: 'plus', label: 'Plus' },
-  { id: 'circle', label: 'Circle outline' },
+  { id: 'circle-half', label: 'Half circle' },
   { id: 'circle-filled', label: 'Circle filled' },
   { id: 'pentagon', label: 'Pentagon' },
   { id: 'diamond', label: 'Diamond outline' },
@@ -118,18 +119,16 @@ const MILESTONE_ICONS: { id: MilestoneIcon; label: string }[] = [
 ];
 
 const BAR_SHAPES: { id: BarShape; label: string }[] = [
-  { id: 'square', label: 'Square' },
-  { id: 'rounded', label: 'Rounded' },
+  { id: 'square', label: 'Rectangle' },
+  { id: 'rounded', label: 'Rounded rectangle' },
   { id: 'capsule', label: 'Capsule' },
   { id: 'chevron', label: 'Chevron' },
-  { id: 'double-chevron', label: 'Dbl Chevron' },
-  { id: 'arrow-right', label: 'Arrow R' },
+  { id: 'double-chevron', label: 'Double chevron' },
+  { id: 'arrow-right', label: 'Arrow' },
   { id: 'pointed', label: 'Pointed' },
-  { id: 'notched', label: 'Notched' },
-  { id: 'tab', label: 'Tab' },
-  { id: 'arrow-both', label: 'Arrow Both' },
-  { id: 'trapezoid', label: 'Trapezoid' },
-  { id: 'flat', label: 'Flat' },
+  { id: 'arrow-both', label: 'Double arrow' },
+  { id: 'notched', label: 'Leaf' },
+  { id: 'trapezoid', label: 'Parallelogram' },
 ];
 
 const LABEL_POSITIONS: { id: LabelPosition; label: string }[] = [
@@ -1447,20 +1446,20 @@ function MilestoneShapeDropdown({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-[252px] bg-white border border-[var(--color-border)] rounded-lg shadow-xl p-3">
-          <div className="grid grid-cols-6 gap-2">
+        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-[var(--color-border)] rounded-lg shadow-xl p-2">
+          <div className="grid grid-cols-6 gap-1">
             {MILESTONE_ICONS.map((ic) => (
               <button
                 key={ic.id}
                 onClick={() => { onChange(ic.id); setOpen(false); }}
-                className={`flex items-center justify-center h-8 rounded-md transition-colors ${
+                className={`flex items-center justify-center w-9 h-9 rounded-md transition-colors ${
                   value === ic.id
                     ? 'bg-slate-200'
                     : 'hover:bg-[var(--color-surface-hover)]'
                 }`}
                 title={ic.label}
               >
-                <MilestoneIconComponent icon={ic.id} size={18} color={color} />
+                <MilestoneIconComponent icon={ic.id} size={18} color={value === ic.id ? '#1e293b' : '#475569'} />
               </button>
             ))}
           </div>
@@ -2437,8 +2436,9 @@ function EndCapSection({ side }: { side: 'left' | 'right' }) {
 const TIMESCALE_BAR_SHAPES: { id: TimescaleBarShape; label: string }[] = [
   { id: 'rectangle', label: 'Rectangle' },
   { id: 'rounded', label: 'Rounded rectangle' },
-  { id: 'leaf', label: 'Leaf' },
+  { id: 'slant', label: 'Slant' },
   { id: 'ellipse', label: 'Ellipse' },
+  { id: 'leaf', label: 'Leaf' },
   { id: 'modern', label: 'Modern' },
 ];
 
@@ -2477,6 +2477,14 @@ function TimescaleBarShapeIcon({ shape, size = 24, color = '#475569' }: { shape:
           <path d={`M${3},${2} h${w - 8} l${2},${(h - 4) / 2} l-${2},${(h - 4) / 2} H${3} l${2},-${(h - 4) / 2} l-${2},-${(h - 4) / 2} Z`} fill={color} />
         </svg>
       );
+    case 'slant': {
+      const inset = (h - 4) * 0.3;
+      return (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+          <path d={`M${1 + inset},2 H${w - 1} L${w - 1 - inset},${h - 2} H1 Z`} fill={color} />
+        </svg>
+      );
+    }
   }
 }
 
@@ -2501,7 +2509,7 @@ function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarSha
         className="w-full flex items-center gap-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none hover:border-[var(--color-text-muted)] transition-colors"
       >
         <TimescaleBarShapeIcon shape={value} size={20} />
-        <span className="flex-1 text-left truncate">{selected.label}</span>
+        <span className="flex-1 text-left truncate font-medium">{selected.label}</span>
         <ChevronDown className="w-3.5 h-3.5 text-[var(--color-text-muted)]" />
       </button>
       {open && (

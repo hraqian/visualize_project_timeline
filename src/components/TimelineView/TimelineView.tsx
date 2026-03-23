@@ -23,6 +23,7 @@ function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSPropertie
     case 'leaf': return { borderRadius: '0 9999px 9999px 0' };
     case 'ellipse': return { borderRadius: '9999px' };
     case 'modern': return { borderRadius: '4px 12px 4px 12px' };
+    case 'slant': return { clipPath: 'polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%)' };
   }
 }
 

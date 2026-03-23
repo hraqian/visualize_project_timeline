@@ -268,7 +268,7 @@ export interface TimescaleTierConfig {
   separators: boolean;
 }
 
-export type TimescaleBarShape = 'rectangle' | 'rounded' | 'leaf' | 'ellipse' | 'modern';
+export type TimescaleBarShape = 'rectangle' | 'rounded' | 'leaf' | 'ellipse' | 'modern' | 'slant';
 
 export type TodayMarkerPosition = 'above' | 'below';
 
