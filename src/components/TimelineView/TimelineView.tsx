@@ -19,7 +19,7 @@ const SWIMLANE_PADDING_BOTTOM = 10;
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
   switch (shape) {
     case 'rectangle': return { borderRadius: 3 };
-    case 'rounded': return { borderRadius: '20%' };
+    case 'rounded': return { borderRadius: 6 };
     case 'ellipse': return { borderRadius: '9999px' };
     case 'modern': return { borderRadius: 6, transform: 'skewX(-5deg)' };
     case 'leaf': return { borderRadius: '6px 2px 6px 2px', transform: 'skewX(-5deg)' };

@@ -90,7 +90,7 @@ function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSPropertie
   // Maps to same geometry as task bar shapes, but uses CSS-only (no pixel dimensions available)
   switch (shape) {
     case 'rectangle': return { borderRadius: 3 };
-    case 'rounded': return { borderRadius: '20%' };
+    case 'rounded': return { borderRadius: 6 };
     case 'ellipse': return { borderRadius: '9999px' };
     // modern & leaf are parallelograms — approximate with skewX transform on the container
     case 'modern': return { borderRadius: 6, transform: 'skewX(-5deg)' };
