@@ -1,8 +1,8 @@
 import { useRef, useState, useCallback, useMemo, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
-import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
+import { parseISO, differenceInDays, addDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
-import { generateTierLabels, buildVisibleTierCells, getProjectRange, resolveAutoUnit } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, getProjectRangePadded, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig } from '@/types';
 
@@ -163,17 +163,11 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     return (item: ProjectItem) => rowMap.get(item.id) ?? item.row;
   }, [taskLayout, belowIndependentItems, swimlanedItems, sortedSwimlanes]);
 
-  // Compute project range with padding
-  const { origin, totalDays, rangeEndDate } = useMemo(() => {
-    const range = getProjectRange(items);
-    const padStart = startOfMonth(subDays(parseISO(range.start), 14));
-    // End at the end of the month containing the last item
-    const endMonth = startOfMonth(parseISO(range.end));
-    const numMonths = differenceInCalendarMonths(endMonth, padStart) + 1;
-    const padEnd = addMonths(padStart, numMonths);
-    const total = differenceInDays(padEnd, padStart);
-    return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: subDays(padEnd, 1) };
-  }, [items]);
+  // Compute project range with padding — origin aligned to unit boundaries
+  const { origin, totalDays, rangeEndDate } = useMemo(
+    () => getProjectRangePadded(items, timescale),
+    [items, timescale],
+  );
 
   // Migrate legacy single-tier {unit:'month', format:'MMM'} to unit:'auto' for already-loaded projects
   useEffect(() => {

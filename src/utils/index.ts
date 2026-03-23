@@ -1,12 +1,15 @@
 import {
   differenceInDays,
+  differenceInCalendarMonths,
   addDays,
   addWeeks,
   addMonths,
+  subDays,
   parseISO,
   startOfMonth,
   startOfYear,
   startOfWeek,
+  startOfQuarter,
   endOfMonth,
   endOfYear,
   format,
@@ -53,6 +56,49 @@ export function getProjectRange(items: ProjectItem[]): { start: string; end: str
 
 export function getDuration(item: ProjectItem): number {
   return Math.max(1, differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) + 1);
+}
+
+/**
+ * Compute padded project range with origin aligned to the earliest unit
+ * boundary across all visible timescale tiers, so no tier ever shows a
+ * partial first cell.
+ */
+export function getProjectRangePadded(
+  items: ProjectItem[],
+  timescale: TimescaleConfig,
+): { origin: string; totalDays: number; rangeEndDate: Date } {
+  const range = getProjectRange(items);
+  let padStart = startOfMonth(subDays(parseISO(range.start), 14));
+
+  // Resolve visible tier units and align origin to their boundaries
+  const projectSpan = differenceInDays(parseISO(range.end), parseISO(range.start));
+  const visibleUnits = timescale.tiers
+    .filter((t) => t.visible)
+    .map((t) => t.unit === 'auto' ? resolveAutoUnit(projectSpan) : t.unit);
+
+  for (const unit of visibleUnits) {
+    let aligned: Date;
+    switch (unit) {
+      case 'week':
+        aligned = startOfWeek(padStart, { weekStartsOn: 1 });
+        break;
+      case 'quarter':
+        aligned = startOfQuarter(padStart);
+        break;
+      case 'year':
+        aligned = startOfYear(padStart);
+        break;
+      default: // day, month — padStart is already month-aligned
+        aligned = padStart;
+    }
+    if (aligned < padStart) padStart = aligned;
+  }
+
+  const endMonth = startOfMonth(parseISO(range.end));
+  const numMonths = differenceInCalendarMonths(endMonth, padStart) + 1;
+  const padEnd = addMonths(padStart, numMonths);
+  const total = differenceInDays(padEnd, padStart);
+  return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: subDays(padEnd, 1) };
 }
 
 // ─── Timescale Generators ────────────────────────────────────────────────────
@@ -219,8 +265,7 @@ export function buildVisibleTierCells(
     }
   }
 
-  // Build cells with skip-factor grouping — clamp last cell to bar edge
-  // First cell is NOT left-clamped so it retains its full unit width (no partial units).
+  // Build cells with skip-factor grouping — clamp to bar edges
   const cells: TierCell[] = [];
   for (let i = 0; i < labels.length; i += skipFactor) {
     const startFrac = differenceInDays(labels[i].startDate, originDate) / totalDays;
@@ -228,11 +273,12 @@ export function buildVisibleTierCells(
     const endFrac = (differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays;
     if (endFrac <= 0) continue; // entirely before the visible range
     if (startFrac >= 1) break;  // past the visible range
+    const clampedStart = Math.max(startFrac, 0);
     const clampedEnd = Math.min(endFrac, 1);
     cells.push({
       label: labels[i].label,
-      fraction: startFrac,
-      widthFrac: Math.max(clampedEnd - startFrac, 0.001),
+      fraction: clampedStart,
+      widthFrac: Math.max(clampedEnd - clampedStart, 0.001),
     });
   }
 

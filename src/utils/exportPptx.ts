@@ -5,12 +5,8 @@ import PptxGenJS from 'pptxgenjs';
 import {
   differenceInDays,
   parseISO,
-  startOfMonth,
-  subDays,
-  addMonths,
   format,
 } from 'date-fns';
-import { differenceInCalendarMonths } from 'date-fns';
 import type {
   ProjectItem,
   Swimlane,
@@ -21,7 +17,7 @@ import type {
   LabelPosition,
 } from '@/types';
 import {
-  getProjectRange,
+  getProjectRangePadded,
   generateTierLabels,
   buildVisibleTierCells,
   resolveAutoUnit,
@@ -153,15 +149,8 @@ function computeLayout(
   // Row assignment
   const getRow = buildGetRow(taskLayout, belowIndependentItems, swimlanedItemsList, sortedSwimlanes);
 
-  // Range computation
-  const range = getProjectRange(items);
-  const padStart = startOfMonth(subDays(parseISO(range.start), 14));
-  const endMonth = startOfMonth(parseISO(range.end));
-  const numMonths = differenceInCalendarMonths(endMonth, padStart) + 1;
-  const padEnd = addMonths(padStart, numMonths);
-  const totalDays = differenceInDays(padEnd, padStart);
-  const origin = padStart.toISOString().split('T')[0];
-  const rangeEndDate = subDays(padEnd, 1);
+  // Range computation — shared with TimelineView
+  const { origin, totalDays, rangeEndDate } = getProjectRangePadded(items, timescale);
   const totalWidth = totalDays * zoom;
 
   // Above milestones height

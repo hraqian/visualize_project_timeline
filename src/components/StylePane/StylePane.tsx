@@ -40,8 +40,8 @@ import {
 } from '@/types';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { parseISO, differenceInDays, differenceInCalendarMonths, addMonths, addDays, subDays, startOfMonth, endOfMonth, format } from 'date-fns';
-import { generateTierLabels, buildVisibleTierCells, getProjectRange, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
+import { parseISO, differenceInDays, format } from 'date-fns';
+import { generateTierLabels, buildVisibleTierCells, getProjectRangePadded, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
 import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 
@@ -2801,16 +2801,11 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     setTiers((prev) => prev.map((t, i) => (i === idx ? { ...t, ...updates } : t)));
   };
 
-  // Project range — same padding as main TimelineView
-  const { origin, totalDays, rangeEndDate } = useMemo(() => {
-    const range = getProjectRange(items);
-    const padStart = startOfMonth(subDays(parseISO(range.start), 14));
-    const endMonth = startOfMonth(parseISO(range.end));
-    const numMonths = differenceInCalendarMonths(endMonth, padStart) + 1;
-    const padEnd = addMonths(padStart, numMonths);
-    const days = differenceInDays(padEnd, padStart);
-    return { origin: padStart.toISOString().split('T')[0], totalDays: days, rangeEndDate: subDays(padEnd, 1) };
-  }, [items]);
+  // Project range — same padded computation as main TimelineView
+  const { origin, totalDays, rangeEndDate } = useMemo(
+    () => getProjectRangePadded(items, timescale),
+    [items, timescale],
+  );
 
   // Today position as fraction (0-1)
   const todayFraction = useMemo(() => {
