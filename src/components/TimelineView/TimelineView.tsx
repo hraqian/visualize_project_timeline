@@ -6,6 +6,78 @@ import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProj
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig } from '@/types';
 
+// ─── Types for inline editing ────────────────────────────────────────────────
+
+type EditingField = {
+  itemId: string;
+  field: 'title' | 'date' | 'duration' | 'percentComplete' | 'milestoneTitle' | 'milestoneDate' | 'swimlaneName';
+} | null;
+
+// ─── InlineEditInput ─────────────────────────────────────────────────────────
+// A small inline text input that auto-focuses, selects all, and commits on Enter/blur.
+
+function InlineEditInput({
+  value,
+  onCommit,
+  onCancel,
+  style: inputStyle,
+  className,
+}: {
+  value: string;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+  style?: React.CSSProperties;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  }, []);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== value) {
+      onCommit(trimmed);
+    } else {
+      onCancel();
+    }
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        e.stopPropagation();
+      }}
+      onBlur={commit}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      className={className}
+      style={{
+        border: '1px solid #ef4444',
+        borderRadius: 2,
+        outline: 'none',
+        background: 'white',
+        padding: '0 2px',
+        margin: '-1px -3px',
+        boxSizing: 'content-box',
+        ...inputStyle,
+      }}
+    />
+  );
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ROW_HEIGHT = 44;
@@ -49,6 +121,25 @@ function formatDuration(startDate: string, endDate: string, fmt: DurationFormat)
   }
 }
 
+/** Parse a duration string like "7d", "2w", "1.5 months" back to inclusive days. Returns null if invalid. */
+function parseDurationToDays(text: string): number | null {
+  const t = text.trim().toLowerCase();
+  // Try pure number (treat as days)
+  if (/^\d+$/.test(t)) return parseInt(t, 10);
+  // Match number + unit
+  const m = t.match(/^([\d.]+)\s*(d|days?|w|wks?|weeks?|mons?|months?|q|qrts?|quarters?|y|yrs?|years?)$/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (isNaN(n) || n <= 0) return null;
+  const unit = m[2];
+  if (unit.startsWith('d')) return Math.round(n);
+  if (unit.startsWith('w')) return Math.round(n * 7);
+  if (unit.startsWith('mo')) return Math.round(n * 30.44);
+  if (unit.startsWith('q')) return Math.round(n * 91.31);
+  if (unit.startsWith('y')) return Math.round(n * 365.25);
+  return null;
+}
+
 // ─── TimelineView ────────────────────────────────────────────────────────────
 
 export interface TimelineViewHandle {
@@ -76,6 +167,50 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
   const selectedTierIndex = useProjectStore((s) => s.selectedTierIndex);
   const setSelectedTierIndex = useProjectStore((s) => s.setSelectedTierIndex);
   const updateTier = useProjectStore((s) => s.updateTier);
+  const updateItem = useProjectStore((s) => s.updateItem);
+  const updateSwimlane = useProjectStore((s) => s.updateSwimlane);
+
+  // ─── Inline editing state ──────────────────────────────────────────────────
+  const [editingField, setEditingField] = useState<EditingField>(null);
+
+  const startEditing = useCallback((itemId: string, field: EditingField extends null ? never : NonNullable<EditingField>['field']) => {
+    setEditingField({ itemId, field });
+  }, []);
+
+  const cancelEditing = useCallback(() => {
+    setEditingField(null);
+  }, []);
+
+  const commitEdit = useCallback((itemId: string, field: string, value: string) => {
+    const item = items.find((i) => i.id === itemId);
+    switch (field) {
+      case 'title':
+        if (item) updateItem(itemId, { name: value });
+        break;
+      case 'milestoneTitle':
+        if (item) updateItem(itemId, { name: value });
+        break;
+      case 'percentComplete': {
+        const pct = parseInt(value.replace('%', ''), 10);
+        if (!isNaN(pct) && item) updateItem(itemId, { percentComplete: Math.max(0, Math.min(100, pct)) });
+        break;
+      }
+      case 'duration': {
+        if (!item) break;
+        const days = parseDurationToDays(value);
+        if (days && days > 0) {
+          const newEnd = addDays(parseISO(item.startDate), days - 1); // inclusive
+          updateItem(itemId, { endDate: format(newEnd, 'yyyy-MM-dd') });
+        }
+        break;
+      }
+      case 'swimlaneName': {
+        updateSwimlane(itemId, { name: value });
+        break;
+      }
+    }
+    setEditingField(null);
+  }, [items, updateItem, updateSwimlane]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -463,6 +598,10 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
           onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
           onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
           onClickDate={() => { setSelectedItem(item.id); setStylePaneSection('milestoneDate'); }}
+          editingField={editingField}
+          onStartEdit={(field) => startEditing(item.id, field)}
+          onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
+          onCancelEdit={cancelEditing}
         />
       );
     }
@@ -482,6 +621,10 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
         onMouseDown={(e) => handleMouseDown(e, item.id)}
         onClickBar={() => { setSelectedItem(item.id); setStylePaneSection('bar'); }}
         onClickSection={(section) => { setSelectedItem(item.id); setStylePaneSection(section); }}
+        editingField={editingField}
+        onStartEdit={(field) => startEditing(item.id, field)}
+        onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
+        onCancelEdit={cancelEditing}
       />
     );
   };
@@ -539,6 +682,10 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                     onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
                     onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
                     onClickDate={() => { setSelectedItem(item.id); setStylePaneSection('milestoneDate'); }}
+                    editingField={editingField}
+                    onStartEdit={(field) => startEditing(item.id, field)}
+                    onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
+                    onCancelEdit={cancelEditing}
                   />
                 );
               })}
@@ -743,6 +890,10 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                       e.stopPropagation();
                       setSelectedSwimlane(swimlane.id);
                     }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      startEditing(swimlane.id, 'swimlaneName');
+                    }}
                   >
                     {/* Badge background (separate layer so text is not affected by transparency) */}
                     <div
@@ -752,19 +903,36 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                         opacity: (100 - swimlane.headerTransparency) / 100,
                       }}
                     />
-                    <span
-                      className="truncate px-2 relative"
-                      style={{
-                        color: swimlane.titleFontColor,
-                        fontSize: swimlane.titleFontSize,
-                        fontFamily: swimlane.titleFontFamily,
-                        fontWeight: swimlane.titleFontWeight,
-                        fontStyle: swimlane.titleFontStyle,
-                        textDecoration: swimlane.titleTextDecoration,
-                      }}
-                    >
-                      {swimlane.name}
-                    </span>
+                    {editingField?.itemId === swimlane.id && editingField?.field === 'swimlaneName' ? (
+                      <InlineEditInput
+                        value={swimlane.name}
+                        onCommit={(v) => commitEdit(swimlane.id, 'swimlaneName', v)}
+                        onCancel={cancelEditing}
+                        style={{
+                          color: swimlane.titleFontColor,
+                          fontSize: swimlane.titleFontSize,
+                          fontFamily: swimlane.titleFontFamily,
+                          fontWeight: swimlane.titleFontWeight,
+                          width: SWIMLANE_BADGE_WIDTH - 16,
+                          position: 'relative',
+                          zIndex: 1,
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className="truncate px-2 relative"
+                        style={{
+                          color: swimlane.titleFontColor,
+                          fontSize: swimlane.titleFontSize,
+                          fontFamily: swimlane.titleFontFamily,
+                          fontWeight: swimlane.titleFontWeight,
+                          fontStyle: swimlane.titleFontStyle,
+                          textDecoration: swimlane.titleTextDecoration,
+                        }}
+                      >
+                        {swimlane.name}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -1050,9 +1218,14 @@ interface TaskBarProps {
   onMouseDown: (e: React.MouseEvent) => void;
   onClickBar: () => void;
   onClickSection: (section: 'title' | 'date' | 'duration' | 'percentComplete') => void;
+  editingField: EditingField;
+  onStartEdit: (field: 'title' | 'duration' | 'percentComplete') => void;
+  onCommitEdit: (field: string, value: string) => void;
+  onCancelEdit: () => void;
 }
 
-function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickSection }: TaskBarProps) {
+function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit }: TaskBarProps) {
+  const isEditing = (field: string) => editingField?.itemId === item.id && editingField?.field === field;
   const style = item.taskStyle;
   const barHeight = style.thickness;
   const barY = y + (ROW_HEIGHT - barHeight) / 2;
@@ -1184,16 +1357,16 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       {/* Title Label */}
       {style.showTitle && (
         <div
-          className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
+          className={`absolute whitespace-nowrap cursor-pointer ${isEditing('title') ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
           style={{
             fontSize: style.fontSize,
             fontFamily: style.fontFamily,
             fontWeight: style.fontWeight,
             fontStyle: style.fontStyle ?? 'normal',
-            textDecoration: style.textDecoration ?? 'none',
+            textDecoration: isEditing('title') ? 'none' : (style.textDecoration ?? 'none'),
             color: style.fontColor,
-            maxWidth: 200,
-            overflow: 'hidden',
+            maxWidth: isEditing('title') ? 'none' : 200,
+            overflow: isEditing('title') ? 'visible' : 'hidden',
             textOverflow: 'ellipsis',
             ...(style.labelPosition === 'far-left'
               ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 24 }
@@ -1208,8 +1381,18 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
           }}
           onClick={(e) => { e.stopPropagation(); onClickSection('title'); }}
+          onDoubleClick={(e) => { e.stopPropagation(); onStartEdit('title'); }}
         >
-          <span>{item.name}</span>
+          {isEditing('title') ? (
+            <InlineEditInput
+              value={item.name}
+              onCommit={(v) => onCommitEdit('title', v)}
+              onCancel={onCancelEdit}
+              style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: style.fontColor }}
+            />
+          ) : (
+            <span>{item.name}</span>
+          )}
         </div>
       )}
 
@@ -1250,16 +1433,16 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       {/* Duration Label */}
       {style.showDuration && (
         <div
-          className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
+          className={`absolute whitespace-nowrap cursor-pointer ${isEditing('duration') ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
           style={{
             fontSize: style.durationFontSize,
             fontFamily: style.durationFontFamily,
             fontWeight: style.durationFontWeight,
             fontStyle: style.durationFontStyle ?? 'normal',
-            textDecoration: style.durationTextDecoration ?? 'none',
+            textDecoration: isEditing('duration') ? 'none' : (style.durationTextDecoration ?? 'none'),
             color: style.durationFontColor,
-            maxWidth: 200,
-            overflow: 'hidden',
+            maxWidth: isEditing('duration') ? 'none' : 200,
+            overflow: isEditing('duration') ? 'visible' : 'hidden',
             textOverflow: 'ellipsis',
             ...(style.durationLabelPosition === 'left'
               ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
@@ -1286,24 +1469,34 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }), // 'right' (default)
           }}
           onClick={(e) => { e.stopPropagation(); onClickSection('duration'); }}
+          onDoubleClick={(e) => { e.stopPropagation(); onStartEdit('duration'); }}
         >
-          <span>{formatDuration(item.startDate, item.endDate, style.durationFormat)}</span>
+          {isEditing('duration') ? (
+            <InlineEditInput
+              value={formatDuration(item.startDate, item.endDate, style.durationFormat)}
+              onCommit={(v) => onCommitEdit('duration', v)}
+              onCancel={onCancelEdit}
+              style={{ fontSize: style.durationFontSize, fontFamily: style.durationFontFamily, fontWeight: style.durationFontWeight, color: style.durationFontColor, width: 80 }}
+            />
+          ) : (
+            <span>{formatDuration(item.startDate, item.endDate, style.durationFormat)}</span>
+          )}
         </div>
       )}
 
       {/* Percent Complete Label */}
       {style.showPercentComplete && (
         <div
-          className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
+          className={`absolute whitespace-nowrap cursor-pointer ${isEditing('percentComplete') ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
           style={{
             fontSize: style.pctFontSize,
             fontFamily: style.pctFontFamily,
             fontWeight: style.pctFontWeight,
             fontStyle: style.pctFontStyle ?? 'normal',
-            textDecoration: style.pctTextDecoration ?? 'none',
+            textDecoration: isEditing('percentComplete') ? 'none' : (style.pctTextDecoration ?? 'none'),
             color: style.pctFontColor,
-            maxWidth: 200,
-            overflow: 'hidden',
+            maxWidth: isEditing('percentComplete') ? 'none' : 200,
+            overflow: isEditing('percentComplete') ? 'visible' : 'hidden',
             textOverflow: 'ellipsis',
             ...(style.pctLabelPosition === 'left'
               ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
@@ -1341,8 +1534,18 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }), // 'right'
           }}
           onClick={(e) => { e.stopPropagation(); onClickSection('percentComplete'); }}
+          onDoubleClick={(e) => { e.stopPropagation(); onStartEdit('percentComplete'); }}
         >
-          <span>{item.percentComplete}%</span>
+          {isEditing('percentComplete') ? (
+            <InlineEditInput
+              value={`${item.percentComplete}%`}
+              onCommit={(v) => onCommitEdit('percentComplete', v)}
+              onCancel={onCancelEdit}
+              style={{ fontSize: style.pctFontSize, fontFamily: style.pctFontFamily, fontWeight: style.pctFontWeight, color: style.pctFontColor, width: 50 }}
+            />
+          ) : (
+            <span>{item.percentComplete}%</span>
+          )}
         </div>
       )}
 
@@ -1365,9 +1568,14 @@ interface MilestoneItemProps {
   onClickIcon: () => void;
   onClickLabel: () => void;
   onClickDate: () => void;
+  editingField: EditingField;
+  onStartEdit: (field: 'milestoneTitle') => void;
+  onCommitEdit: (field: string, value: string) => void;
+  onCancelEdit: () => void;
 }
 
-function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel, onClickDate }: MilestoneItemProps) {
+function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit }: MilestoneItemProps) {
+  const isEditingTitle = editingField?.itemId === item.id && editingField?.field === 'milestoneTitle';
   const style = item.milestoneStyle;
   const isIndependent = item.swimlaneId === null;
 
@@ -1380,21 +1588,31 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
     // Build the title element
     const titleEl = style.showTitle ? (
       <div
-        className="whitespace-nowrap truncate cursor-pointer text-center hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
+        className={`whitespace-nowrap cursor-pointer text-center ${isEditingTitle ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
         style={{
           fontSize: style.fontSize,
           fontFamily: style.fontFamily,
           fontWeight: style.fontWeight,
           fontStyle: style.fontStyle ?? 'normal',
-          textDecoration: style.textDecoration ?? 'none',
+          textDecoration: isEditingTitle ? 'none' : (style.textDecoration ?? 'none'),
           color: style.fontColor,
-          maxWidth: 200,
-          overflow: 'hidden',
+          maxWidth: isEditingTitle ? 'none' : 200,
+          overflow: isEditingTitle ? 'visible' : 'hidden',
           textOverflow: 'ellipsis',
         }}
         onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+        onDoubleClick={(e) => { e.stopPropagation(); onStartEdit('milestoneTitle'); }}
       >
-        {item.name}
+        {isEditingTitle ? (
+          <InlineEditInput
+            value={item.name}
+            onCommit={(v) => onCommitEdit('milestoneTitle', v)}
+            onCancel={onCancelEdit}
+            style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: style.fontColor, width: 120 }}
+          />
+        ) : (
+          item.name
+        )}
       </div>
     ) : null;
 
@@ -1521,21 +1739,31 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           }}
         >
           <div
-            className="truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
+            className={`cursor-pointer ${isEditingTitle ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
             style={{
               fontSize: style.fontSize,
               fontFamily: style.fontFamily,
               fontWeight: style.fontWeight,
               fontStyle: style.fontStyle ?? 'normal',
-              textDecoration: style.textDecoration ?? 'none',
+              textDecoration: isEditingTitle ? 'none' : (style.textDecoration ?? 'none'),
               color: style.fontColor,
-              maxWidth: 200,
-              overflow: 'hidden',
+              maxWidth: isEditingTitle ? 'none' : 200,
+              overflow: isEditingTitle ? 'visible' : 'hidden',
               textOverflow: 'ellipsis',
             }}
             onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+            onDoubleClick={(e) => { e.stopPropagation(); onStartEdit('milestoneTitle'); }}
           >
-            {item.name}
+            {isEditingTitle ? (
+              <InlineEditInput
+                value={item.name}
+                onCommit={(v) => onCommitEdit('milestoneTitle', v)}
+                onCancel={onCancelEdit}
+                style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: style.fontColor, width: 120 }}
+              />
+            ) : (
+              item.name
+            )}
           </div>
           <div
             className="cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
@@ -1557,22 +1785,32 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           {/* Title label */}
           {style.showTitle && (
             <div
-              className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
+              className={`absolute whitespace-nowrap cursor-pointer ${isEditingTitle ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
               style={{
                 fontSize: style.fontSize,
                 fontFamily: style.fontFamily,
                 fontWeight: style.fontWeight,
                 fontStyle: style.fontStyle ?? 'normal',
-                textDecoration: style.textDecoration ?? 'none',
+                textDecoration: isEditingTitle ? 'none' : (style.textDecoration ?? 'none'),
                 color: style.fontColor,
-                maxWidth: 200,
-                overflow: 'hidden',
+                maxWidth: isEditingTitle ? 'none' : 200,
+                overflow: isEditingTitle ? 'visible' : 'hidden',
                 textOverflow: 'ellipsis',
                 ...sideStyle(titlePos),
               }}
               onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
+              onDoubleClick={(e) => { e.stopPropagation(); onStartEdit('milestoneTitle'); }}
             >
-              <span>{item.name}</span>
+              {isEditingTitle ? (
+                <InlineEditInput
+                  value={item.name}
+                  onCommit={(v) => onCommitEdit('milestoneTitle', v)}
+                  onCancel={onCancelEdit}
+                  style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: style.fontColor, width: 120 }}
+                />
+              ) : (
+                <span>{item.name}</span>
+              )}
             </div>
           )}
 
