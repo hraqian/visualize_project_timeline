@@ -291,19 +291,24 @@ function TypePickerPopover({ item, onUpdateItem, onUpdateTaskStyle, onUpdateMile
           {/* Separator */}
           <div className="w-px h-6 bg-[var(--color-border)] mx-0.5" />
           {/* Color swatches */}
-          {COLOR_SWATCHES.map((swatch, i) => (
-            <button
-              key={`${swatch}-${i}`}
-              onClick={() => handleSelectColor(swatch)}
-              className={`w-8 h-8 rounded-md border-2 transition-all ${
-                activeColor === swatch
-                  ? 'border-[var(--color-text-muted)] scale-105'
-                  : 'border-transparent hover:scale-110'
-              }`}
-              style={{ backgroundColor: swatch }}
-              title={swatch}
-            />
-          ))}
+          {COLOR_SWATCHES.map((swatch, i) => {
+            const isLight = ['#f8fafc', '#ffffff', '#fff'].includes(swatch.toLowerCase());
+            return (
+              <button
+                key={`${swatch}-${i}`}
+                onClick={() => handleSelectColor(swatch)}
+                className={`w-8 h-8 rounded-md border-2 transition-all ${
+                  activeColor === swatch
+                    ? 'border-[var(--color-text-muted)] scale-105'
+                    : isLight
+                      ? 'border-slate-200 hover:scale-110'
+                      : 'border-transparent hover:scale-110'
+                }`}
+                style={{ backgroundColor: swatch }}
+                title={swatch}
+              />
+            );
+          })}
         </div>
       </div>
 
