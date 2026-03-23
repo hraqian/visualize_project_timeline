@@ -314,7 +314,7 @@ export function DataView() {
                   onChange={handleHeaderCheckbox}
                 />
               </th>
-              <th className="text-left pl-1.5 pr-4 py-2.5 text-xs font-medium text-slate-500 tracking-wide min-w-[220px]">Title</th>
+              <th className="text-left pl-3 pr-4 py-2.5 text-xs font-medium text-slate-500 tracking-wide min-w-[220px]">Title</th>
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-24">Type</th>
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-24">Duration</th>
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-32">Start</th>
@@ -883,7 +883,7 @@ function IndependentItemsGroup({
       {/* Add row for independent items */}
       <tr>
         <td className="pl-5 pr-0 py-2" />
-        <td colSpan={totalColumns - 1} className="pl-1.5 pr-4 py-2">
+        <td colSpan={totalColumns - 1} className="pl-3 pr-4 py-2">
           <InlineAddRow onAdd={(type) => onAddItem(type)} />
         </td>
       </tr>
@@ -1179,7 +1179,7 @@ function SwimlaneGroup({
       {!isCollapsed && (
         <tr>
           <td className="pl-5 pr-0 py-2" />
-          <td colSpan={totalColumns - 1} className="pl-1.5 pr-4 py-2">
+          <td colSpan={totalColumns - 1} className="pl-3 pr-4 py-2">
             <InlineAddRow onAdd={(type) => onAddItem(type)} />
           </td>
         </tr>
@@ -1347,7 +1347,7 @@ function ItemRow({
       </td>
 
       {/* Title */}
-      <td className="pl-1.5 pr-4 py-3">
+      <td className="pl-3 pr-4 py-3">
         <input
           ref={nameRef}
           className="w-full bg-transparent border-none outline-none text-[13px] text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-indigo-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
