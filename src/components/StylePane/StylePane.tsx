@@ -38,7 +38,7 @@ import {
   type DependencySchedulingMode,
   type DependencyConflictMode,
 } from '@/types';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, differenceInDays, format } from 'date-fns';
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
@@ -96,6 +96,7 @@ function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSPropertie
     case 'modern': return { borderRadius: 6, transform: 'skewX(-5deg)' };
     case 'leaf': return { borderRadius: '6px 2px 6px 2px', transform: 'skewX(-5deg)' };
     case 'slant': return { clipPath: 'polygon(8% 0%, 100% 0%, 92% 100%, 0% 100%)' };
+    default: return {};
   }
 }
 
