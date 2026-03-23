@@ -538,22 +538,22 @@ export function DataView() {
                   onChange={handleHeaderCheckbox}
                 />
               </th>
-              <th className="text-left pl-3 pr-4 py-2.5 text-xs font-medium text-slate-600 tracking-wide min-w-[220px]">Title</th>
-              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 tracking-wide w-24">Type</th>
-              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 tracking-wide w-24">Duration</th>
-              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 tracking-wide w-32">Start</th>
-              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 tracking-wide w-32">End</th>
+              <th className="text-left pl-3 pr-4 py-2.5 text-xs font-medium text-slate-600 min-w-[220px]">Title</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 w-24">Type</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 w-24">Duration</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 w-32">Start</th>
+              <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 w-32">End</th>
               {columnVisibility.percentComplete && (
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 tracking-wide w-28 whitespace-nowrap">% Complete</th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 w-28 whitespace-nowrap">% Complete</th>
               )}
               {columnVisibility.assignedTo && (
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 tracking-wide w-36">Assigned To</th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 w-36">Assigned To</th>
               )}
               {columnVisibility.status && (
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 tracking-wide w-36">Status</th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 w-36">Status</th>
               )}
               {columnVisibility.predecessors && (
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 tracking-wide w-36">Predecessors</th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-600 w-36">Predecessors</th>
               )}
               <th className="w-10 px-2 py-2.5" />
               <th className="px-3 py-2.5">
