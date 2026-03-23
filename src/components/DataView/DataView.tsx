@@ -1774,7 +1774,7 @@ function ItemRow({
           />
         ) : (
           <span
-            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[11px] text-slate-600 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               setDurationValue(String(duration));
@@ -1805,7 +1805,7 @@ function ItemRow({
       >
         <div className="relative flex items-center gap-1.5">
           <span
-            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[11px] text-slate-600 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               onCellFocus('startDate');
@@ -1851,7 +1851,7 @@ function ItemRow({
       >
          <div className="relative flex items-center gap-1.5">
           <span
-            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[11px] text-slate-600 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               onCellFocus('endDate');
@@ -1956,7 +1956,7 @@ function ItemRow({
                   }}
                 />
               </div>
-              <span className="text-[11px] text-slate-600 group-hover/pct:text-indigo-600 transition-colors">
+              <span className="text-[11px] text-slate-600 tabular-nums group-hover/pct:text-indigo-600 transition-colors">
                 {item.percentComplete}%
               </span>
             </div>
