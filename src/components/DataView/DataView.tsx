@@ -1062,7 +1062,7 @@ function SwimlaneGroup({
               size={14}
               className="absolute left-1 text-slate-300 opacity-0 group-hover/swimlane:opacity-100 transition-opacity cursor-grab"
             />
-            <div className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: swimlane.color }} />
+            <div className="w-2.5 h-5 rounded-sm shrink-0" style={{ backgroundColor: swimlane.color }} />
             {/* Pencil edit icon — hover only */}
             <button
               onClick={(e) => {
