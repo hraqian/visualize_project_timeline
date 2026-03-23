@@ -259,6 +259,7 @@ export interface TimescaleTierConfig {
   backgroundColor: string;
   fontColor: string;
   fontSize: number;
+  fontSizeAuto?: boolean;               // true = auto-size font to fit cell; false/undefined = use fontSize
   fontFamily: string;
   fontWeight: number;                   // 400 | 700
   fontStyle: 'normal' | 'italic';

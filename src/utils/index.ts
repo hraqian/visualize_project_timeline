@@ -310,13 +310,81 @@ export function buildVisibleTierCells(
     });
   }
 
-  // Prefix first visible label for sequential units
+  // Prefix first visible label for sequential units (e.g., "Week 9", "Day 1")
   if (cells.length > 0 && (unit === 'week' || unit === 'day')) {
     const prefix = unit === 'week' ? 'Week ' : 'Day ';
     cells[0].label = prefix + cells[0].label;
   }
 
   return cells;
+}
+
+// ─── Auto Font Sizing ────────────────────────────────────────────────────────
+
+let _measureCanvas: HTMLCanvasElement | null = null;
+
+function getMeasureCtx(): CanvasRenderingContext2D | null {
+  if (typeof document === 'undefined') return null;
+  if (!_measureCanvas) _measureCanvas = document.createElement('canvas');
+  return _measureCanvas.getContext('2d');
+}
+
+/**
+ * Compute the optimal font size so that the longest label fits within cellWidthPx.
+ * Uses canvas text measurement for accuracy.
+ *
+ * @param cells         The tier cells (first cell has the prefix, so it's usually longest)
+ * @param fontFamily    CSS font family string
+ * @param fontWeight    CSS font weight (number)
+ * @param fontStyle     'normal' | 'italic'
+ * @param cellWidthPx   Width of a single cell in pixels
+ * @param hPadding      Total horizontal padding inside the cell (left + right)
+ * @param minSize       Minimum font size (default 7)
+ * @param maxSize       Maximum font size (default 18)
+ * @returns             Optimal font size in px
+ */
+export function computeAutoFontSize(
+  cells: TierCell[],
+  fontFamily: string,
+  fontWeight: number,
+  fontStyle: 'normal' | 'italic',
+  cellWidthPx: number,
+  hPadding: number = 12,
+  minSize: number = 7,
+  maxSize: number = 18,
+): number {
+  const ctx = getMeasureCtx();
+  if (!ctx || cells.length === 0) return 12; // fallback
+
+  const availableWidth = cellWidthPx - hPadding;
+  if (availableWidth <= 0) return minSize;
+
+  // Find the longest label text (usually the first cell with prefix)
+  let longestLabel = '';
+  for (const cell of cells) {
+    if (cell.label.length > longestLabel.length) {
+      longestLabel = cell.label;
+    }
+  }
+
+  // Binary search for the largest font size that fits
+  let lo = minSize;
+  let hi = maxSize;
+  let best = minSize;
+
+  while (lo <= hi) {
+    const mid = Math.round((lo + hi) / 2);
+    ctx.font = `${fontStyle} ${fontWeight} ${mid}px ${fontFamily}`;
+    const measured = ctx.measureText(longestLabel).width;
+    if (measured <= availableWidth) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  return best;
 }
 
 // ─── Critical Path ───────────────────────────────────────────────────────────
@@ -750,7 +818,7 @@ export function getFormatOptionsForUnit(unit: TimescaleTier): { value: TierForma
 export function getDefaultTimescale(): TimescaleConfig {
   return {
     tiers: [
-      { unit: 'auto', format: 'MMM', visible: true, backgroundColor: '#334155', fontColor: '#e2e8f0', fontSize: 12, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
+      { unit: 'auto', format: 'MMM', visible: true, backgroundColor: '#334155', fontColor: '#e2e8f0', fontSize: 12, fontSizeAuto: true, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
     ],
     barShape: 'rounded',
     fiscalYearStartMonth: 1,

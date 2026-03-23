@@ -41,7 +41,7 @@ import {
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, differenceInDays, format } from 'date-fns';
-import { generateTierLabels, buildVisibleTierCells, getProjectRangePadded, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
 import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 
@@ -2642,7 +2642,7 @@ function ScaleSection() {
           </label>
           <div className="flex gap-1.5">
             <FontFamilyDropdown value={tier.fontFamily} onChange={(f) => updateTier(activeTierStoreIndex, { fontFamily: f })} fonts={FONT_FAMILIES} />
-            <FontSizeDropdown value={tier.fontSize} onChange={(s) => updateTier(activeTierStoreIndex, { fontSize: s })} />
+            <FontSizeDropdown value={tier.fontSize} onChange={(s) => updateTier(activeTierStoreIndex, { fontSize: s, fontSizeAuto: false })} />
           </div>
         </div>
       </div>
@@ -2775,9 +2775,9 @@ function ScaleSection() {
 // ─── Tier Settings Modal ─────────────────────────────────────────────────────
 
 const DEFAULT_3_TIERS: TimescaleTierConfig[] = [
-  { unit: 'month', format: 'MMM', visible: true, backgroundColor: '#6b7f5c', fontColor: '#f8fafc', fontSize: 12, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
-  { unit: 'week', format: 'w_num', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
-  { unit: 'day', format: 'd_num', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
+  { unit: 'month', format: 'MMM', visible: true, backgroundColor: '#6b7f5c', fontColor: '#f8fafc', fontSize: 12, fontSizeAuto: true, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
+  { unit: 'week', format: 'w_num', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11, fontSizeAuto: true, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
+  { unit: 'day', format: 'd_num', visible: false, backgroundColor: '#94a3b8', fontColor: '#f8fafc', fontSize: 11, fontSizeAuto: true, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', textAlign: 'center', separators: true },
 ];
 
 const TIER_LABELS = ['Top tier', 'Middle tier', 'Bottom tier'];
@@ -2880,7 +2880,15 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
               {/* Bar — uses timescale.barShape */}
               <div className="relative">
                 <div className="border-b border-[var(--color-border)] overflow-hidden relative" style={getTimescaleBarShapeStyle(timescale.barShape)}>
-                  {previewTierLabels.map(({ tier, cells }, tierIdx) => (
+                  {previewTierLabels.map(({ tier, cells }, tierIdx) => {
+                    // Compute cell width for auto font sizing (preview uses percentage-based layout)
+                    const previewBarWidth = 920; // matches BAR_WIDTH_PX used in previewTierLabels
+                    const cellWidthPx = cells.length > 0 ? cells[0].widthFrac * previewBarWidth : 0;
+                    const effectiveFontSize = (tier.fontSizeAuto ?? true)
+                      ? Math.min(computeAutoFontSize(cells, tier.fontFamily, tier.fontWeight, tier.fontStyle, cellWidthPx, 12), 12)
+                      : Math.min(tier.fontSize, 12);
+
+                    return (
                     <div
                       key={tierIdx}
                       className="relative"
@@ -2889,12 +2897,12 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                       {cells.map((cell, ci) => (
                         <div
                           key={ci}
-                          className={`absolute top-0 h-full flex items-center overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
+                          className={`absolute top-0 h-full flex items-center ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
                           style={{
                             left: `${cell.fraction * 100}%`,
                             width: `${cell.widthFrac * 100}%`,
                             color: tier.fontColor,
-                            fontSize: Math.min(tier.fontSize, 12),
+                            fontSize: effectiveFontSize,
                             fontFamily: tier.fontFamily,
                             fontWeight: tier.fontWeight,
                             fontStyle: tier.fontStyle,
@@ -2904,11 +2912,12 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                             paddingRight: ci === cells.length - 1 ? 8 : 4,
                           }}
                         >
-                          <span className="truncate">{cell.label}</span>
+                          <span style={{ whiteSpace: 'nowrap' }}>{cell.label}</span>
                         </div>
                       ))}
                     </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Elapsed time bar — colored strip from left to today */}
                   {(timescale.showElapsedTime ?? false) && todayFraction > 0 && (
@@ -3104,7 +3113,7 @@ function TierColumn({
             </label>
             <div className="flex gap-1">
               <FontFamilyDropdown value={tier.fontFamily} onChange={(fontFamily) => updateTier({ fontFamily })} fonts={FONT_FAMILIES} />
-              <FontSizeDropdown value={tier.fontSize} onChange={(fontSize) => updateTier({ fontSize })} />
+              <FontSizeDropdown value={tier.fontSize} onChange={(fontSize) => updateTier({ fontSize, fontSizeAuto: false })} />
             </div>
           </div>
         </div>

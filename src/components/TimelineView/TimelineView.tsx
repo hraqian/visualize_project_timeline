@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useMemo, useEffect, forwardRef, useImper
 import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, addDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
-import { generateTierLabels, buildVisibleTierCells, getProjectRangePadded, resolveAutoUnit } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig } from '@/types';
 
@@ -561,6 +561,14 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                     const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
                     const isSelected = selectedTierIndex === storeIndex;
 
+                    // Compute cell width in px (all cells are equal width)
+                    const cellWidthPx = cells.length > 0 ? cells[0].widthFrac * totalWidth : 0;
+
+                    // Auto font sizing: pick optimal size to fit the longest label (first cell with prefix)
+                    const effectiveFontSize = (tier.fontSizeAuto ?? true)
+                      ? computeAutoFontSize(cells, tier.fontFamily, tier.fontWeight, tier.fontStyle, cellWidthPx, 12)
+                      : tier.fontSize;
+
                     return (
                       <div
                         key={tierIdx}
@@ -571,14 +579,14 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                         {cells.map((cell, ci) => (
                           <div
                             key={ci}
-                            className={`flex items-center shrink-0 overflow-hidden ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
+                            className={`flex items-center shrink-0 ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
                             style={{
                               position: 'absolute',
                               left: cell.fraction * totalWidth,
                               width: cell.widthFrac * totalWidth,
                               height: 28,
                               color: tier.fontColor,
-                              fontSize: tier.fontSize,
+                              fontSize: effectiveFontSize,
                               fontFamily: tier.fontFamily,
                               fontWeight: tier.fontWeight,
                               fontStyle: tier.fontStyle,
@@ -588,7 +596,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                               paddingRight: ci === cells.length - 1 ? 8 : 4,
                             }}
                           >
-                            <span className="truncate">{cell.label}</span>
+                            <span style={{ whiteSpace: 'nowrap' }}>{cell.label}</span>
                           </div>
                         ))}
                       </div>

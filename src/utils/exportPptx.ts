@@ -20,6 +20,7 @@ import {
   getProjectRangePadded,
   generateTierLabels,
   buildVisibleTierCells,
+  computeAutoFontSize,
   resolveAutoUnit,
 } from '@/utils/index';
 
@@ -367,10 +368,14 @@ function drawTimescale(
     });
 
     // Cell labels
+    const cellWidthPx = cells.length > 0 ? cells[0].widthFrac * ctx.totalWidth : 0;
+    const baseFontSize = (tier.fontSizeAuto ?? true)
+      ? computeAutoFontSize(cells, tier.fontFamily, tier.fontWeight, tier.fontStyle, cellWidthPx, 12)
+      : tier.fontSize;
     for (const cell of cells) {
       const cellX = ctx.offsetX + px2in(cell.fraction * ctx.totalWidth, ctx.scale);
       const cellW = px2in(cell.widthFrac * ctx.totalWidth, ctx.scale);
-      const fontSize = Math.max(5, tier.fontSize * ctx.scale * 0.75);
+      const fontSize = Math.max(5, baseFontSize * ctx.scale * 0.75);
 
       // Separator line
       if (tier.separators && cell.fraction > 0.001) {
