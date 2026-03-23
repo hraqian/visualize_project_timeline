@@ -682,7 +682,7 @@ function TaskStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Shape */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex gap-3">
             <div>
               <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
                 Color
@@ -692,7 +692,7 @@ function TaskStyleControls({
                 onChange={(color) => updateTaskStyle(item.id, { color })}
               />
             </div>
-            <div>
+            <div className="flex-1">
               <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
                 Shape
               </label>
