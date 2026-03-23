@@ -1103,36 +1103,6 @@ function SwimlaneGroup({
             >
               <Pencil size={13} />
             </button>
-            {editingName ? (
-              <input
-                className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[15px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
-                value={nameValue}
-                onChange={(e) => setNameValue(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                onBlur={() => {
-                  onUpdateSwimlane(swimlane.id, { name: nameValue });
-                  setEditingName(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    onUpdateSwimlane(swimlane.id, { name: nameValue });
-                    setEditingName(false);
-                  }
-                }}
-                onClick={(e) => e.stopPropagation()}
-                autoFocus
-              />
-            ) : (
-              <span
-                className="font-semibold text-[15px] text-slate-700"
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  setEditingName(true);
-                }}
-              >
-                {swimlane.name}
-              </span>
-            )}
 
             {/* Collapse/Expand toggle — always visible */}
             <Tooltip label={isCollapsed ? 'Expand' : 'Collapse'}>
