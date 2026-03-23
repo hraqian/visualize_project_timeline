@@ -125,11 +125,12 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
       <button
         ref={triggerRef}
         onClick={handleToggle}
-        className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-text-muted)] transition-colors text-sm text-[var(--color-text)] w-full"
+        className="flex items-center gap-1.5 px-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-text-muted)] transition-colors text-[var(--color-text)] w-full"
+        style={{ height: 28, fontSize: 7 }}
       >
-        <ShapePreview shape={value} color={ICON_COLOR} width={18} height={10} />
+        <ShapePreview shape={value} color={ICON_COLOR} width={14} height={8} />
         <span className="flex-1 text-left font-medium">{currentLabel}</span>
-        <ChevronDown size={14} className="text-[var(--color-text-muted)] shrink-0" />
+        <ChevronDown size={10} className="text-[var(--color-text-muted)] shrink-0" />
       </button>
 
       {/* Dropdown — portal to body so it escapes overflow clipping */}
