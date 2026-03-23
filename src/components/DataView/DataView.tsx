@@ -307,7 +307,7 @@ export function DataView() {
         <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
           <thead className="sticky top-0 z-10">
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="pl-5 pr-0 py-2.5 w-auto">
+              <th className="pl-5 pr-0 py-2.5" style={{ width: '38px' }}>
                 <Checkbox
                   checked={allChecked}
                   indeterminate={someChecked}
