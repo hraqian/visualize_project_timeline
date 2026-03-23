@@ -235,10 +235,12 @@ export function buildVisibleTierCells(
     });
   }
 
-  // Prefix first visible label for sequential units
+  // Prefix all labels for sequential units so the context isn't lost when the first cell is clipped
   if (cells.length > 0 && (unit === 'week' || unit === 'day')) {
     const prefix = unit === 'week' ? 'Week ' : 'Day ';
-    cells[0].label = prefix + cells[0].label;
+    for (const cell of cells) {
+      cell.label = prefix + cell.label;
+    }
   }
 
   return cells;
