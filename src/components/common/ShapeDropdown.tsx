@@ -126,7 +126,7 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
         ref={triggerRef}
         onClick={handleToggle}
         className="flex items-center gap-1.5 px-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-text-muted)] transition-colors text-[var(--color-text)] w-full"
-        style={{ height: 28, fontSize: 7 }}
+        style={{ height: 28, fontSize: 14 }}
       >
         <ShapePreview shape={value} color={ICON_COLOR} width={14} height={8} />
         <span className="flex-1 text-left font-medium">{currentLabel}</span>
