@@ -29,6 +29,21 @@ import { PRESET_COLORS } from '@/types';
 import { buildRowNumberMap, formatItemDependencies, parseDependencyShorthand, shorthandToDependencies, validateDependencyShorthand } from '@/utils';
 import { DependencyEditorModal } from '@/components/common/DependencyEditorModal';
 
+// ─── Color swatches (matches TypePicker) ─────────────────────────────────────
+
+const COLOR_SWATCHES = [
+  '#22c55e', // green
+  '#ef4444', // red
+  '#2563eb', // blue
+  '#334155', // slate-700
+  '#f8b878', // peach/sand
+  '#000000', // black
+  '#f8fafc', // white-ish
+  '#93a5cf', // blue-gray
+  '#475569', // slate-600
+  '#6b7040', // olive
+];
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function computeDuration(startDate: string, endDate: string): number {
@@ -834,19 +849,28 @@ function ColorPickerButton({ onSetColor }: { onSetColor: (color: string) => void
       </Tooltip>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-3 z-40">
-          <div className="grid grid-cols-4 gap-1.5">
-            {PRESET_COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={() => {
-                  onSetColor(color);
-                  setOpen(false);
-                }}
-                className="w-7 h-7 rounded-md border border-slate-100 hover:scale-110 hover:shadow-md transition-all"
-                style={{ backgroundColor: color }}
-              />
-            ))}
+        <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 z-40">
+          <div className="flex items-center gap-1.5">
+            {/* Paint bucket icon placeholder */}
+            <div className="w-7 h-7 rounded-md border border-slate-200 flex items-center justify-center">
+              <Paintbrush size={14} className="text-slate-700" />
+            </div>
+            <div className="w-px h-6 bg-slate-200 mx-0.5" />
+            {COLOR_SWATCHES.map((swatch, i) => {
+              const isLight = ['#f8fafc', '#ffffff', '#fff'].includes(swatch.toLowerCase());
+              return (
+                <button
+                  key={`${swatch}-${i}`}
+                  onClick={() => {
+                    onSetColor(swatch);
+                    setOpen(false);
+                  }}
+                  className={`w-7 h-7 rounded-md hover:scale-110 transition-all ${isLight ? 'border border-slate-200' : ''}`}
+                  style={{ backgroundColor: swatch }}
+                  title={swatch}
+                />
+              );
+            })}
           </div>
         </div>
       )}
@@ -2397,7 +2421,7 @@ function SwimlaneColorPicker({
     e.stopPropagation();
     if (!open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      const menuHeight = 180;
+      const menuHeight = 60;
       setFlipUp(rect.bottom + menuHeight > window.innerHeight);
     }
     setOpen(!open);
@@ -2426,36 +2450,34 @@ function SwimlaneColorPicker({
 
       {open && (
         <div
-          className={`absolute left-0 ${flipUp ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white border border-slate-200 rounded-lg shadow-lg z-40 p-3 w-[196px]`}
+          className={`absolute left-0 ${flipUp ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white border border-slate-200 rounded-lg shadow-lg z-40 p-2.5`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="text-[12px] font-medium text-slate-500 mb-2">Choose color</div>
-          <div className="grid grid-cols-4 gap-1.5">
-            {PRESET_COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChange(color);
-                }}
-                className="w-9 h-9 rounded-md flex items-center justify-center hover:scale-110 transition-transform"
-                style={{ backgroundColor: color }}
-              >
-                {color === currentColor && (
-                  <Check size={14} className="text-white" />
-                )}
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5">
+            {/* Paint bucket icon */}
+            <div className="w-7 h-7 rounded-md border border-slate-200 flex items-center justify-center shrink-0">
+              <Paintbrush size={14} className="text-slate-700" />
+            </div>
+            <div className="w-px h-6 bg-slate-200 mx-0.5 shrink-0" />
+            {COLOR_SWATCHES.map((swatch, i) => {
+              const isLight = ['#f8fafc', '#ffffff', '#fff'].includes(swatch.toLowerCase());
+              const isSelected = swatch === currentColor;
+              return (
+                <button
+                  key={`${swatch}-${i}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onChange(swatch);
+                  }}
+                  className={`w-7 h-7 rounded-md shrink-0 hover:scale-110 transition-all ${
+                    isSelected ? 'ring-2 ring-slate-400 ring-offset-1' : ''
+                  } ${isLight ? 'border border-slate-200' : ''}`}
+                  style={{ backgroundColor: swatch }}
+                  title={swatch}
+                />
+              );
+            })}
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-            }}
-            className="mt-2.5 w-full text-center text-[12px] font-medium text-slate-500 hover:text-slate-700 py-1 rounded hover:bg-slate-50 transition-colors"
-          >
-            Done
-          </button>
         </div>
       )}
     </div>
