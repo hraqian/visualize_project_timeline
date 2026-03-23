@@ -1639,7 +1639,7 @@ function ItemRow({
         </tr>
       )}
       <tr
-        className={`group/row transition-colors cursor-pointer [&>td]:border-b [&>td]:border-slate-200 ${
+        className={`group/row transition-colors cursor-pointer [&>td]:border-b [&>td]:border-slate-100 ${
           isChecked ? 'bg-indigo-50/60' : isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/80'
         } ${isItemDragging ? 'opacity-50' : ''}`}
         onClick={() => onSelectItem(item.id)}
