@@ -1160,9 +1160,6 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
           onClick={(e) => { e.stopPropagation(); onClickSection('title'); }}
         >
           <span>{item.name}</span>
-          {item.percentComplete > 0 && item.percentComplete < 100 && (
-            <span className="text-[10px] text-[var(--color-text-muted)] ml-1">{item.percentComplete}%</span>
-          )}
         </div>
       )}
 
