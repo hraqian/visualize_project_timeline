@@ -307,14 +307,14 @@ export function DataView() {
         <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
           <thead className="sticky top-0 z-10">
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="w-10 px-1 py-2.5">
+              <th className="pl-5 pr-1 py-2.5 w-auto">
                 <Checkbox
                   checked={allChecked}
                   indeterminate={someChecked}
                   onChange={handleHeaderCheckbox}
                 />
               </th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500 tracking-wide min-w-[220px]">Title</th>
+              <th className="text-left pl-2 pr-4 py-2.5 text-xs font-medium text-slate-500 tracking-wide min-w-[220px]">Title</th>
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-24">Type</th>
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-24">Duration</th>
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-32">Start</th>
@@ -882,7 +882,8 @@ function IndependentItemsGroup({
 
       {/* Add row for independent items */}
       <tr>
-        <td colSpan={totalColumns} className="pl-14 pr-4 py-2">
+        <td className="pl-5 pr-1 py-2" />
+        <td colSpan={totalColumns - 1} className="pl-2 pr-4 py-2">
           <InlineAddRow onAdd={(type) => onAddItem(type)} />
         </td>
       </tr>
@@ -1055,11 +1056,11 @@ function SwimlaneGroup({
         }}
       >
         <td className="pt-8 pb-2.5" colSpan={totalColumns}>
-          <div className="flex items-center gap-2 pl-4 pr-4">
-            {/* Grip handle — hover only */}
+          <div className="relative flex items-center gap-2 pl-5 pr-4">
+            {/* Grip handle — hover only, positioned absolutely so it doesn't shift layout */}
             <GripVertical
               size={14}
-              className="text-slate-300 opacity-0 group-hover/swimlane:opacity-100 transition-opacity cursor-grab shrink-0"
+              className="absolute left-1 text-slate-300 opacity-0 group-hover/swimlane:opacity-100 transition-opacity cursor-grab"
             />
             <div className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: swimlane.color }} />
             {/* Pencil edit icon — hover only */}
@@ -1177,7 +1178,8 @@ function SwimlaneGroup({
       {/* Add row */}
       {!isCollapsed && (
         <tr>
-          <td colSpan={totalColumns} className="pl-14 pr-4 py-2">
+          <td className="pl-5 pr-1 py-2" />
+          <td colSpan={totalColumns - 1} className="pl-2 pr-4 py-2">
             <InlineAddRow onAdd={(type) => onAddItem(type)} />
           </td>
         </tr>
@@ -1308,7 +1310,7 @@ function ItemRow({
         </tr>
       )}
       <tr
-        className={`group/row transition-colors cursor-pointer border-b border-slate-200 ${
+        className={`group/row transition-colors cursor-pointer [&>td]:border-b [&>td]:border-slate-200 ${
           isChecked ? 'bg-indigo-50/60' : isSelected ? 'bg-indigo-50/40' : 'hover:bg-slate-50/80'
         } ${isItemDragging ? 'opacity-50' : ''}`}
         onClick={() => onSelectItem(item.id)}
@@ -1323,7 +1325,7 @@ function ItemRow({
         onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onItemDrop(); }}
       >
       {/* Checkbox / Grip Handle / Row Number */}
-      <td className="px-1 py-3 text-center">
+      <td className="pl-5 pr-1 py-3 text-center">
         {hasAnyChecked || isChecked ? (
           <Checkbox checked={isChecked} onChange={onToggleChecked} />
         ) : (
@@ -1345,7 +1347,7 @@ function ItemRow({
       </td>
 
       {/* Title */}
-      <td className="px-2 py-3">
+      <td className="pl-2 pr-4 py-3">
         <input
           ref={nameRef}
           className="w-full bg-transparent border-none outline-none text-[13px] text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-indigo-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
