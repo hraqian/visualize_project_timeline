@@ -74,6 +74,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
   const taskLayout = useProjectStore((s) => s.taskLayout);
   const selectedTierIndex = useProjectStore((s) => s.selectedTierIndex);
   const setSelectedTierIndex = useProjectStore((s) => s.setSelectedTierIndex);
+  const updateTier = useProjectStore((s) => s.updateTier);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -173,6 +174,18 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     const total = differenceInDays(padEnd, padStart);
     return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: subDays(padEnd, 1) };
   }, [items]);
+
+  // Migrate legacy single-tier {unit:'month', format:'MMM'} to unit:'auto' for already-loaded projects
+  useEffect(() => {
+    if (
+      timescale.tiers.length === 1 &&
+      timescale.tiers[0].unit === 'month' &&
+      timescale.tiers[0].format === 'MMM'
+    ) {
+      updateTier(0, { unit: 'auto' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-fit zoom to container width on mount
   useEffect(() => {

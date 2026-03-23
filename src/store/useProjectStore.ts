@@ -369,6 +369,10 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     if (!data) return;
     undoStack = [];
     redoStack = [];
+    // Migrate: upgrade legacy default timescale tier from 'month' to 'auto'
+    if (data.timescale?.tiers?.length === 1 && data.timescale.tiers[0].unit === 'month' && data.timescale.tiers[0].format === 'MMM') {
+      data.timescale.tiers[0].unit = 'auto';
+    }
     set({
       ...data,
       isDirty: false,
