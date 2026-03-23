@@ -52,6 +52,33 @@ const OPTIONAL_COLUMN_LABELS: Record<OptionalColumn, string> = {
   predecessors: 'Predecessors',
 };
 
+// ─── Navigable column IDs (in visual order) ─────────────────────────────────
+
+type CellColumn = 'title' | 'type' | 'duration' | 'startDate' | 'endDate' | 'percentComplete' | 'assignedTo' | 'status' | 'predecessors';
+
+const FIXED_COLUMNS: CellColumn[] = ['title', 'type', 'duration', 'startDate', 'endDate'];
+const OPTIONAL_COLUMNS_ORDER: CellColumn[] = ['percentComplete', 'assignedTo', 'status', 'predecessors'];
+
+function getNavigableColumns(columnVisibility: ColumnVisibility): CellColumn[] {
+  const cols = [...FIXED_COLUMNS];
+  for (const col of OPTIONAL_COLUMNS_ORDER) {
+    if (col in columnVisibility && columnVisibility[col as keyof ColumnVisibility]) {
+      cols.push(col);
+    }
+  }
+  return cols;
+}
+
+interface FocusedCell {
+  itemId: string;
+  column: CellColumn;
+}
+
+interface FlatItem {
+  itemId: string;
+  swimlaneId: string | null;
+}
+
 // ─── Tooltip ─────────────────────────────────────────────────────────────────
 
 function Tooltip({ label, children, align = 'center' }: { label: string; children: React.ReactNode; align?: 'left' | 'center' | 'right' }) {
@@ -163,6 +190,195 @@ export function DataView() {
     .filter((i) => i.swimlaneId === null || !swimlaneIds.has(i.swimlaneId))
     .sort((a, b) => a.row - b.row);
 
+  // ─── Cell navigation system ──────────────────────────────────────────
+  const [focusedCell, setFocusedCell] = useState<FocusedCell | null>(null);
+  const [editingCell, setEditingCell] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const navigableColumns = useMemo(() => getNavigableColumns(columnVisibility), [columnVisibility]);
+
+  // Flat ordered list of all visible items (independent first, then swimlanes in order)
+  const flatItemOrder = useMemo<FlatItem[]>(() => {
+    const result: FlatItem[] = [];
+    for (const item of independentItems) {
+      result.push({ itemId: item.id, swimlaneId: null });
+    }
+    for (const sw of sortedSwimlanes) {
+      if (collapsedSwimlanes.has(sw.id)) continue;
+      const swimItems = items.filter((i) => i.swimlaneId === sw.id).sort((a, b) => a.row - b.row);
+      for (const item of swimItems) {
+        result.push({ itemId: item.id, swimlaneId: sw.id });
+      }
+    }
+    return result;
+  }, [independentItems, sortedSwimlanes, items, collapsedSwimlanes]);
+
+  // Find which swimlane an item belongs to in the flat order
+  const getSwimlaneForItem = useCallback((itemId: string): string | null => {
+    const entry = flatItemOrder.find((f) => f.itemId === itemId);
+    return entry?.swimlaneId ?? null;
+  }, [flatItemOrder]);
+
+  // Check if an item is the last in its swimlane/group
+  const isLastInGroup = useCallback((itemId: string): boolean => {
+    const entry = flatItemOrder.find((f) => f.itemId === itemId);
+    if (!entry) return false;
+    const swimlaneId = entry.swimlaneId;
+    const groupItems = flatItemOrder.filter((f) => f.swimlaneId === swimlaneId);
+    return groupItems[groupItems.length - 1]?.itemId === itemId;
+  }, [flatItemOrder]);
+
+  const navigateCell = useCallback((direction: 'next' | 'prev' | 'down' | 'up', currentCell: FocusedCell): FocusedCell | 'create-task' | null => {
+    const colIdx = navigableColumns.indexOf(currentCell.column);
+    const rowIdx = flatItemOrder.findIndex((f) => f.itemId === currentCell.itemId);
+    if (colIdx === -1 || rowIdx === -1) return null;
+
+    if (direction === 'next') {
+      if (colIdx < navigableColumns.length - 1) {
+        return { itemId: currentCell.itemId, column: navigableColumns[colIdx + 1] };
+      }
+      // Last column — check if this is the last item in its group
+      if (isLastInGroup(currentCell.itemId)) {
+        return 'create-task';
+      }
+      // Move to first column of next row
+      if (rowIdx < flatItemOrder.length - 1) {
+        return { itemId: flatItemOrder[rowIdx + 1].itemId, column: navigableColumns[0] };
+      }
+      return 'create-task';
+    }
+
+    if (direction === 'prev') {
+      if (colIdx > 0) {
+        return { itemId: currentCell.itemId, column: navigableColumns[colIdx - 1] };
+      }
+      // First column — move to last column of previous row
+      if (rowIdx > 0) {
+        return { itemId: flatItemOrder[rowIdx - 1].itemId, column: navigableColumns[navigableColumns.length - 1] };
+      }
+      // Already at very top-left — do nothing
+      return null;
+    }
+
+    if (direction === 'down') {
+      if (rowIdx < flatItemOrder.length - 1) {
+        // Check if next item is in same group or different group
+        const currentSwimlane = flatItemOrder[rowIdx].swimlaneId;
+        const nextSwimlane = flatItemOrder[rowIdx + 1].swimlaneId;
+        if (currentSwimlane === nextSwimlane) {
+          return { itemId: flatItemOrder[rowIdx + 1].itemId, column: currentCell.column };
+        }
+        // We crossed a swimlane boundary — this means current item is last in its group
+        return 'create-task';
+      }
+      // Last item overall — create task
+      return 'create-task';
+    }
+
+    if (direction === 'up') {
+      if (rowIdx > 0) {
+        return { itemId: flatItemOrder[rowIdx - 1].itemId, column: currentCell.column };
+      }
+      return null;
+    }
+
+    return null;
+  }, [navigableColumns, flatItemOrder]);
+
+  // Create a new task in the appropriate group and focus its title (or specific column)
+  const createTaskInGroup = useCallback((swimlaneId: string | null, focusColumn?: CellColumn): void => {
+    const today = new Date().toISOString().split('T')[0];
+    const id = addItem({
+      name: 'New Task',
+      type: 'task' as const,
+      swimlaneId: swimlaneId ?? undefined,
+      startDate: today,
+    });
+    // Use requestAnimationFrame to wait for the new item to render
+    const targetCol = focusColumn ?? 'title';
+    requestAnimationFrame(() => {
+      setFocusedCell({ itemId: id, column: targetCol });
+      if (targetCol === 'title') {
+        setEditingCell(true);
+        setFocusItemId(id); // This triggers the auto-focus/select behavior in ItemRow
+      }
+    });
+  }, [addItem]);
+
+  const handleCellKeyDown = useCallback((e: React.KeyboardEvent, cell: FocusedCell, isEditing: boolean) => {
+    const { key, shiftKey } = e;
+
+    if (key === 'Tab') {
+      e.preventDefault();
+      const result = navigateCell(shiftKey ? 'prev' : 'next', cell);
+      if (result === 'create-task') {
+        const swimlaneId = getSwimlaneForItem(cell.itemId);
+        createTaskInGroup(swimlaneId, navigableColumns[0]);
+      } else if (result) {
+        setFocusedCell(result);
+        setEditingCell(false);
+      }
+      return;
+    }
+
+    if (key === 'Enter') {
+      e.preventDefault();
+      // Commit current cell and move down
+      const result = navigateCell('down', cell);
+      if (result === 'create-task') {
+        const swimlaneId = getSwimlaneForItem(cell.itemId);
+        createTaskInGroup(swimlaneId, cell.column);
+      } else if (result) {
+        setFocusedCell(result);
+        setEditingCell(false);
+      }
+      return;
+    }
+
+    if (key === 'Escape') {
+      setEditingCell(false);
+      return;
+    }
+
+    // Left/Right only navigate when NOT editing
+    if (!isEditing) {
+      if (key === 'ArrowRight') {
+        e.preventDefault();
+        const result = navigateCell('next', cell);
+        if (result === 'create-task') {
+          const swimlaneId = getSwimlaneForItem(cell.itemId);
+          createTaskInGroup(swimlaneId, navigableColumns[0]);
+        } else if (result) {
+          setFocusedCell(result);
+          setEditingCell(false);
+        }
+        return;
+      }
+      if (key === 'ArrowLeft') {
+        e.preventDefault();
+        const result = navigateCell('prev', cell);
+        if (result && result !== 'create-task') {
+          setFocusedCell(result);
+          setEditingCell(false);
+        }
+        return;
+      }
+    }
+  }, [navigateCell, getSwimlaneForItem, createTaskInGroup, navigableColumns]);
+
+  // Click-outside: clear focus when clicking outside the table
+  useEffect(() => {
+    if (!focusedCell) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (tableContainerRef.current && !tableContainerRef.current.contains(e.target as Node)) {
+        setFocusedCell(null);
+        setEditingCell(false);
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [focusedCell]);
+
   // Row number map: item ID -> 1-based display index (for dependency shorthand)
   const rowNumberMap = useMemo(
     () => buildRowNumberMap(items, swimlanes),
@@ -263,6 +479,10 @@ export function DataView() {
       startDate: today,
     });
     setFocusItemId(id);
+    requestAnimationFrame(() => {
+      setFocusedCell({ itemId: id, column: 'title' });
+      setEditingCell(true);
+    });
   };
 
   const handleAddIndependentItem = (type: ItemType) => {
@@ -273,6 +493,10 @@ export function DataView() {
       startDate: today,
     });
     setFocusItemId(id);
+    requestAnimationFrame(() => {
+      setFocusedCell({ itemId: id, column: 'title' });
+      setEditingCell(true);
+    });
   };
 
   const handleAddSwimlane = () => {
@@ -303,7 +527,7 @@ export function DataView() {
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto scrollbar-thin border border-slate-200 rounded-lg">
+      <div ref={tableContainerRef} className="flex-1 overflow-auto scrollbar-thin border border-slate-200 rounded-lg">
         <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
           <thead className="sticky top-0 z-10">
             <tr className="bg-slate-50 border-b border-slate-200">
@@ -381,6 +605,12 @@ export function DataView() {
               rowNumberMap={rowNumberMap}
               onDependencyChange={handleDependencyChange}
               onOpenDependencyEditor={(id) => setDepEditorItemId(id)}
+              focusedCell={focusedCell}
+              editingCell={editingCell}
+              onCellFocus={(itemId, col) => { setFocusedCell({ itemId, column: col }); setEditingCell(false); }}
+              onCellEditStart={() => setEditingCell(true)}
+              onCellEditEnd={() => setEditingCell(false)}
+              onCellKeyDown={handleCellKeyDown}
             />
 
             {sortedSwimlanes.map((swimlane, idx) => {
@@ -456,7 +686,13 @@ export function DataView() {
                   dependencies={dependencies}
                   rowNumberMap={rowNumberMap}
                   onDependencyChange={handleDependencyChange}
-                  onOpenDependencyEditor={(id) => setDepEditorItemId(id)}
+                   onOpenDependencyEditor={(id) => setDepEditorItemId(id)}
+                   focusedCell={focusedCell}
+                   editingCell={editingCell}
+                   onCellFocus={(itemId, col) => { setFocusedCell({ itemId, column: col }); setEditingCell(false); }}
+                   onCellEditStart={() => setEditingCell(true)}
+                   onCellEditEnd={() => setEditingCell(false)}
+                   onCellKeyDown={handleCellKeyDown}
                 />
               );
             })}
@@ -785,6 +1021,13 @@ interface IndependentItemsGroupProps {
   rowNumberMap: Map<string, number>;
   onDependencyChange: (itemId: string, shorthand: string) => void;
   onOpenDependencyEditor: (itemId: string) => void;
+  // Cell navigation
+  focusedCell: FocusedCell | null;
+  editingCell: boolean;
+  onCellFocus: (itemId: string, column: CellColumn) => void;
+  onCellEditStart: () => void;
+  onCellEditEnd: () => void;
+  onCellKeyDown: (e: React.KeyboardEvent, cell: FocusedCell, isEditing: boolean) => void;
 }
 
 function IndependentItemsGroup({
@@ -820,6 +1063,12 @@ function IndependentItemsGroup({
   rowNumberMap,
   onDependencyChange,
   onOpenDependencyEditor,
+  focusedCell,
+  editingCell,
+  onCellFocus,
+  onCellEditStart,
+  onCellEditEnd,
+  onCellKeyDown,
 }: IndependentItemsGroupProps) {
   return (
     <>
@@ -877,14 +1126,20 @@ function IndependentItemsGroup({
           rowNumberMap={rowNumberMap}
           onDependencyChange={onDependencyChange}
           onOpenDependencyEditor={onOpenDependencyEditor}
+          focusedColumn={focusedCell?.itemId === item.id ? focusedCell.column : null}
+          editingCell={focusedCell?.itemId === item.id ? editingCell : false}
+          onCellFocus={(col) => onCellFocus(item.id, col)}
+          onCellEditStart={onCellEditStart}
+          onCellEditEnd={onCellEditEnd}
+          onCellKeyDown={(e, col, isEditing) => onCellKeyDown(e, { itemId: item.id, column: col }, isEditing)}
         />
       ))}
 
       {/* Add row for independent items */}
-      <tr>
+      <tr className="group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onAddItem('task')}>
         <td className="pl-5 pr-0 py-2" />
         <td colSpan={totalColumns - 1} className="pl-3 pr-4 py-2">
-          <InlineAddRow onAdd={(type) => onAddItem(type)} />
+          <InlineAddRow />
         </td>
       </tr>
 
@@ -952,6 +1207,13 @@ interface SwimlaneGroupProps {
   rowNumberMap: Map<string, number>;
   onDependencyChange: (itemId: string, shorthand: string) => void;
   onOpenDependencyEditor: (itemId: string) => void;
+  // Cell navigation
+  focusedCell: FocusedCell | null;
+  editingCell: boolean;
+  onCellFocus: (itemId: string, column: CellColumn) => void;
+  onCellEditStart: () => void;
+  onCellEditEnd: () => void;
+  onCellKeyDown: (e: React.KeyboardEvent, cell: FocusedCell, isEditing: boolean) => void;
 }
 
 function SwimlaneGroup({
@@ -1004,6 +1266,12 @@ function SwimlaneGroup({
   rowNumberMap,
   onDependencyChange,
   onOpenDependencyEditor,
+  focusedCell,
+  editingCell,
+  onCellFocus,
+  onCellEditStart,
+  onCellEditEnd,
+  onCellKeyDown,
 }: SwimlaneGroupProps) {
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(swimlane.name);
@@ -1165,15 +1433,21 @@ function SwimlaneGroup({
             rowNumberMap={rowNumberMap}
             onDependencyChange={onDependencyChange}
             onOpenDependencyEditor={onOpenDependencyEditor}
+            focusedColumn={focusedCell?.itemId === item.id ? focusedCell.column : null}
+            editingCell={focusedCell?.itemId === item.id ? editingCell : false}
+            onCellFocus={(col) => onCellFocus(item.id, col)}
+            onCellEditStart={onCellEditStart}
+            onCellEditEnd={onCellEditEnd}
+            onCellKeyDown={(e, col, isEditing) => onCellKeyDown(e, { itemId: item.id, column: col }, isEditing)}
           />
         ))}
 
       {/* Add row */}
       {!isCollapsed && (
-        <tr>
+        <tr className="group hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onAddItem('task')}>
           <td className="pl-5 pr-0 py-2" />
           <td colSpan={totalColumns - 1} className="pl-3 pr-4 py-2">
-            <InlineAddRow onAdd={(type) => onAddItem(type)} />
+            <InlineAddRow />
           </td>
         </tr>
       )}
@@ -1223,6 +1497,13 @@ interface ItemRowProps {
   rowNumberMap: Map<string, number>;
   onDependencyChange: (itemId: string, shorthand: string) => void;
   onOpenDependencyEditor: (itemId: string) => void;
+  // Cell navigation
+  focusedColumn: CellColumn | null;
+  editingCell: boolean;
+  onCellFocus: (column: CellColumn) => void;
+  onCellEditStart: () => void;
+  onCellEditEnd: () => void;
+  onCellKeyDown: (e: React.KeyboardEvent, column: CellColumn, isEditing: boolean) => void;
 }
 
 function ItemRow({
@@ -1257,6 +1538,12 @@ function ItemRow({
   rowNumberMap,
   onDependencyChange,
   onOpenDependencyEditor,
+  focusedColumn,
+  editingCell: editingCellProp,
+  onCellFocus,
+  onCellEditStart,
+  onCellEditEnd,
+  onCellKeyDown,
 }: ItemRowProps) {
   const duration = item.type === 'milestone' ? 0 : computeDuration(item.startDate, item.endDate);
 
@@ -1268,6 +1555,12 @@ function ItemRow({
   const [assignedValue, setAssignedValue] = useState(item.assignedTo);
   const [editingPredecessors, setEditingPredecessors] = useState(false);
   const [predecessorsValue, setPredecessorsValue] = useState('');
+
+  // Refs for focusable cells
+  const cellRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const endDateRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   // Compute the shorthand string for this item's dependencies
   const predecessorsShorthand = useMemo(
@@ -1281,9 +1574,52 @@ function ItemRow({
     [editingPredecessors, predecessorsValue, item.id, rowNumberMap]
   );
 
-  const startDateRef = useRef<HTMLInputElement>(null);
-  const endDateRef = useRef<HTMLInputElement>(null);
-  const nameRef = useRef<HTMLInputElement>(null);
+  const isEditingLocal = focusedColumn !== null && (
+    (focusedColumn === 'title') || // title is always an input
+    (focusedColumn === 'duration' && editingDuration) ||
+    (focusedColumn === 'percentComplete' && editingProgress) ||
+    (focusedColumn === 'assignedTo' && editingAssigned) ||
+    (focusedColumn === 'predecessors' && editingPredecessors)
+  );
+
+  // When focusedColumn changes, focus the corresponding td (unless editing)
+  useEffect(() => {
+    if (focusedColumn && cellRefs.current[focusedColumn]) {
+      // For title column, focus the input directly
+      if (focusedColumn === 'title' && nameRef.current) {
+        nameRef.current.focus();
+        return;
+      }
+      const td = cellRefs.current[focusedColumn];
+      if (td && document.activeElement !== td && !td.contains(document.activeElement)) {
+        td.focus();
+      }
+    }
+  }, [focusedColumn]);
+
+  // When focusedColumn changes and editingCellProp is true, enter edit mode for click-to-edit cells
+  useEffect(() => {
+    if (focusedColumn && editingCellProp) {
+      if (focusedColumn === 'duration') {
+        setDurationValue(String(duration));
+        setEditingDuration(true);
+      } else if (focusedColumn === 'percentComplete') {
+        setProgressValue(String(item.percentComplete));
+        setEditingProgress(true);
+      } else if (focusedColumn === 'assignedTo') {
+        setAssignedValue(item.assignedTo);
+        setEditingAssigned(true);
+      } else if (focusedColumn === 'predecessors') {
+        setPredecessorsValue(predecessorsShorthand);
+        setEditingPredecessors(true);
+      }
+    }
+  }, [focusedColumn, editingCellProp]);
+
+  // Helper for cell keydown handling
+  const handleCellKeyDown = (e: React.KeyboardEvent, column: CellColumn, isEditing: boolean) => {
+    onCellKeyDown(e, column, isEditing);
+  };
 
   useEffect(() => {
     if (shouldFocus && nameRef.current) {
@@ -1340,21 +1676,40 @@ function ItemRow({
       </td>
 
       {/* Title */}
-      <td className="pl-3 pr-4 py-3">
+      <td
+        ref={(el) => { cellRefs.current['title'] = el; }}
+        className={`pl-3 pr-4 py-3 ${focusedColumn === 'title' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+      >
         <input
           ref={nameRef}
           className="w-full bg-transparent border-none outline-none text-[13px] text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-indigo-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
           value={item.name}
           onChange={(e) => onUpdateItem(item.id, { name: e.target.value })}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            handleCellKeyDown(e, 'title', true);
           }}
+          onFocus={() => onCellFocus('title')}
           onClick={(e) => e.stopPropagation()}
         />
       </td>
 
       {/* Type */}
-      <td className="px-3 py-3">
+      <td
+        ref={(el) => { cellRefs.current['type'] = el; }}
+        className={`px-3 py-3 ${focusedColumn === 'type' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+        tabIndex={focusedColumn === 'type' ? 0 : -1}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            // Open the type picker by clicking its button
+            const btn = cellRefs.current['type']?.querySelector('button');
+            if (btn) btn.click();
+            return;
+          }
+          handleCellKeyDown(e, 'type', false);
+        }}
+        onFocus={() => onCellFocus('type')}
+      >
         <TypePickerCell
           item={item}
           onUpdateItem={onUpdateItem}
@@ -1364,7 +1719,24 @@ function ItemRow({
       </td>
 
       {/* Duration */}
-      <td className="px-3 py-3">
+      <td
+        ref={(el) => { cellRefs.current['duration'] = el; }}
+        className={`px-3 py-3 ${focusedColumn === 'duration' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+        tabIndex={focusedColumn === 'duration' ? 0 : -1}
+        onKeyDown={(e) => {
+          if (!editingDuration) {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              setDurationValue(String(duration));
+              setEditingDuration(true);
+              onCellEditStart();
+              return;
+            }
+            handleCellKeyDown(e, 'duration', false);
+          }
+        }}
+        onFocus={() => onCellFocus('duration')}
+      >
         {editingDuration ? (
           <input
             type="number"
@@ -1377,14 +1749,26 @@ function ItemRow({
               const v = parseInt(durationValue);
               if (!isNaN(v) && v >= 0) onDurationChange(item.id, v);
               setEditingDuration(false);
+              onCellEditEnd();
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 const v = parseInt(durationValue);
                 if (!isNaN(v) && v >= 0) onDurationChange(item.id, v);
                 setEditingDuration(false);
+                onCellEditEnd();
+                handleCellKeyDown(e, 'duration', true);
+              } else if (e.key === 'Escape') {
+                setEditingDuration(false);
+                onCellEditEnd();
+              } else if (e.key === 'Tab') {
+                e.preventDefault();
+                const v = parseInt(durationValue);
+                if (!isNaN(v) && v >= 0) onDurationChange(item.id, v);
+                setEditingDuration(false);
+                onCellEditEnd();
+                handleCellKeyDown(e, 'duration', true);
               }
-              if (e.key === 'Escape') setEditingDuration(false);
             }}
             onClick={(e) => e.stopPropagation()}
           />
@@ -1395,6 +1779,8 @@ function ItemRow({
               e.stopPropagation();
               setDurationValue(String(duration));
               setEditingDuration(true);
+              onCellFocus('duration');
+              onCellEditStart();
             }}
           >
             {duration} days
@@ -1403,12 +1789,26 @@ function ItemRow({
       </td>
 
       {/* Start Date */}
-      <td className="px-3 py-3">
+      <td
+        ref={(el) => { cellRefs.current['startDate'] = el; }}
+        className={`px-3 py-3 ${focusedColumn === 'startDate' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+        tabIndex={focusedColumn === 'startDate' ? 0 : -1}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            startDateRef.current?.showPicker();
+            return;
+          }
+          handleCellKeyDown(e, 'startDate', false);
+        }}
+        onFocus={() => onCellFocus('startDate')}
+      >
         <div className="relative flex items-center gap-1.5">
           <span
             className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
+              onCellFocus('startDate');
               startDateRef.current?.showPicker();
             }}
           >
@@ -1419,6 +1819,7 @@ function ItemRow({
             className="text-slate-300 opacity-0 group-hover/row:opacity-100 transition-opacity cursor-pointer shrink-0"
             onClick={(e) => {
               e.stopPropagation();
+              onCellFocus('startDate');
               startDateRef.current?.showPicker();
             }}
           />
@@ -1434,12 +1835,26 @@ function ItemRow({
       </td>
 
       {/* End Date */}
-      <td className="px-3 py-3">
-        <div className="relative flex items-center gap-1.5">
+      <td
+        ref={(el) => { cellRefs.current['endDate'] = el; }}
+        className={`px-3 py-3 ${focusedColumn === 'endDate' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+        tabIndex={focusedColumn === 'endDate' ? 0 : -1}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            endDateRef.current?.showPicker();
+            return;
+          }
+          handleCellKeyDown(e, 'endDate', false);
+        }}
+        onFocus={() => onCellFocus('endDate')}
+      >
+         <div className="relative flex items-center gap-1.5">
           <span
             className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
+              onCellFocus('endDate');
               endDateRef.current?.showPicker();
             }}
           >
@@ -1450,6 +1865,7 @@ function ItemRow({
             className="text-slate-300 opacity-0 group-hover/row:opacity-100 transition-opacity cursor-pointer shrink-0"
             onClick={(e) => {
               e.stopPropagation();
+              onCellFocus('endDate');
               endDateRef.current?.showPicker();
             }}
           />
@@ -1466,7 +1882,24 @@ function ItemRow({
 
       {/* Progress */}
       {columnVisibility.percentComplete && (
-        <td className="px-3 py-3">
+        <td
+          ref={(el) => { cellRefs.current['percentComplete'] = el; }}
+          className={`px-3 py-3 ${focusedColumn === 'percentComplete' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+          tabIndex={focusedColumn === 'percentComplete' ? 0 : -1}
+          onKeyDown={(e) => {
+            if (!editingProgress) {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                setProgressValue(String(item.percentComplete));
+                setEditingProgress(true);
+                onCellEditStart();
+                return;
+              }
+              handleCellKeyDown(e, 'percentComplete', false);
+            }
+          }}
+          onFocus={() => onCellFocus('percentComplete')}
+        >
           {editingProgress ? (
             <input
               type="number"
@@ -1480,14 +1913,26 @@ function ItemRow({
                 const v = Math.min(100, Math.max(0, parseInt(progressValue) || 0));
                 onUpdateItem(item.id, { percentComplete: v });
                 setEditingProgress(false);
+                onCellEditEnd();
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   const v = Math.min(100, Math.max(0, parseInt(progressValue) || 0));
                   onUpdateItem(item.id, { percentComplete: v });
                   setEditingProgress(false);
+                  onCellEditEnd();
+                  handleCellKeyDown(e, 'percentComplete', true);
+                } else if (e.key === 'Escape') {
+                  setEditingProgress(false);
+                  onCellEditEnd();
+                } else if (e.key === 'Tab') {
+                  e.preventDefault();
+                  const v = Math.min(100, Math.max(0, parseInt(progressValue) || 0));
+                  onUpdateItem(item.id, { percentComplete: v });
+                  setEditingProgress(false);
+                  onCellEditEnd();
+                  handleCellKeyDown(e, 'percentComplete', true);
                 }
-                if (e.key === 'Escape') setEditingProgress(false);
               }}
               onClick={(e) => e.stopPropagation()}
             />
@@ -1498,6 +1943,8 @@ function ItemRow({
                 e.stopPropagation();
                 setProgressValue(String(item.percentComplete));
                 setEditingProgress(true);
+                onCellFocus('percentComplete');
+                onCellEditStart();
               }}
             >
               <div className="w-10 h-1.5 rounded-full bg-slate-200 overflow-hidden shrink-0">
@@ -1519,7 +1966,24 @@ function ItemRow({
 
       {/* Assigned To */}
       {columnVisibility.assignedTo && (
-        <td className="px-3 py-3">
+        <td
+          ref={(el) => { cellRefs.current['assignedTo'] = el; }}
+          className={`px-3 py-3 ${focusedColumn === 'assignedTo' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+          tabIndex={focusedColumn === 'assignedTo' ? 0 : -1}
+          onKeyDown={(e) => {
+            if (!editingAssigned) {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                setAssignedValue(item.assignedTo);
+                setEditingAssigned(true);
+                onCellEditStart();
+                return;
+              }
+              handleCellKeyDown(e, 'assignedTo', false);
+            }
+          }}
+          onFocus={() => onCellFocus('assignedTo')}
+        >
           {editingAssigned ? (
             <input
               className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700 outline-none focus:border-indigo-500"
@@ -1530,15 +1994,24 @@ function ItemRow({
               onBlur={() => {
                 onUpdateItem(item.id, { assignedTo: assignedValue.trim() });
                 setEditingAssigned(false);
+                onCellEditEnd();
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   onUpdateItem(item.id, { assignedTo: assignedValue.trim() });
                   setEditingAssigned(false);
-                }
-                if (e.key === 'Escape') {
+                  onCellEditEnd();
+                  handleCellKeyDown(e, 'assignedTo', true);
+                } else if (e.key === 'Escape') {
                   setAssignedValue(item.assignedTo);
                   setEditingAssigned(false);
+                  onCellEditEnd();
+                } else if (e.key === 'Tab') {
+                  e.preventDefault();
+                  onUpdateItem(item.id, { assignedTo: assignedValue.trim() });
+                  setEditingAssigned(false);
+                  onCellEditEnd();
+                  handleCellKeyDown(e, 'assignedTo', true);
                 }
               }}
               onClick={(e) => e.stopPropagation()}
@@ -1550,6 +2023,8 @@ function ItemRow({
               e.stopPropagation();
               setAssignedValue(item.assignedTo);
               setEditingAssigned(true);
+              onCellFocus('assignedTo');
+              onCellEditStart();
               }}
             >
               {item.assignedTo}
@@ -1561,6 +2036,8 @@ function ItemRow({
                 e.stopPropagation();
                 setAssignedValue('');
                 setEditingAssigned(true);
+                onCellFocus('assignedTo');
+                onCellEditStart();
               }}
             >
               <UserPlus size={12} className="opacity-0 group-hover/row:opacity-100 transition-opacity" />
@@ -1570,8 +2047,23 @@ function ItemRow({
       )}
 
       {/* Status */}
+      {/* Status */}
       {columnVisibility.status && (
-         <td className="px-3 py-3">
+         <td
+          ref={(el) => { cellRefs.current['status'] = el; }}
+          className={`px-3 py-3 ${focusedColumn === 'status' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+           tabIndex={focusedColumn === 'status' ? 0 : -1}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              const btn = cellRefs.current['status']?.querySelector('button');
+              if (btn) btn.click();
+              return;
+            }
+            handleCellKeyDown(e, 'status', false);
+          }}
+          onFocus={() => onCellFocus('status')}
+        >
           <StatusCell
             statusId={item.statusId}
             statusLabels={statusLabels}
@@ -1583,7 +2075,24 @@ function ItemRow({
 
       {/* Predecessors */}
       {columnVisibility.predecessors && (
-        <td className="px-3 py-3">
+        <td
+          ref={(el) => { cellRefs.current['predecessors'] = el; }}
+          className={`px-3 py-3 ${focusedColumn === 'predecessors' ? 'ring-2 ring-inset ring-indigo-400' : ''}`}
+          tabIndex={focusedColumn === 'predecessors' ? 0 : -1}
+          onKeyDown={(e) => {
+            if (!editingPredecessors) {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                setPredecessorsValue(predecessorsShorthand);
+                setEditingPredecessors(true);
+                onCellEditStart();
+                return;
+              }
+              handleCellKeyDown(e, 'predecessors', false);
+            }
+          }}
+          onFocus={() => onCellFocus('predecessors')}
+        >
           <div className="flex items-center gap-1 max-w-[160px]">
             {editingPredecessors ? (
               <div className="flex-1 relative">
@@ -1598,26 +2107,40 @@ function ItemRow({
                   onChange={(e) => setPredecessorsValue(e.target.value)}
                   onBlur={() => {
                     if (predecessorsWarnings.length > 0) {
-                      // Don't commit if there are warnings — revert
                       setEditingPredecessors(false);
                       setPredecessorsValue(predecessorsShorthand);
+                      onCellEditEnd();
                       return;
                     }
                     setEditingPredecessors(false);
                     if (predecessorsValue !== predecessorsShorthand) {
                       onDependencyChange(item.id, predecessorsValue);
                     }
+                    onCellEditEnd();
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      if (predecessorsWarnings.length > 0) return; // block commit
+                      if (predecessorsWarnings.length > 0) return;
                       setEditingPredecessors(false);
                       if (predecessorsValue !== predecessorsShorthand) {
                         onDependencyChange(item.id, predecessorsValue);
                       }
+                      onCellEditEnd();
+                      handleCellKeyDown(e, 'predecessors', true);
                     } else if (e.key === 'Escape') {
                       setEditingPredecessors(false);
                       setPredecessorsValue(predecessorsShorthand);
+                      onCellEditEnd();
+                    } else if (e.key === 'Tab') {
+                      e.preventDefault();
+                      if (predecessorsWarnings.length === 0) {
+                        setEditingPredecessors(false);
+                        if (predecessorsValue !== predecessorsShorthand) {
+                          onDependencyChange(item.id, predecessorsValue);
+                        }
+                        onCellEditEnd();
+                        handleCellKeyDown(e, 'predecessors', true);
+                      }
                     }
                   }}
                   autoFocus
@@ -1641,6 +2164,8 @@ function ItemRow({
                     e.stopPropagation();
                     setPredecessorsValue(predecessorsShorthand);
                     setEditingPredecessors(true);
+                    onCellFocus('predecessors');
+                    onCellEditStart();
                   }}
                 >
                   {predecessorsShorthand || '\u2014'}
@@ -2065,14 +2590,11 @@ function StatusCell({
 
 // ─── Inline Add Row ──────────────────────────────────────────────────────────
 
-function InlineAddRow({ onAdd }: { onAdd: (type: ItemType) => void }) {
+function InlineAddRow() {
   return (
-    <button
-      onClick={() => onAdd('task')}
-      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-500 transition-colors py-0.5"
-    >
+    <span className="flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-indigo-500 transition-colors py-0.5 pointer-events-none select-none">
       <Plus size={13} />
       Add task or milestone
-    </button>
+    </span>
   );
 }
