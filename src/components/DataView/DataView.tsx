@@ -1740,7 +1740,7 @@ function ItemRow({
         {editingDuration ? (
           <input
             type="number"
-            className="w-16 bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700 outline-none focus:border-indigo-500"
+            className="w-16 bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-indigo-500"
             value={durationValue}
             min={0}
             autoFocus
@@ -1774,7 +1774,7 @@ function ItemRow({
           />
         ) : (
           <span
-            className="text-[11px] text-slate-600 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[12px] text-slate-700 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               setDurationValue(String(duration));
@@ -1805,7 +1805,7 @@ function ItemRow({
       >
         <div className="relative flex items-center gap-1.5">
           <span
-            className="text-[11px] text-slate-600 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[12px] text-slate-700 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               onCellFocus('startDate');
@@ -1851,7 +1851,7 @@ function ItemRow({
       >
          <div className="relative flex items-center gap-1.5">
           <span
-            className="text-[11px] text-slate-600 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[12px] text-slate-700 tabular-nums cursor-pointer hover:text-indigo-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               onCellFocus('endDate');
@@ -1903,7 +1903,7 @@ function ItemRow({
           {editingProgress ? (
             <input
               type="number"
-              className="w-14 bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700 outline-none focus:border-indigo-500"
+              className="w-14 bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-indigo-500"
               value={progressValue}
               min={0}
               max={100}
@@ -1956,7 +1956,7 @@ function ItemRow({
                   }}
                 />
               </div>
-              <span className="text-[11px] text-slate-600 tabular-nums group-hover/pct:text-indigo-600 transition-colors">
+              <span className="text-[12px] text-slate-700 tabular-nums group-hover/pct:text-indigo-600 transition-colors">
                 {item.percentComplete}%
               </span>
             </div>
@@ -1986,7 +1986,7 @@ function ItemRow({
         >
           {editingAssigned ? (
             <input
-              className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700 outline-none focus:border-indigo-500"
+              className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-indigo-500"
               value={assignedValue}
               placeholder="Type a name..."
               autoFocus
@@ -2018,7 +2018,7 @@ function ItemRow({
             />
           ) : item.assignedTo ? (
             <span
-            className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
+            className="text-[12px] text-slate-700 cursor-pointer hover:text-indigo-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               setAssignedValue(item.assignedTo);
