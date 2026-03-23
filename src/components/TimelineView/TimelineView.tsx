@@ -590,7 +590,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                     return (
                       <div
                         key={tierIdx}
-                        className={`flex h-7 relative cursor-pointer transition-shadow ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
+                        className={`flex h-7 relative cursor-pointer transition-shadow hover:outline hover:outline-1 hover:outline-red-400 ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
                         style={{ backgroundColor: tier.backgroundColor }}
                         onClick={(e) => { e.stopPropagation(); setSelectedTierIndex(storeIndex); setStylePaneSection('scale'); }}
                       >
@@ -733,7 +733,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
 
                   {/* Colored swimlane badge on left edge */}
                   <div
-                    className={`absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md tracking-wide z-[6] cursor-pointer transition-shadow ${
+                    className={`absolute left-0 top-0 bottom-0 flex items-center justify-center rounded-r-md tracking-wide z-[6] cursor-pointer transition-shadow hover:outline hover:outline-1 hover:outline-red-400 ${
                       selectedSwimlaneId === swimlane.id ? 'ring-2 ring-offset-1 ring-slate-700' : ''
                     }`}
                     style={{
@@ -1152,7 +1152,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       onMouseDown={onMouseDown}
     >
       <div
-        className="w-full h-full relative overflow-hidden cursor-pointer"
+        className="w-full h-full relative overflow-hidden cursor-pointer hover:outline hover:outline-1 hover:outline-red-400"
         style={{
           ...shapeStyle,
           backgroundColor: `${style.color}30`,
@@ -1184,7 +1184,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       {/* Title Label */}
       {style.showTitle && (
         <div
-          className="absolute whitespace-nowrap truncate cursor-pointer"
+          className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
           style={{
             fontSize: style.fontSize,
             fontFamily: style.fontFamily,
@@ -1216,7 +1216,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       {/* Date Label */}
       {style.showDate && (
         <div
-          className="absolute whitespace-nowrap truncate cursor-pointer"
+          className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
           style={{
             fontSize: style.dateFontSize,
             fontFamily: style.dateFontFamily,
@@ -1250,7 +1250,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       {/* Duration Label */}
       {style.showDuration && (
         <div
-          className="absolute whitespace-nowrap truncate cursor-pointer"
+          className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
           style={{
             fontSize: style.durationFontSize,
             fontFamily: style.durationFontFamily,
@@ -1294,7 +1294,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       {/* Percent Complete Label */}
       {style.showPercentComplete && (
         <div
-          className="absolute whitespace-nowrap truncate cursor-pointer"
+          className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
           style={{
             fontSize: style.pctFontSize,
             fontFamily: style.pctFontFamily,
@@ -1380,7 +1380,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
     // Build the title element
     const titleEl = style.showTitle ? (
       <div
-        className="whitespace-nowrap truncate cursor-pointer text-center"
+        className="whitespace-nowrap truncate cursor-pointer text-center hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
         style={{
           fontSize: style.fontSize,
           fontFamily: style.fontFamily,
@@ -1401,7 +1401,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
     // Build the date element
     const dateEl = style.showDate ? (
       <div
-        className="whitespace-nowrap cursor-pointer text-center"
+        className="whitespace-nowrap cursor-pointer text-center hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
         style={{
           fontSize: style.dateFontSize,
           fontFamily: style.dateFontFamily,
@@ -1419,7 +1419,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
     // Build the icon element
     const iconEl = (
       <div
-        className={`relative cursor-pointer ${isSelected ? 'drop-shadow-lg' : ''}`}
+        className={`relative cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 ${isSelected ? 'drop-shadow-lg' : ''}`}
         style={{
           filter: isSelected ? `drop-shadow(0 0 6px ${style.color}80)` : 'none',
         }}
@@ -1499,7 +1499,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
       onMouseDown={onMouseDown}
     >
       <div
-        className={`relative cursor-pointer ${isSelected ? 'drop-shadow-lg' : ''}`}
+        className={`relative cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 ${isSelected ? 'drop-shadow-lg' : ''}`}
         style={{
           filter: isSelected ? `drop-shadow(0 0 6px ${style.color}80)` : 'none',
         }}
@@ -1521,7 +1521,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           }}
         >
           <div
-            className="truncate cursor-pointer"
+            className="truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
             style={{
               fontSize: style.fontSize,
               fontFamily: style.fontFamily,
@@ -1538,7 +1538,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
             {item.name}
           </div>
           <div
-            className="cursor-pointer"
+            className="cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
             style={{
               fontSize: style.dateFontSize,
               fontFamily: style.dateFontFamily,
@@ -1557,7 +1557,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           {/* Title label */}
           {style.showTitle && (
             <div
-              className="absolute whitespace-nowrap truncate cursor-pointer"
+              className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
               style={{
                 fontSize: style.fontSize,
                 fontFamily: style.fontFamily,
@@ -1579,7 +1579,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           {/* Date label */}
           {style.showDate && (
             <div
-              className="absolute whitespace-nowrap cursor-pointer"
+              className="absolute whitespace-nowrap cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
               style={{
                 fontSize: style.dateFontSize,
                 fontFamily: style.dateFontFamily,
