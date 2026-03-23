@@ -1067,7 +1067,6 @@ function SwimlaneGroup({
               currentColor={swimlane.color}
               onChange={(color) => onUpdateSwimlane(swimlane.id, { color })}
             />
-            <div className="shrink-0" style={{ width: '12px', height: '18px', backgroundColor: swimlane.color }} />
             {editingName ? (
               <input
                 className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[15px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
@@ -1089,7 +1088,7 @@ function SwimlaneGroup({
               />
             ) : (
               <span
-                className="font-semibold text-[15px] text-slate-700 cursor-text"
+                className="font-semibold text-[15px] text-slate-700 cursor-text rounded px-1.5 py-0.5 -mx-1.5 -my-0.5 hover:ring-1 hover:ring-slate-300 transition-all"
                 onClick={(e) => {
                   e.stopPropagation();
                   setEditingName(true);
@@ -1859,7 +1858,7 @@ function SwimlaneColorPicker({
   const [open, setOpen] = useState(false);
   const [flipUp, setFlipUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -1871,8 +1870,8 @@ function SwimlaneColorPicker({
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
       const menuHeight = 180;
       setFlipUp(rect.bottom + menuHeight > window.innerHeight);
     }
@@ -1880,14 +1879,25 @@ function SwimlaneColorPicker({
   };
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        ref={btnRef}
+    <div className="relative shrink-0" ref={ref} style={{ width: '12px' }}>
+      {/* Default: solid color square. On swimlane hover: pencil + thin color bar */}
+      <div
+        ref={triggerRef}
         onClick={handleToggle}
-        className="text-slate-300 opacity-0 group-hover/swimlane:opacity-100 hover:text-slate-500 transition-all shrink-0 p-0.5"
+        className="cursor-pointer flex flex-col items-center"
+        style={{ width: '12px' }}
       >
-        <Pencil size={13} />
-      </button>
+        {/* Default color square — hidden on swimlane hover */}
+        <div
+          className="group-hover/swimlane:hidden"
+          style={{ width: '12px', height: '18px', backgroundColor: currentColor }}
+        />
+        {/* Hover state: pencil icon + thin color bar — shown on swimlane hover */}
+        <div className="hidden group-hover/swimlane:flex flex-col items-center gap-0.5 rounded hover:bg-slate-100 transition-colors py-0.5">
+          <Pencil size={12} className="text-slate-400" />
+          <div style={{ width: '12px', height: '3px', backgroundColor: currentColor, borderRadius: '1px' }} />
+        </div>
+      </div>
 
       {open && (
         <div
