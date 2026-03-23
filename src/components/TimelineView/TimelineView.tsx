@@ -501,11 +501,15 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
           setStylePaneSection(null);
         }}
       >
+        <div style={{
+          width: totalWidth + leftCapWidth + rightCapWidth,
+          margin: '0 auto',
+        }}>
         <div ref={exportRef} style={{
           width: totalWidth,
           position: 'relative',
-          marginLeft: leftCapWidth > 0 || rightCapWidth > 0 ? leftCapWidth : 'auto',
-          marginRight: leftCapWidth > 0 || rightCapWidth > 0 ? rightCapWidth : 'auto',
+          marginLeft: leftCapWidth,
+          marginRight: rightCapWidth,
         }}>
           {/* ─── "Above" milestones row (before sticky timescale header) ─── */}
           {aboveHeight > 0 && (
@@ -1007,9 +1011,10 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                 </>
               );
             })()}
-          </div>
-        </div>
-      </div>
+           </div>
+         </div>
+         </div>
+       </div>
 
       {/* ─── Zoom controls (bottom-right overlay) ─── */}
       <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-white/90 border border-[var(--color-border)] rounded-lg px-2 py-1 shadow-sm z-20">
