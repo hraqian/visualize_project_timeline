@@ -1056,14 +1056,44 @@ function SwimlaneGroup({
         }}
       >
         <td className="pt-8 pb-2.5" colSpan={totalColumns}>
-          <div className="relative flex items-center gap-2 pl-5 pr-4">
+          <div className="relative flex items-center gap-1.5 pl-5 pr-4">
             {/* Grip handle — hover only, positioned absolutely so it doesn't shift layout */}
             <GripVertical
               size={14}
               className="absolute left-1 text-slate-300 opacity-0 group-hover/swimlane:opacity-100 transition-opacity cursor-grab"
             />
             <div className="w-2.5 h-5 rounded-sm shrink-0" style={{ backgroundColor: swimlane.color }} />
-            {/* Pencil edit icon — hover only */}
+            {editingName ? (
+              <input
+                className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[15px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                onBlur={() => {
+                  onUpdateSwimlane(swimlane.id, { name: nameValue });
+                  setEditingName(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    onUpdateSwimlane(swimlane.id, { name: nameValue });
+                    setEditingName(false);
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+            ) : (
+              <span
+                className="font-semibold text-[15px] text-slate-700"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setEditingName(true);
+                }}
+              >
+                {swimlane.name}
+              </span>
+            )}
+            {/* Pencil edit icon — hover only, after name */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
