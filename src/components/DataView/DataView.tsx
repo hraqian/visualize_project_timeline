@@ -1083,27 +1083,27 @@ function SwimlaneGroup({
                 autoFocus
               />
             ) : (
-              <span
-                className="font-semibold text-[15px] text-slate-700"
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  setEditingName(true);
-                }}
-              >
-                {swimlane.name}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="font-semibold text-[15px] text-slate-700"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setEditingName(true);
+                  }}
+                >
+                  {swimlane.name}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingName(true);
+                  }}
+                  className="text-slate-300 opacity-0 group-hover/swimlane:opacity-100 hover:text-slate-500 transition-all shrink-0"
+                >
+                  <Pencil size={13} />
+                </button>
+              </div>
             )}
-            {/* Pencil edit icon — hover only, after name */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditingName(true);
-              }}
-              className="text-slate-300 opacity-0 group-hover/swimlane:opacity-100 hover:text-slate-500 transition-all shrink-0"
-            >
-              <Pencil size={13} />
-            </button>
-
             {/* Collapse/Expand toggle — always visible */}
             <Tooltip label={isCollapsed ? 'Expand' : 'Collapse'}>
               <button
@@ -1111,7 +1111,7 @@ function SwimlaneGroup({
                   e.stopPropagation();
                   onToggleCollapse();
                 }}
-                className="text-slate-300 hover:text-slate-500 transition-colors"
+                className="text-slate-300 hover:text-slate-500 transition-colors ml-1"
               >
                 {isCollapsed ? <ChevronsUpDown size={15} /> : <ChevronsDownUp size={15} />}
               </button>
