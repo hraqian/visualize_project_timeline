@@ -1062,7 +1062,7 @@ function SwimlaneGroup({
               size={14}
               className="absolute left-1 text-slate-300 opacity-0 group-hover/swimlane:opacity-100 transition-opacity cursor-grab"
             />
-            <div className="w-2.5 h-5 rounded-sm shrink-0" style={{ backgroundColor: swimlane.color }} />
+            <div className="rounded-sm shrink-0" style={{ width: '12px', height: '18px', backgroundColor: swimlane.color }} />
             {editingName ? (
               <input
                 className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[15px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
