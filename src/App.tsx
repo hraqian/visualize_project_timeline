@@ -156,7 +156,7 @@ function App() {
   return (
     <div className="h-full flex flex-col bg-[var(--color-bg)]">
       {/* ─── Row 1: Project title banner ─── */}
-      <div className="flex items-center h-10 bg-[#4f46e5] shrink-0 px-3">
+      <div className="flex items-center h-11 bg-[#4f46e5] shrink-0 px-3">
         {/* Left: Save + Undo/Redo */}
         <div className="flex items-center gap-1 flex-1 min-w-0">
           <button
@@ -227,7 +227,7 @@ function App() {
       </div>
 
       {/* ─── Row 2: Toolbar ─── */}
-      <div className="flex items-center h-12 px-4 border-b border-[var(--color-border)] bg-[var(--color-bg)] shrink-0">
+      <div className="flex items-center h-12 px-4 mt-0.5 border-b border-[var(--color-border)] bg-[var(--color-bg)] shrink-0">
         {/* Left: Add buttons */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {isTimeline ? (

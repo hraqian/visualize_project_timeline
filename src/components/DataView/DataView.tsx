@@ -5,7 +5,8 @@ import { v4 as uuid } from 'uuid';
 import {
   Trash2,
   ChevronDown,
-  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   GripVertical,
   Plus,
   X,
@@ -20,6 +21,7 @@ import {
   Eye,
   ListPlus,
   ListChecks,
+  Pencil,
 } from 'lucide-react';
 import { TypePickerCell } from './TypePicker';
 import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn, ProjectItem, ColumnVisibility, Dependency } from '@/types';
@@ -287,7 +289,7 @@ export function DataView() {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-white relative">
+    <div className="h-full flex flex-col overflow-hidden bg-white relative p-4 pt-3">
       {/* Selection Toolbar — shown when items are checked */}
       {hasChecked && (
         <SelectionToolbar
@@ -301,7 +303,7 @@ export function DataView() {
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto scrollbar-thin">
+      <div className="flex-1 overflow-auto scrollbar-thin border border-slate-200 rounded-lg">
         <table className="w-full text-sm" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
           <thead className="sticky top-0 z-10">
             <tr className="bg-slate-50 border-b border-slate-200">
@@ -318,7 +320,7 @@ export function DataView() {
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-32">Start</th>
               <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-32">End</th>
               {columnVisibility.percentComplete && (
-                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-16">%</th>
+                <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-24">% Complete</th>
               )}
               {columnVisibility.assignedTo && (
                 <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-36">Assigned To</th>
@@ -330,7 +332,7 @@ export function DataView() {
                 <th className="text-left px-3 py-2.5 text-xs font-medium text-slate-500 tracking-wide w-36">Predecessors</th>
               )}
               <th className="w-10 px-2 py-2.5" />
-              <th className="w-10 px-1 py-2.5">
+              <th className="px-1 py-2.5">
                 <ColumnConfigButton
                   columnVisibility={columnVisibility}
                   onToggle={toggleColumn}
@@ -339,6 +341,8 @@ export function DataView() {
             </tr>
           </thead>
           <tbody>
+            {/* Spacer below header */}
+            <tr><td colSpan={totalColumns} className="h-1.5 p-0" /></tr>
             {/* Independent items (no swimlane) */}
             <IndependentItemsGroup
               items={independentItems}
@@ -458,7 +462,12 @@ export function DataView() {
             })}
 
             <tr>
-              <td colSpan={totalColumns} className="pt-5 pb-4 px-4">
+              <td colSpan={totalColumns} className="p-0">
+                <div className="h-px bg-slate-200" />
+              </td>
+            </tr>
+            <tr>
+              <td colSpan={totalColumns} className="pt-7 pb-4 pl-6 pr-4">
                 <button
                   onClick={handleAddSwimlane}
                   className="flex items-center gap-1.5 text-sm font-medium text-slate-500 border border-slate-300 rounded-md px-3 py-1.5 hover:border-indigo-400 hover:text-indigo-600 transition-all"
@@ -635,9 +644,10 @@ function ColumnConfigButton({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-0.5 p-1 rounded border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors"
+        className="flex items-center gap-1 px-2 py-1 rounded border border-slate-200 text-xs font-medium text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors whitespace-nowrap"
       >
         <Plus size={12} />
+        Add column
         <ChevronDown size={10} />
       </button>
       {open && (
@@ -872,19 +882,17 @@ function IndependentItemsGroup({
 
       {/* Add row for independent items */}
       <tr>
-        <td colSpan={totalColumns} className="pl-14 pr-4 py-1.5">
+        <td colSpan={totalColumns} className="pl-14 pr-4 py-2">
           <InlineAddRow onAdd={(type) => onAddItem(type)} />
         </td>
       </tr>
 
-      {/* Separator before swimlanes */}
-      {(indItems.length > 0 || dragItemId) && (
-        <tr>
-          <td colSpan={totalColumns} className="py-1">
-            <div className="h-px bg-slate-200" />
-          </td>
-        </tr>
-      )}
+      {/* Bottom border for independent items section */}
+      <tr>
+        <td colSpan={totalColumns} className="p-0">
+          <div className="h-px bg-slate-200" />
+        </td>
+      </tr>
     </>
   );
 }
@@ -1046,15 +1054,24 @@ function SwimlaneGroup({
           }
         }}
       >
-        <td className="py-2.5" colSpan={totalColumns}>
-          <div className="flex items-center gap-2 px-4" style={{ borderLeft: `3px solid ${swimlane.color}` }}>
+        <td className="pt-8 pb-2.5" colSpan={totalColumns}>
+          <div className="flex items-center gap-2 pl-4 pr-4">
+            {/* Grip handle — hover only */}
             <GripVertical
               size={14}
               className="text-slate-300 opacity-0 group-hover/swimlane:opacity-100 transition-opacity cursor-grab shrink-0"
             />
-            <div>
-              {isCollapsed ? <ChevronRight size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
-            </div>
+            <div className="w-3.5 h-3.5 rounded-sm shrink-0" style={{ backgroundColor: swimlane.color }} />
+            {/* Pencil edit icon — hover only */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingName(true);
+              }}
+              className="text-slate-300 opacity-0 group-hover/swimlane:opacity-100 hover:text-slate-500 transition-all shrink-0"
+            >
+              <Pencil size={13} />
+            </button>
             {editingName ? (
               <input
                 className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[13px] font-semibold text-slate-800 outline-none focus:border-indigo-500"
@@ -1086,8 +1103,22 @@ function SwimlaneGroup({
               </span>
             )}
 
+            {/* Collapse/Expand toggle — always visible */}
+            <Tooltip label={isCollapsed ? 'Expand' : 'Collapse'}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleCollapse();
+                }}
+                className="text-slate-300 hover:text-slate-500 transition-colors"
+              >
+                {isCollapsed ? <ChevronsUpDown size={15} /> : <ChevronsDownUp size={15} />}
+              </button>
+            </Tooltip>
+
             {/* More menu — visible on hover */}
-            <div className="opacity-0 group-hover/swimlane:opacity-100 transition-opacity ml-1">
+            <div className="opacity-0 group-hover/swimlane:opacity-100 transition-opacity flex items-center gap-1">
+              <div className="w-px h-4 bg-slate-200" />
               <SwimlaneMoreMenu
                 onAddAbove={() => onAddSwimlaneRelative('above')}
                 onAddBelow={() => onAddSwimlaneRelative('below')}
@@ -1096,8 +1127,6 @@ function SwimlaneGroup({
                 onDelete={onDeleteSwimlane}
               />
             </div>
-
-            <span className="text-[11px] text-slate-400 ml-auto">({swimItems.length})</span>
           </div>
         </td>
       </tr>
@@ -1148,11 +1177,18 @@ function SwimlaneGroup({
       {/* Add row */}
       {!isCollapsed && (
         <tr>
-          <td colSpan={totalColumns} className="pl-14 pr-4 py-1.5">
+          <td colSpan={totalColumns} className="pl-14 pr-4 py-2">
             <InlineAddRow onAdd={(type) => onAddItem(type)} />
           </td>
         </tr>
       )}
+
+      {/* Bottom border for swimlane section */}
+      <tr>
+        <td colSpan={totalColumns} className="p-0">
+          <div className="h-px bg-slate-200" />
+        </td>
+      </tr>
     </>
   );
 }
@@ -1287,7 +1323,7 @@ function ItemRow({
         onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onItemDrop(); }}
       >
       {/* Checkbox / Grip Handle / Row Number */}
-      <td className="px-1 py-2 text-center">
+      <td className="px-1 py-3 text-center">
         {hasAnyChecked || isChecked ? (
           <Checkbox checked={isChecked} onChange={onToggleChecked} />
         ) : (
@@ -1309,10 +1345,10 @@ function ItemRow({
       </td>
 
       {/* Title */}
-      <td className="px-4 py-2">
+      <td className="px-2 py-3">
         <input
           ref={nameRef}
-          className="w-full bg-transparent border-none outline-none text-xs text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-indigo-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
+          className="w-full bg-transparent border-none outline-none text-[13px] text-slate-700 placeholder-slate-300 focus:bg-white focus:ring-1 focus:ring-indigo-300 focus:px-2 focus:py-0.5 focus:rounded transition-all"
           value={item.name}
           onChange={(e) => onUpdateItem(item.id, { name: e.target.value })}
           onKeyDown={(e) => {
@@ -1323,7 +1359,7 @@ function ItemRow({
       </td>
 
       {/* Type */}
-      <td className="px-3 py-2">
+      <td className="px-3 py-3">
         <TypePickerCell
           item={item}
           onUpdateItem={onUpdateItem}
@@ -1333,7 +1369,7 @@ function ItemRow({
       </td>
 
       {/* Duration */}
-      <td className="px-3 py-2">
+      <td className="px-3 py-3">
         {editingDuration ? (
           <input
             type="number"
@@ -1372,7 +1408,7 @@ function ItemRow({
       </td>
 
       {/* Start Date */}
-      <td className="px-3 py-2">
+      <td className="px-3 py-3">
         <div className="relative flex items-center gap-1.5">
           <span
             className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
@@ -1403,7 +1439,7 @@ function ItemRow({
       </td>
 
       {/* End Date */}
-      <td className="px-3 py-2">
+      <td className="px-3 py-3">
         <div className="relative flex items-center gap-1.5">
           <span
             className="text-[11px] text-slate-600 cursor-pointer hover:text-indigo-600 transition-colors"
@@ -1435,7 +1471,7 @@ function ItemRow({
 
       {/* Progress */}
       {columnVisibility.percentComplete && (
-        <td className="px-3 py-2">
+        <td className="px-3 py-3">
           {editingProgress ? (
             <input
               type="number"
@@ -1477,7 +1513,7 @@ function ItemRow({
 
       {/* Assigned To */}
       {columnVisibility.assignedTo && (
-        <td className="px-3 py-2">
+        <td className="px-3 py-3">
           {editingAssigned ? (
             <input
               className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700 outline-none focus:border-indigo-500"
@@ -1514,7 +1550,7 @@ function ItemRow({
             </span>
           ) : (
             <button
-              className="flex items-center justify-center w-full h-6 border border-dashed border-slate-200 rounded text-slate-300 hover:border-slate-400 hover:text-slate-400 transition-colors"
+              className="flex items-center justify-center w-full h-6 border border-dashed border-transparent group-hover/row:border-slate-200 rounded text-slate-300 hover:border-slate-400 hover:text-slate-400 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 setAssignedValue('');
@@ -1529,7 +1565,7 @@ function ItemRow({
 
       {/* Status */}
       {columnVisibility.status && (
-         <td className="px-3 py-2">
+         <td className="px-3 py-3">
           <StatusCell
             statusId={item.statusId}
             statusLabels={statusLabels}
@@ -1541,7 +1577,7 @@ function ItemRow({
 
       {/* Predecessors */}
       {columnVisibility.predecessors && (
-        <td className="px-3 py-2">
+        <td className="px-3 py-3">
           <div className="flex items-center gap-1 max-w-[160px]">
             {editingPredecessors ? (
               <div className="flex-1 relative">
@@ -1620,7 +1656,7 @@ function ItemRow({
       )}
 
       {/* Actions — hover only: trash + more menu */}
-      <td className="px-2 py-2">
+      <td className="px-2 py-3">
         <div className="flex items-center gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
           <button
             onClick={(e) => { e.stopPropagation(); onDeleteItem(item.id); }}
@@ -1862,7 +1898,7 @@ function StatusCell({
         </button>
       ) : (
         <button
-          className="flex items-center justify-center w-full h-6 border border-dashed border-slate-200 rounded text-slate-300 hover:border-slate-400 hover:text-slate-400 transition-colors"
+          className="flex items-center justify-center w-full h-6 border border-dashed border-transparent group-hover/row:border-slate-200 rounded text-slate-300 hover:border-slate-400 hover:text-slate-400 transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             setOpen(!open);
@@ -1936,7 +1972,7 @@ function InlineAddRow({ onAdd }: { onAdd: (type: ItemType) => void }) {
   return (
     <button
       onClick={() => onAdd('task')}
-      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-indigo-600 transition-colors py-0.5"
+      className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-indigo-500 transition-colors py-0.5"
     >
       <Plus size={13} />
       Add task or milestone
