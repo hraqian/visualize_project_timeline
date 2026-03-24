@@ -595,7 +595,7 @@ function drawTaskBar(
   const barHeightPx = style.thickness;
   const h = px2in(barHeightPx, ctx.scale);
   const rowY = yBasePx + rowYPx;
-  const barYPx = rowY + (rowH - barHeightPx) / 2;
+  const barYPx = rowY + (ROW_BASE - barHeightPx) / 2;
   const y = canvasY(barYPx, ctx);
 
   // Bar border radius (simplified for PPTX)
@@ -799,7 +799,7 @@ function drawMilestone(
     centerYIn = ctx.timescaleY - ctx.aboveHeight + px2in(aboveYPx + sizePx / 2, ctx.scale);
   } else {
     const rowY = yBasePx + rowYPx;
-    centerYIn = canvasY(rowY + rowH / 2, ctx);
+    centerYIn = canvasY(rowY + ROW_BASE / 2, ctx);
   }
 
   // Diamond shape (default milestone representation)
@@ -946,14 +946,14 @@ function getItemCenterYPx(
   const rowH = getRowH(item);
   // Check if independent
   if (belowIndependentItems.some(i => i.id === item.id)) {
-    return INDEPENDENT_SECTION_PADDING + rowY + rowH / 2;
+    return INDEPENDENT_SECTION_PADDING + rowY + ROW_BASE / 2;
   }
   // Check swimlane
   const slLayout = swimlaneLayout.find(sl => sl.swimlane.id === item.swimlaneId);
   if (slLayout) {
-    return slLayout.contentY + rowY + rowH / 2;
+    return slLayout.contentY + rowY + ROW_BASE / 2;
   }
-  return rowY + rowH / 2;
+  return rowY + ROW_BASE / 2;
 }
 
 // ─── Main Export Function ────────────────────────────────────────────────────

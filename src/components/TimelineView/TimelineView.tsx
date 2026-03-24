@@ -597,7 +597,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       const startX = itemToX(item.startDate);
       const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
       const endX = startX + barWidth;
-      const barY = getItemY(item) + (getRowH(item) - style.thickness) / 2;
+      const barY = getItemY(item) + (ROW_BASE - style.thickness) / 2;
       const strokeWidth = CONNECTOR_THICKNESS_MAP[style.connectorThickness] ?? 1;
 
       // Left edge line: from bar top up to y=0
@@ -701,7 +701,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const xStart = itemToX(item.startDate);
         const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
         const bh = item.taskStyle.thickness;
-        const barY = yBase + (rowH - bh) / 2;
+        const barY = yBase + (ROW_BASE - bh) / 2;
         positions.push({
           id: item.id,
           type: 'task',
@@ -718,7 +718,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           type: 'milestone',
           leftX: cx - sz / 2,
           rightX: cx + sz / 2,
-          centerY: yBase + rowH / 2,
+          centerY: yBase + ROW_BASE / 2,
           barHeight: sz,
         });
       }
@@ -1633,7 +1633,7 @@ function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragg
   const isEditing = (field: string) => editingField?.itemId === item.id && editingField?.field === field;
   const style = item.taskStyle;
   const barHeight = style.thickness;
-  const barY = y + (rowHeight - barHeight) / 2;
+  const barY = y + (ROW_BASE - barHeight) / 2;
   const w = Math.max(width, 8);
 
   const insetPx = barHeight * 0.4;
@@ -2087,7 +2087,7 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
   // "above" position: title → date → shape (top to bottom)
   // "below" position: shape → date → title (top to bottom)
   if (isIndependent) {
-    const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + rowHeight / 2 - style.size / 2;
+    const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_BASE / 2 - style.size / 2;
 
     // Build the title element
     const titleEl = style.showTitle ? (
@@ -2230,7 +2230,7 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
   }
 
   // ─── Swimlaned milestones: position-based layout ───
-  const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + rowHeight / 2 - style.size / 2;
+  const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_BASE / 2 - style.size / 2;
 
   // Determine if title and date are on the same side
   const titlePos = style.labelPosition;
