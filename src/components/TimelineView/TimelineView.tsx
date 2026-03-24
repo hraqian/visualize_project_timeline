@@ -4,6 +4,7 @@ import { parseISO, differenceInDays, addDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut } from 'lucide-react';
+import { DatePickerPopover } from './DatePickerPopover';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig } from '@/types';
 
 // ─── Types for inline editing ────────────────────────────────────────────────
@@ -211,6 +212,28 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     }
     setEditingField(null);
   }, [items, updateItem, updateSwimlane]);
+
+  // ─── Date picker popover state ─────────────────────────────────────────────
+  const [datePicker, setDatePicker] = useState<{
+    itemId: string;
+    mode: 'range' | 'single';
+    anchorRect: DOMRect;
+  } | null>(null);
+
+  const openDatePicker = useCallback((itemId: string, mode: 'range' | 'single', anchorEl: HTMLElement) => {
+    setDatePicker({ itemId, mode, anchorRect: anchorEl.getBoundingClientRect() });
+  }, []);
+
+  const closeDatePicker = useCallback(() => {
+    setDatePicker(null);
+  }, []);
+
+  const commitDatePicker = useCallback((startDate: string, endDate: string) => {
+    if (datePicker) {
+      updateItem(datePicker.itemId, { startDate, endDate });
+    }
+    setDatePicker(null);
+  }, [datePicker, updateItem]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -602,6 +625,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
           onStartEdit={(field) => startEditing(item.id, field)}
           onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
           onCancelEdit={cancelEditing}
+          onOpenDatePicker={(el) => openDatePicker(item.id, 'single', el)}
         />
       );
     }
@@ -625,6 +649,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
         onStartEdit={(field) => startEditing(item.id, field)}
         onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
         onCancelEdit={cancelEditing}
+        onOpenDatePicker={(el) => openDatePicker(item.id, 'range', el)}
       />
     );
   };
@@ -686,6 +711,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
                     onStartEdit={(field) => startEditing(item.id, field)}
                     onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
                     onCancelEdit={cancelEditing}
+                    onOpenDatePicker={(el) => openDatePicker(item.id, 'single', el)}
                   />
                 );
               })}
@@ -1201,6 +1227,22 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
         </button>
       </div>
       </div>
+
+      {/* ─── Date Picker Popover ─── */}
+      {datePicker && (() => {
+        const pickerItem = items.find((i) => i.id === datePicker.itemId);
+        if (!pickerItem) return null;
+        return (
+          <DatePickerPopover
+            mode={datePicker.mode}
+            startDate={pickerItem.startDate}
+            endDate={pickerItem.endDate}
+            anchorRect={datePicker.anchorRect}
+            onCommit={commitDatePicker}
+            onCancel={closeDatePicker}
+          />
+        );
+      })()}
     </div>
   );
 });
@@ -1222,9 +1264,10 @@ interface TaskBarProps {
   onStartEdit: (field: 'title' | 'duration' | 'percentComplete') => void;
   onCommitEdit: (field: string, value: string) => void;
   onCancelEdit: () => void;
+  onOpenDatePicker: (anchorEl: HTMLElement) => void;
 }
 
-function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit }: TaskBarProps) {
+function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker }: TaskBarProps) {
   const isEditing = (field: string) => editingField?.itemId === item.id && editingField?.field === field;
   const style = item.taskStyle;
   const barHeight = style.thickness;
@@ -1423,6 +1466,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
           }}
           onClick={(e) => { e.stopPropagation(); onClickSection('date'); }}
+          onDoubleClick={(e) => { e.stopPropagation(); onOpenDatePicker(e.currentTarget as HTMLElement); }}
         >
           <span>
             {format(parseISO(item.startDate), style.dateFormat)} - {format(parseISO(item.endDate), style.dateFormat)}
@@ -1572,9 +1616,10 @@ interface MilestoneItemProps {
   onStartEdit: (field: 'milestoneTitle') => void;
   onCommitEdit: (field: string, value: string) => void;
   onCancelEdit: () => void;
+  onOpenDatePicker: (anchorEl: HTMLElement) => void;
 }
 
-function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit }: MilestoneItemProps) {
+function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker }: MilestoneItemProps) {
   const isEditingTitle = editingField?.itemId === item.id && editingField?.field === 'milestoneTitle';
   const style = item.milestoneStyle;
   const isIndependent = item.swimlaneId === null;
@@ -1629,6 +1674,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           color: style.dateFontColor,
         }}
         onClick={(e) => { e.stopPropagation(); onClickDate(); }}
+        onDoubleClick={(e) => { e.stopPropagation(); onOpenDatePicker(e.currentTarget as HTMLElement); }}
       >
         {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
       </div>
@@ -1776,6 +1822,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
               color: style.dateFontColor,
             }}
             onClick={(e) => { e.stopPropagation(); onClickDate(); }}
+            onDoubleClick={(e) => { e.stopPropagation(); onOpenDatePicker(e.currentTarget as HTMLElement); }}
           >
             {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
           </div>
@@ -1828,6 +1875,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
                 ...sideStyle(datePos),
               }}
               onClick={(e) => { e.stopPropagation(); onClickDate(); }}
+              onDoubleClick={(e) => { e.stopPropagation(); onOpenDatePicker(e.currentTarget as HTMLElement); }}
             >
               {format(parseISO(item.startDate), style.dateFormat || 'MMM d')}
             </div>
