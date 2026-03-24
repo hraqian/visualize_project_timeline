@@ -74,6 +74,7 @@ function InlineEditInput({
         margin: '-1px -3px',
         boxSizing: 'content-box',
         ...inputStyle,
+        color: '#334155',
       }}
     />
   );
