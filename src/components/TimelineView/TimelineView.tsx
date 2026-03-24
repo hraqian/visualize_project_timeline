@@ -82,7 +82,8 @@ function InlineEditInput({
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const ROW_HEIGHT = 44;
+const ROW_HEIGHT = 44; // Default/fallback: ROW_BASE + default spacing (8)
+const ROW_BASE = 36;   // Base cell height (bar slot) before spacing is added
 const SWIMLANE_BADGE_WIDTH = 120;
 const INDEPENDENT_SECTION_PADDING = 12;
 const CONNECTOR_THICKNESS_MAP: Record<ConnectorThickness, number> = { thin: 1, medium: 2, thick: 3 };
@@ -347,6 +348,55 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     return (item: ProjectItem) => rowMap.get(item.id) ?? item.row;
   }, [taskLayout, belowIndependentItems, swimlanedItems, sortedSwimlanes]);
 
+  // ─── Per-row layout: cumulative Y positions accounting for per-item spacing ──
+  // Spacing = gap below each row. Row height = ROW_BASE + max(spacing of items in row).
+  // Builds a map: itemId → { rowY: cumulative Y from group start, rowHeight: full row height }
+  const { getRowY, getRowH, getGroupHeight } = useMemo(() => {
+    const rowYMap = new Map<string, number>();  // itemId → cumY
+    const rowHMap = new Map<string, number>();  // itemId → row total height (ROW_BASE + spacing)
+
+    // For a group of items, compute row Y offsets
+    const processGroup = (groupItems: ProjectItem[]): number => {
+      if (groupItems.length === 0) return 0;
+      // Group items by row index
+      const rowItems = new Map<number, ProjectItem[]>();
+      for (const it of groupItems) {
+        const r = getRow(it);
+        if (!rowItems.has(r)) rowItems.set(r, []);
+        rowItems.get(r)!.push(it);
+      }
+      // Sort rows
+      const sortedRows = [...rowItems.keys()].sort((a, b) => a - b);
+      let cumY = 0;
+      for (const r of sortedRows) {
+        const items = rowItems.get(r)!;
+        // Max spacing in this row
+        const maxSpacing = Math.max(...items.map((it) => it.taskStyle.spacing));
+        const rowH = ROW_BASE + maxSpacing;
+        for (const it of items) {
+          rowYMap.set(it.id, cumY);
+          rowHMap.set(it.id, rowH);
+        }
+        cumY += rowH;
+      }
+      return cumY;
+    };
+
+    // Track total height per group key
+    const groupHeightMap = new Map<string, number>();
+    groupHeightMap.set('__independent__', processGroup(belowIndependentItems));
+    for (const sl of sortedSwimlanes) {
+      const slItems = swimlanedItems.filter((it) => it.swimlaneId === sl.id);
+      groupHeightMap.set(sl.id, processGroup(slItems));
+    }
+
+    return {
+      getRowY: (item: ProjectItem) => rowYMap.get(item.id) ?? getRow(item) * ROW_HEIGHT,
+      getRowH: (item: ProjectItem) => rowHMap.get(item.id) ?? ROW_HEIGHT,
+      getGroupHeight: (groupKey: string) => groupHeightMap.get(groupKey) ?? 0,
+    };
+  }, [getRow, belowIndependentItems, swimlanedItems, sortedSwimlanes]);
+
   // Compute project range with padding — origin aligned to unit boundaries
   const { origin, totalDays, rangeEndDate } = useMemo(
     () => getProjectRangePadded(items, timescale),
@@ -420,9 +470,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   // Independent items section height (only "below" items — those in the canvas)
   const independentHeight = useMemo(() => {
     if (belowIndependentItems.length === 0) return 0;
-    const maxRow = Math.max(...belowIndependentItems.map((i) => getRow(i)), 0);
-    return (maxRow + 1) * ROW_HEIGHT + INDEPENDENT_SECTION_PADDING * 2;
-  }, [belowIndependentItems, getRow]);
+    return getGroupHeight('__independent__') + INDEPENDENT_SECTION_PADDING * 2;
+  }, [belowIndependentItems, getGroupHeight]);
 
   // Swimlane layout: compute y offset for each swimlane
   const swimlaneLayout = useMemo(() => {
@@ -431,15 +480,13 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     for (let i = 0; i < sortedSwimlanes.length; i++) {
       const sl = sortedSwimlanes[i];
       if (i > 0) y += swimlaneSpacing; // gap between bands
-      const slItems = swimlanedItems.filter((it) => it.swimlaneId === sl.id);
-      const maxRow = slItems.length > 0 ? Math.max(...slItems.map((it) => getRow(it))) : 0;
-      const contentHeight = (maxRow + 1) * ROW_HEIGHT;
+      const contentHeight = getGroupHeight(sl.id);
       const height = SWIMLANE_PADDING_TOP + contentHeight + SWIMLANE_PADDING_BOTTOM;
       layout.push({ swimlane: sl, y, height, contentY: y + SWIMLANE_PADDING_TOP });
       y += height;
     }
     return layout;
-  }, [sortedSwimlanes, swimlanedItems, independentHeight, swimlaneSpacing, getRow]);
+  }, [sortedSwimlanes, independentHeight, swimlaneSpacing, getGroupHeight]);
 
   const canvasHeight = (swimlaneLayout.length > 0
     ? swimlaneLayout[swimlaneLayout.length - 1].y + swimlaneLayout[swimlaneLayout.length - 1].height
@@ -480,11 +527,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
             return 0;
           }
           if (!swimlaneIds.has(item.swimlaneId)) {
-            return INDEPENDENT_SECTION_PADDING + getRow(item) * ROW_HEIGHT + ROW_HEIGHT / 2;
+            return INDEPENDENT_SECTION_PADDING + getRowY(item) + getRowH(item) / 2;
           }
           const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
           if (!sl) return 0;
-          return sl.contentY + getRow(item) * ROW_HEIGHT + ROW_HEIGHT / 2;
+          return sl.contentY + getRowY(item) + getRowH(item) / 2;
         };
 
         // FS: exit right edge center of predecessor, enter left edge center of successor
@@ -518,15 +565,16 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           const exitX = fromX + OFFSET;
           const enterX = toX - OFFSET;
           const midY = (fromY + toY) / 2;
-          // If same row, offset midY by half ROW_HEIGHT
-          const actualMidY = fromY === toY ? fromY + ROW_HEIGHT / 2 : midY;
+          // If same row, offset midY by half the row height
+          const rowH = Math.max(getRowH(from), getRowH(to));
+          const actualMidY = fromY === toY ? fromY + rowH / 2 : midY;
           path = `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${actualMidY} L ${enterX} ${actualMidY} L ${enterX} ${toY} L ${toX} ${toY}`;
         }
 
         return { path, isCritical, key: `${dep.fromId}-${dep.toId}` };
       })
       .filter(Boolean);
-  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRow]);
+  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, getRowH]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
   const verticalConnectors = useMemo(() => {
@@ -534,11 +582,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
     const getItemY = (item: ProjectItem) => {
       if (!swimlaneIds.has(item.swimlaneId)) {
-        return INDEPENDENT_SECTION_PADDING + getRow(item) * ROW_HEIGHT;
+        return INDEPENDENT_SECTION_PADDING + getRowY(item);
       }
       const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
       if (!sl) return 0;
-      return sl.contentY + getRow(item) * ROW_HEIGHT;
+      return sl.contentY + getRowY(item);
     };
 
     for (const item of visibleItems) {
@@ -549,7 +597,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       const startX = itemToX(item.startDate);
       const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
       const endX = startX + barWidth;
-      const barY = getItemY(item) + (ROW_HEIGHT - style.thickness) / 2;
+      const barY = getItemY(item) + (getRowH(item) - style.thickness) / 2;
       const strokeWidth = CONNECTOR_THICKNESS_MAP[style.connectorThickness] ?? 1;
 
       // Left edge line: from bar top up to y=0
@@ -574,7 +622,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     }
 
     return lines;
-  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, zoom, getRow]);
+  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, zoom, getRowY, getRowH]);
 
   // ─── Drag handlers ─────────────────────────────────────────────────
 
@@ -634,25 +682,26 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const getItemPositions = useCallback(() => {
     const positions: { id: string; type: string; leftX: number; rightX: number; centerY: number; barHeight: number }[] = [];
 
-    const getItemY = (item: ProjectItem) => {
+    const getItemYBase = (item: ProjectItem) => {
       if (item.type === 'milestone' && item.swimlaneId === null && item.milestoneStyle.position === 'above') {
         return 0;
       }
       if (!swimlaneIds.has(item.swimlaneId)) {
-        return INDEPENDENT_SECTION_PADDING + getRow(item) * ROW_HEIGHT;
+        return INDEPENDENT_SECTION_PADDING + getRowY(item);
       }
       const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
       if (!sl) return 0;
-      return sl.contentY + getRow(item) * ROW_HEIGHT;
+      return sl.contentY + getRowY(item);
     };
 
     for (const item of visibleItems) {
-      const yBase = getItemY(item);
+      const yBase = getItemYBase(item);
+      const rowH = getRowH(item);
       if (item.type === 'task') {
         const xStart = itemToX(item.startDate);
         const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
         const bh = item.taskStyle.thickness;
-        const barY = yBase + (ROW_HEIGHT - bh) / 2;
+        const barY = yBase + (rowH - bh) / 2;
         positions.push({
           id: item.id,
           type: 'task',
@@ -669,13 +718,13 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           type: 'milestone',
           leftX: cx - sz / 2,
           rightX: cx + sz / 2,
-          centerY: yBase + ROW_HEIGHT / 2,
+          centerY: yBase + rowH / 2,
           barHeight: sz,
         });
       }
     }
     return positions;
-  }, [visibleItems, swimlaneIds, swimlaneLayout, getRow, itemToX, zoom]);
+  }, [visibleItems, swimlaneIds, swimlaneLayout, getRowY, getRowH, itemToX, zoom]);
 
   const handleDepHandleMouseDown = useCallback(
     (sourceId: string, sourceSide: 'start' | 'end', e: React.MouseEvent) => {
@@ -822,7 +871,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
   const renderItem = (item: ProjectItem, yBase: number) => {
     const x = itemToX(item.startDate);
-    const y = yBase + getRow(item) * ROW_HEIGHT;
+    const y = yBase + getRowY(item);
     const isDragging = draggingId === item.id;
     // Snap to day grid during drag so the bar doesn't jump on drop
     let translateX = isDragging ? Math.round(dragOffset / zoom) * zoom : 0;
@@ -845,6 +894,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           item={item}
           x={x}
           y={y}
+          rowHeight={getRowH(item)}
           iconTopOverride={belowOverride}
           translateX={translateX}
           isSelected={isSelected}
@@ -876,6 +926,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         item={item}
         x={x}
         y={y}
+        rowHeight={getRowH(item)}
         width={width}
         translateX={translateX}
         isSelected={isSelected}
@@ -944,6 +995,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     item={item}
                     x={ax}
                     y={0}
+                    rowHeight={ROW_HEIGHT}
                     iconTopOverride={ay}
                     translateX={txl}
                     isSelected={isSel}
@@ -1351,7 +1403,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 const iconSize = item.milestoneStyle.size;
                 const cx = gx + snappedOffsetPx;
                 const origCx = gx;
-                const cy = yBase + getRow(item) * ROW_HEIGHT + (ROW_HEIGHT - iconSize) / 2;
+                const cy = yBase + getRowY(item) + (getRowH(item) - iconSize) / 2;
                 return (
                   <>
                     {/* Ghost at original position */}
@@ -1422,7 +1474,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
               const barHeight = item.taskStyle.thickness;
               const width = Math.max(differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom, 8);
-              const gy = yBase + getRow(item) * ROW_HEIGHT + (ROW_HEIGHT - barHeight) / 2;
+              const gy = yBase + getRowY(item) + (getRowH(item) - barHeight) / 2;
               const snapLeft = gx + snappedOffsetPx;
               const snapRight = snapLeft + width;
               return (
@@ -1556,6 +1608,7 @@ interface TaskBarProps {
   item: ProjectItem;
   x: number;
   y: number;
+  rowHeight: number;
   width: number;
   translateX: number;
   isSelected: boolean;
@@ -1576,11 +1629,11 @@ interface TaskBarProps {
   depDragTargetSide: 'start' | 'end' | null;
 }
 
-function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: TaskBarProps) {
+function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: TaskBarProps) {
   const isEditing = (field: string) => editingField?.itemId === item.id && editingField?.field === field;
   const style = item.taskStyle;
   const barHeight = style.thickness;
-  const barY = y + (ROW_HEIGHT - barHeight) / 2;
+  const barY = y + (rowHeight - barHeight) / 2;
   const w = Math.max(width, 8);
 
   const insetPx = barHeight * 0.4;
@@ -2003,6 +2056,7 @@ interface MilestoneItemProps {
   item: ProjectItem;
   x: number;
   y: number;
+  rowHeight: number;
   iconTopOverride?: number;
   translateX: number;
   isSelected: boolean;
@@ -2024,7 +2078,7 @@ interface MilestoneItemProps {
   depDragTargetSide: 'start' | 'end' | null;
 }
 
-function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: MilestoneItemProps) {
+function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: MilestoneItemProps) {
   const isEditingTitle = editingField?.itemId === item.id && editingField?.field === 'milestoneTitle';
   const style = item.milestoneStyle;
   const isIndependent = item.swimlaneId === null;
@@ -2033,7 +2087,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
   // "above" position: title → date → shape (top to bottom)
   // "below" position: shape → date → title (top to bottom)
   if (isIndependent) {
-    const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_HEIGHT / 2 - style.size / 2;
+    const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + rowHeight / 2 - style.size / 2;
 
     // Build the title element
     const titleEl = style.showTitle ? (
@@ -2176,7 +2230,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
   }
 
   // ─── Swimlaned milestones: position-based layout ───
-  const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_HEIGHT / 2 - style.size / 2;
+  const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + rowHeight / 2 - style.size / 2;
 
   // Determine if title and date are on the same side
   const titlePos = style.labelPosition;

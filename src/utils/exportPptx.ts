@@ -27,6 +27,7 @@ import {
 // ─── Constants (mirror TimelineView) ─────────────────────────────────────────
 
 const ROW_HEIGHT = 44;
+const ROW_BASE = 36;
 const SWIMLANE_BADGE_WIDTH = 120;
 const INDEPENDENT_SECTION_PADDING = 12;
 const SWIMLANE_PADDING_TOP = 10;
@@ -113,6 +114,40 @@ interface SwimlaneLayout {
   contentY: number; // px
 }
 
+/** Compute per-row cumulative Y positions accounting for per-item spacing. */
+function buildGroupRowLayout(
+  groupItems: ProjectItem[],
+  getRow: (item: ProjectItem) => number
+): { getRowY: (item: ProjectItem) => number; getRowH: (item: ProjectItem) => number; totalHeight: number } {
+  const rowYMap = new Map<string, number>();
+  const rowHMap = new Map<string, number>();
+  if (groupItems.length === 0) return { getRowY: () => 0, getRowH: () => ROW_HEIGHT, totalHeight: 0 };
+  // Group items by row
+  const rowItems = new Map<number, ProjectItem[]>();
+  for (const it of groupItems) {
+    const r = getRow(it);
+    if (!rowItems.has(r)) rowItems.set(r, []);
+    rowItems.get(r)!.push(it);
+  }
+  const sortedRows = [...rowItems.keys()].sort((a, b) => a - b);
+  let cumY = 0;
+  for (const r of sortedRows) {
+    const items = rowItems.get(r)!;
+    const maxSpacing = Math.max(...items.map((it) => it.taskStyle.spacing));
+    const rowH = ROW_BASE + maxSpacing;
+    for (const it of items) {
+      rowYMap.set(it.id, cumY);
+      rowHMap.set(it.id, rowH);
+    }
+    cumY += rowH;
+  }
+  return {
+    getRowY: (item) => rowYMap.get(item.id) ?? getRow(item) * ROW_HEIGHT,
+    getRowH: (item) => rowHMap.get(item.id) ?? ROW_HEIGHT,
+    totalHeight: cumY,
+  };
+}
+
 function computeLayout(
   items: ProjectItem[],
   swimlanes: Swimlane[],
@@ -130,6 +165,8 @@ function computeLayout(
   swimlaneLayout: SwimlaneLayout[];
   sortedSwimlanes: Swimlane[];
   getRow: (item: ProjectItem) => number;
+  getRowY: (item: ProjectItem) => number;
+  getRowH: (item: ProjectItem) => number;
   canvasHeight: number;
   tierLabels: { tier: typeof timescale.tiers[0]; labels: ReturnType<typeof generateTierLabels> }[];
   rangeEndDate: Date;
@@ -149,6 +186,22 @@ function computeLayout(
 
   // Row assignment
   const getRow = buildGetRow(taskLayout, belowIndependentItems, swimlanedItemsList, sortedSwimlanes);
+
+  // Per-item row layout (spacing-aware)
+  const indepLayout = buildGroupRowLayout(belowIndependentItems, getRow);
+  const swimlaneRowLayouts = new Map<string, ReturnType<typeof buildGroupRowLayout>>();
+  for (const sl of sortedSwimlanes) {
+    const slItems = swimlanedItemsList.filter((it) => it.swimlaneId === sl.id);
+    swimlaneRowLayouts.set(sl.id, buildGroupRowLayout(slItems, getRow));
+  }
+  const getRowY = (item: ProjectItem) => {
+    if (!swimlaneIds.has(item.swimlaneId)) return indepLayout.getRowY(item);
+    return swimlaneRowLayouts.get(item.swimlaneId!)?.getRowY(item) ?? getRow(item) * ROW_HEIGHT;
+  };
+  const getRowH = (item: ProjectItem) => {
+    if (!swimlaneIds.has(item.swimlaneId)) return indepLayout.getRowH(item);
+    return swimlaneRowLayouts.get(item.swimlaneId!)?.getRowH(item) ?? ROW_HEIGHT;
+  };
 
   // Range computation — shared with TimelineView
   const { origin, totalDays, rangeEndDate } = getProjectRangePadded(items, timescale);
@@ -171,8 +224,7 @@ function computeLayout(
   // Independent height
   let independentHeight = 0;
   if (belowIndependentItems.length > 0) {
-    const maxRow = Math.max(...belowIndependentItems.map((i) => getRow(i)), 0);
-    independentHeight = (maxRow + 1) * ROW_HEIGHT + INDEPENDENT_SECTION_PADDING * 2;
+    independentHeight = indepLayout.totalHeight + INDEPENDENT_SECTION_PADDING * 2;
   }
 
   // Swimlane layout
@@ -181,9 +233,7 @@ function computeLayout(
   for (let i = 0; i < sortedSwimlanes.length; i++) {
     const sl = sortedSwimlanes[i];
     if (i > 0) y += swimlaneSpacing;
-    const slItems = swimlanedItemsList.filter((it) => it.swimlaneId === sl.id);
-    const maxRow = slItems.length > 0 ? Math.max(...slItems.map((it) => getRow(it))) : 0;
-    const contentHeight = (maxRow + 1) * ROW_HEIGHT;
+    const contentHeight = swimlaneRowLayouts.get(sl.id)?.totalHeight ?? 0;
     const height = SWIMLANE_PADDING_TOP + contentHeight + SWIMLANE_PADDING_BOTTOM;
     swimlaneLayoutList.push({ swimlane: sl, y, height, contentY: y + SWIMLANE_PADDING_TOP });
     y += height;
@@ -239,6 +289,8 @@ function computeLayout(
     swimlaneLayout: swimlaneLayoutList,
     sortedSwimlanes,
     getRow,
+    getRowY,
+    getRowH,
     canvasHeight,
     tierLabels,
     rangeEndDate,
@@ -533,7 +585,8 @@ function drawTaskBar(
   ctx: LayoutContext,
   item: ProjectItem,
   yBasePx: number,
-  rowNum: number,
+  rowYPx: number,
+  rowH: number,
 ) {
   const style = item.taskStyle;
   const x = itemX(item.startDate, ctx);
@@ -541,8 +594,8 @@ function drawTaskBar(
   const w = px2in(Math.max(barWidthPx, 8), ctx.scale);
   const barHeightPx = style.thickness;
   const h = px2in(barHeightPx, ctx.scale);
-  const rowY = yBasePx + rowNum * ROW_HEIGHT;
-  const barYPx = rowY + (ROW_HEIGHT - barHeightPx) / 2;
+  const rowY = yBasePx + rowYPx;
+  const barYPx = rowY + (rowH - barHeightPx) / 2;
   const y = canvasY(barYPx, ctx);
 
   // Bar border radius (simplified for PPTX)
@@ -729,7 +782,8 @@ function drawMilestone(
   ctx: LayoutContext,
   item: ProjectItem,
   yBasePx: number,
-  rowNum: number,
+  rowYPx: number,
+  rowH: number,
   isAbove: boolean,
   aboveYPx?: number,
 ) {
@@ -744,8 +798,8 @@ function drawMilestone(
     // Above milestones: position relative to timescale top
     centerYIn = ctx.timescaleY - ctx.aboveHeight + px2in(aboveYPx + sizePx / 2, ctx.scale);
   } else {
-    const rowY = yBasePx + rowNum * ROW_HEIGHT;
-    centerYIn = canvasY(rowY + ROW_HEIGHT / 2, ctx);
+    const rowY = yBasePx + rowYPx;
+    centerYIn = canvasY(rowY + rowH / 2, ctx);
   }
 
   // Diamond shape (default milestone representation)
@@ -833,7 +887,8 @@ function drawDependencies(
   belowIndependentItems: ProjectItem[],
   swimlanedItems: ProjectItem[],
   swimlaneLayout: SwimlaneLayout[],
-  getRow: (item: ProjectItem) => number,
+  getRowY: (item: ProjectItem) => number,
+  getRowH: (item: ProjectItem) => number,
 ) {
   const itemMap = new Map(items.filter(i => i.visible).map(i => [i.id, i]));
 
@@ -853,8 +908,8 @@ function drawDependencies(
     const toX = ctx.offsetX + px2in(toStartXPx, ctx.scale);
 
     // Y positions
-    const fromYPx = getItemCenterYPx(from, belowIndependentItems, swimlanedItems, swimlaneLayout, getRow);
-    const toYPx = getItemCenterYPx(to, belowIndependentItems, swimlanedItems, swimlaneLayout, getRow);
+    const fromYPx = getItemCenterYPx(from, belowIndependentItems, swimlanedItems, swimlaneLayout, getRowY, getRowH);
+    const toYPx = getItemCenterYPx(to, belowIndependentItems, swimlanedItems, swimlaneLayout, getRowY, getRowH);
     const fromY = canvasY(fromYPx, ctx);
     const toY = canvasY(toYPx, ctx);
 
@@ -884,19 +939,21 @@ function getItemCenterYPx(
   belowIndependentItems: ProjectItem[],
   swimlanedItems: ProjectItem[],
   swimlaneLayout: SwimlaneLayout[],
-  getRow: (item: ProjectItem) => number,
+  getRowY: (item: ProjectItem) => number,
+  getRowH: (item: ProjectItem) => number,
 ): number {
-  const row = getRow(item);
+  const rowY = getRowY(item);
+  const rowH = getRowH(item);
   // Check if independent
   if (belowIndependentItems.some(i => i.id === item.id)) {
-    return INDEPENDENT_SECTION_PADDING + row * ROW_HEIGHT + ROW_HEIGHT / 2;
+    return INDEPENDENT_SECTION_PADDING + rowY + rowH / 2;
   }
   // Check swimlane
   const slLayout = swimlaneLayout.find(sl => sl.swimlane.id === item.swimlaneId);
   if (slLayout) {
-    return slLayout.contentY + row * ROW_HEIGHT + ROW_HEIGHT / 2;
+    return slLayout.contentY + rowY + rowH / 2;
   }
-  return row * ROW_HEIGHT + ROW_HEIGHT / 2;
+  return rowY + rowH / 2;
 }
 
 // ─── Main Export Function ────────────────────────────────────────────────────
@@ -919,6 +976,8 @@ export async function exportNativePptx(
     swimlaneLayout,
     sortedSwimlanes,
     getRow,
+    getRowY,
+    getRowH,
     canvasHeight,
     tierLabels,
     rangeEndDate,
@@ -941,11 +1000,10 @@ export async function exportNativePptx(
   // 4. Task bars and milestones
   // Independent "below" items
   for (const item of belowIndependentItems) {
-    const row = getRow(item);
     if (item.type === 'task') {
-      drawTaskBar(slide, ctx, item, INDEPENDENT_SECTION_PADDING, row);
+      drawTaskBar(slide, ctx, item, INDEPENDENT_SECTION_PADDING, getRowY(item), getRowH(item));
     } else {
-      drawMilestone(slide, ctx, item, INDEPENDENT_SECTION_PADDING, row, false);
+      drawMilestone(slide, ctx, item, INDEPENDENT_SECTION_PADDING, getRowY(item), getRowH(item), false);
     }
   }
 
@@ -958,24 +1016,23 @@ export async function exportNativePptx(
     if (s.showDate) stackH += Math.ceil(s.dateFontSize * 1.25) + 1;
     const aboveHeightPx = ctx.aboveHeight / ctx.scale;
     const ay = aboveHeightPx - stackH - aboveRowGap;
-    drawMilestone(slide, ctx, item, 0, 0, true, ay);
+    drawMilestone(slide, ctx, item, 0, 0, ROW_HEIGHT, true, ay);
   }
 
   // Swimlaned items
   for (const sl of swimlaneLayout) {
     const slItems = swimlanedItems.filter((it) => it.swimlaneId === sl.swimlane.id);
     for (const item of slItems) {
-      const row = getRow(item);
       if (item.type === 'task') {
-        drawTaskBar(slide, ctx, item, sl.contentY, row);
+        drawTaskBar(slide, ctx, item, sl.contentY, getRowY(item), getRowH(item));
       } else {
-        drawMilestone(slide, ctx, item, sl.contentY, row, false);
+        drawMilestone(slide, ctx, item, sl.contentY, getRowY(item), getRowH(item), false);
       }
     }
   }
 
   // 5. Dependency lines
-  drawDependencies(slide, ctx, dependencies, items, belowIndependentItems, swimlanedItems, swimlaneLayout, getRow);
+  drawDependencies(slide, ctx, dependencies, items, belowIndependentItems, swimlanedItems, swimlaneLayout, getRowY, getRowH);
 
   // Write file
   const fileName = `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx`;
