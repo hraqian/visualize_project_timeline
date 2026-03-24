@@ -25,6 +25,7 @@ interface DatePickerPopoverProps {
   anchorRect: DOMRect;
   onCommit: (startDate: string, endDate: string) => void;
   onCancel: () => void;
+  onOpenSettings?: () => void;
 }
 
 type ActiveField = 'start' | 'end';
@@ -99,6 +100,7 @@ export function DatePickerPopover({
   anchorRect,
   onCommit,
   onCancel,
+  onOpenSettings,
 }: DatePickerPopoverProps) {
   const [draftStart, setDraftStart] = useState(() => parseISO(initialStart));
   const [draftEnd, setDraftEnd] = useState(() => parseISO(initialEnd));
@@ -479,19 +481,20 @@ export function DatePickerPopover({
 
       {/* ── Footer ── */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', borderTop: '1px solid #f1f5f9' }}>
-        {/* Settings placeholder */}
+        {/* Settings */}
         <div
+          onClick={() => { if (onOpenSettings) { handleDone(); onOpenSettings(); } }}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 6,
             fontSize: 13,
-            color: '#64748b',
-            cursor: 'pointer',
+            color: onOpenSettings ? '#64748b' : '#cbd5e1',
+            cursor: onOpenSettings ? 'pointer' : 'default',
             padding: '4px 8px',
             borderRadius: 4,
           }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f1f5f9'; }}
+          onMouseEnter={(e) => { if (onOpenSettings) (e.currentTarget as HTMLDivElement).style.backgroundColor = '#f1f5f9'; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent'; }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

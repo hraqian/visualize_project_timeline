@@ -324,7 +324,7 @@ function App() {
       {/* ─── Main content ─── */}
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-hidden">
-          {activeView === 'data' ? <DataView /> : <TimelineView ref={timelineRef} />}
+          {activeView === 'data' ? <DataView /> : <TimelineView ref={timelineRef} onOpenSettings={() => setShowSettingsModal(true)} />}
         </div>
         {isTimeline && (
           <div className="w-[280px] border-l border-[var(--color-border)] overflow-y-auto scrollbar-thin shrink-0">

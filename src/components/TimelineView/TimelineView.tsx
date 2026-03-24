@@ -148,7 +148,11 @@ export interface TimelineViewHandle {
   getExportElement: () => HTMLDivElement | null;
 }
 
-export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView(_props, ref) {
+interface TimelineViewProps {
+  onOpenSettings?: () => void;
+}
+
+export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function TimelineView({ onOpenSettings }, ref) {
   const items = useProjectStore((s) => s.items);
   const swimlanes = useProjectStore((s) => s.swimlanes);
   const dependencies = useProjectStore((s) => s.dependencies);
@@ -1241,6 +1245,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
             anchorRect={datePicker.anchorRect}
             onCommit={commitDatePicker}
             onCancel={closeDatePicker}
+            onOpenSettings={onOpenSettings}
           />
         );
       })()}
