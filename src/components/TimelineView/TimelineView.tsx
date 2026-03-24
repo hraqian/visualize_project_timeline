@@ -5,7 +5,7 @@ import { MilestoneIconComponent } from '@/components/common/MilestoneIconCompone
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { DatePickerPopover } from './DatePickerPopover';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig, DependencyType } from '@/types';
 
 // ─── Types for inline editing ────────────────────────────────────────────────
 
@@ -175,6 +175,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const updateTier = useProjectStore((s) => s.updateTier);
   const updateItem = useProjectStore((s) => s.updateItem);
   const updateSwimlane = useProjectStore((s) => s.updateSwimlane);
+  const addDependency = useProjectStore((s) => s.addDependency);
+  const updateDependency = useProjectStore((s) => s.updateDependency);
 
   // ─── Inline editing state ──────────────────────────────────────────────────
   const [editingField, setEditingField] = useState<EditingField>(null);
@@ -249,6 +251,20 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const draggingId = dragState?.id ?? null;
   const dragOffset = dragState?.offset ?? 0;
   const dragRef = useRef<{ id: string; startX: number } | null>(null);
+
+  // ─── Hovered item tracking ────────────────────────────────────────────────
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+
+  // ─── Dependency drag-to-connect state ─────────────────────────────────────
+  const [depDrag, setDepDrag] = useState<{
+    sourceId: string;
+    sourceSide: 'start' | 'end';
+    mouseX: number;
+    mouseY: number;
+    targetId: string | null;
+    targetSide: 'start' | 'end' | null;
+  } | null>(null);
+  const depDragRef = useRef<{ sourceId: string; sourceSide: 'start' | 'end'; startX: number; startY: number } | null>(null);
 
   const sortedSwimlanes = useMemo(
     () => [...swimlanes].sort((a, b) => a.order - b.order),
@@ -444,9 +460,10 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
   const timescaleHeight = tierLabels.length * 28;
 
-  // Dependency lines SVG paths
+  // Dependency lines SVG paths — orthogonal routing (right-angle segments only)
   const depPaths = useMemo(() => {
     if (!showDependencies) return [];
+    const OFFSET = 12; // horizontal offset before first vertical turn
     return dependencies
       .filter((dep) => dep.visible !== false)
       .map((dep) => {
@@ -455,7 +472,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         if (!from || !to) return null;
 
         const getItemY = (item: ProjectItem) => {
-          // "Above" milestones are rendered above the timescale bar — use top of canvas as endpoint
           if (item.type === 'milestone' && item.swimlaneId === null && item.milestoneStyle.position === 'above') {
             return 0;
           }
@@ -467,15 +483,41 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           return sl.contentY + getRow(item) * ROW_HEIGHT + ROW_HEIGHT / 2;
         };
 
-        const fromX = itemToX(from.endDate) + (from.type === 'milestone' ? from.milestoneStyle.size / 2 : 0);
+        // FS: exit right edge center of predecessor, enter left edge center of successor
+        const fromX = from.type === 'milestone'
+          ? itemToX(from.startDate) + from.milestoneStyle.size / 2
+          : itemToX(from.startDate) + differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom;
         const fromY = getItemY(from);
-        const toX = itemToX(to.startDate) - (to.type === 'milestone' ? to.milestoneStyle.size / 2 : 0);
+        const toX = to.type === 'milestone'
+          ? itemToX(to.startDate) - to.milestoneStyle.size / 2
+          : itemToX(to.startDate);
         const toY = getItemY(to);
 
         const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
 
-        const midX = (fromX + toX) / 2;
-        const path = `M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`;
+        let path: string;
+        const gap = toX - fromX;
+
+        if (gap >= OFFSET * 2) {
+          // Plenty of horizontal space: L-shape or Z-shape
+          if (fromY === toY) {
+            // Same row: straight horizontal line
+            path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
+          } else {
+            // Z-shape: right → down/up → right
+            const midX = fromX + gap / 2;
+            path = `M ${fromX} ${fromY} L ${midX} ${fromY} L ${midX} ${toY} L ${toX} ${toY}`;
+          }
+        } else {
+          // Close/overlapping: "reverse S" routing
+          // right (small offset) → down to midpoint → left (go back) → down to target row → right into successor
+          const exitX = fromX + OFFSET;
+          const enterX = toX - OFFSET;
+          const midY = (fromY + toY) / 2;
+          // If same row, offset midY by half ROW_HEIGHT
+          const actualMidY = fromY === toY ? fromY + ROW_HEIGHT / 2 : midY;
+          path = `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${actualMidY} L ${enterX} ${actualMidY} L ${enterX} ${toY} L ${toX} ${toY}`;
+        }
 
         return { path, isCritical, key: `${dep.fromId}-${dep.toId}` };
       })
@@ -583,6 +625,163 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     [moveItemToSwimlane]
   );
 
+  // ─── Dependency drag-to-connect handlers ──────────────────────────
+  // Helper: compute item center positions for hit-testing during dep drag
+  const getItemPositions = useCallback(() => {
+    const positions: { id: string; type: string; leftX: number; rightX: number; centerY: number; barHeight: number }[] = [];
+
+    const getItemY = (item: ProjectItem) => {
+      if (item.type === 'milestone' && item.swimlaneId === null && item.milestoneStyle.position === 'above') {
+        return 0;
+      }
+      if (!swimlaneIds.has(item.swimlaneId)) {
+        return INDEPENDENT_SECTION_PADDING + getRow(item) * ROW_HEIGHT;
+      }
+      const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
+      if (!sl) return 0;
+      return sl.contentY + getRow(item) * ROW_HEIGHT;
+    };
+
+    for (const item of visibleItems) {
+      const yBase = getItemY(item);
+      if (item.type === 'task') {
+        const xStart = itemToX(item.startDate);
+        const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+        const bh = item.taskStyle.thickness;
+        const barY = yBase + (ROW_HEIGHT - bh) / 2;
+        positions.push({
+          id: item.id,
+          type: 'task',
+          leftX: xStart,
+          rightX: xStart + barWidth,
+          centerY: barY + bh / 2,
+          barHeight: bh,
+        });
+      } else {
+        const cx = itemToX(item.startDate);
+        const sz = item.milestoneStyle.size;
+        positions.push({
+          id: item.id,
+          type: 'milestone',
+          leftX: cx - sz / 2,
+          rightX: cx + sz / 2,
+          centerY: yBase + ROW_HEIGHT / 2,
+          barHeight: sz,
+        });
+      }
+    }
+    return positions;
+  }, [visibleItems, swimlaneIds, swimlaneLayout, getRow, itemToX, zoom]);
+
+  const handleDepHandleMouseDown = useCallback(
+    (sourceId: string, sourceSide: 'start' | 'end', e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const scrollEl = containerRef.current;
+      if (!scrollEl) return;
+      const rect = scrollEl.getBoundingClientRect();
+      const scrollLeft = scrollEl.scrollLeft;
+      const scrollTop = scrollEl.scrollTop;
+      const mouseX = e.clientX - rect.left + scrollLeft;
+      const mouseY = e.clientY - rect.top + scrollTop;
+      depDragRef.current = { sourceId, sourceSide, startX: mouseX, startY: mouseY };
+      setDepDrag({ sourceId, sourceSide, mouseX, mouseY, targetId: null, targetSide: null });
+    },
+    []
+  );
+
+  // Dep drag mousemove/mouseup
+  useEffect(() => {
+    if (!depDrag) return;
+    const scrollEl = containerRef.current;
+    if (!scrollEl) return;
+
+    const positions = getItemPositions();
+
+    const onMove = (e: MouseEvent) => {
+      if (!depDragRef.current) return;
+      const rect = scrollEl.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left + scrollEl.scrollLeft;
+      const mouseY = e.clientY - rect.top + scrollEl.scrollTop;
+
+      // Hit-test: find closest item within threshold
+      const HIT_THRESHOLD = 20;
+      let bestId: string | null = null;
+      let bestSide: 'start' | 'end' | null = null;
+      let bestDist = Infinity;
+      for (const pos of positions) {
+        if (pos.id === depDragRef.current.sourceId) continue;
+        // Check if mouse is near the item vertically
+        if (Math.abs(mouseY - pos.centerY) > pos.barHeight / 2 + HIT_THRESHOLD) continue;
+        // Check left edge
+        const dLeft = Math.abs(mouseX - pos.leftX);
+        if (dLeft < HIT_THRESHOLD && dLeft < bestDist) {
+          bestDist = dLeft;
+          bestId = pos.id;
+          bestSide = 'start';
+        }
+        // Check right edge
+        const dRight = Math.abs(mouseX - pos.rightX);
+        if (dRight < HIT_THRESHOLD && dRight < bestDist) {
+          bestDist = dRight;
+          bestId = pos.id;
+          bestSide = 'end';
+        }
+        // For milestones, also check center
+        if (pos.type === 'milestone') {
+          const cx = (pos.leftX + pos.rightX) / 2;
+          const dCenter = Math.sqrt((mouseX - cx) ** 2 + (mouseY - pos.centerY) ** 2);
+          if (dCenter < HIT_THRESHOLD && dCenter < bestDist) {
+            bestDist = dCenter;
+            bestId = pos.id;
+            bestSide = 'start';
+          }
+        }
+      }
+
+      setDepDrag({
+        sourceId: depDragRef.current.sourceId,
+        sourceSide: depDragRef.current.sourceSide,
+        mouseX,
+        mouseY,
+        targetId: bestId,
+        targetSide: bestSide,
+      });
+    };
+
+    const onUp = () => {
+      if (!depDragRef.current) return;
+      const currentDrag = depDrag;
+      depDragRef.current = null;
+      setDepDrag(null);
+
+      if (currentDrag?.targetId && currentDrag.targetId !== currentDrag.sourceId) {
+        // Determine fromId/toId based on FS convention
+        // Drag from right handle (end) of predecessor → left handle (start) of successor
+        const fromId = currentDrag.sourceSide === 'end' ? currentDrag.sourceId : currentDrag.targetId;
+        const toId = currentDrag.sourceSide === 'end' ? currentDrag.targetId : currentDrag.sourceId;
+
+        // Check if dependency already exists
+        const existing = dependencies.find((d) => d.fromId === fromId && d.toId === toId);
+        if (existing) {
+          if (existing.type !== 'finish-to-start') {
+            updateDependency(fromId, toId, { type: 'finish-to-start' });
+          }
+          // else: same FS already exists, ignore
+        } else {
+          addDependency(fromId, toId, { type: 'finish-to-start' });
+        }
+      }
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [depDrag, getItemPositions, dependencies, addDependency, updateDependency]);
+
   // ─── Render helpers ────────────────────────────────────────────────
 
   const belowMilestoneGap = 4; // px between timescale bar bottom edge and milestone top edge
@@ -607,6 +806,9 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     // Snap to day grid during drag so the bar doesn't jump on drop
     const translateX = isDragging ? Math.round(dragOffset / zoom) * zoom : 0;
     const isSelected = selectedItemId === item.id;
+    const isHovered = hoveredItemId === item.id;
+    const isDepDragTarget = depDrag?.targetId === item.id;
+    const depDragTargetSide = isDepDragTarget ? depDrag?.targetSide ?? null : null;
 
     if (item.type === 'milestone') {
       // For "below" independent milestones, place icon tight against the timescale bar
@@ -622,6 +824,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           translateX={translateX}
           isSelected={isSelected}
           isDragging={isDragging}
+          isHovered={isHovered}
           onMouseDown={(e) => handleMouseDown(e, item.id)}
           onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
           onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
@@ -631,6 +834,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
           onCancelEdit={cancelEditing}
           onOpenDatePicker={(el) => openDatePicker(item.id, 'single', el)}
+          onMouseEnter={() => setHoveredItemId(item.id)}
+          onMouseLeave={() => setHoveredItemId(null)}
+          onHandleMouseDown={(side, e) => handleDepHandleMouseDown(item.id, side, e)}
+          isDepDragTarget={isDepDragTarget}
+          depDragTargetSide={depDragTargetSide}
         />
       );
     }
@@ -647,6 +855,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         translateX={translateX}
         isSelected={isSelected}
         isDragging={isDragging}
+        isHovered={isHovered}
         onMouseDown={(e) => handleMouseDown(e, item.id)}
         onClickBar={() => { setSelectedItem(item.id); setStylePaneSection('bar'); }}
         onClickSection={(section) => { setSelectedItem(item.id); setStylePaneSection(section); }}
@@ -655,6 +864,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
         onCancelEdit={cancelEditing}
         onOpenDatePicker={(el) => openDatePicker(item.id, 'range', el)}
+        onMouseEnter={() => setHoveredItemId(item.id)}
+        onMouseLeave={() => setHoveredItemId(null)}
+        onHandleMouseDown={(side, e) => handleDepHandleMouseDown(item.id, side, e)}
+        isDepDragTarget={isDepDragTarget}
+        depDragTargetSide={depDragTargetSide}
       />
     );
   };
@@ -978,23 +1192,23 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
               <defs>
                 <marker
                   id="arrowhead"
-                  markerWidth="8"
-                  markerHeight="6"
-                  refX="7"
-                  refY="3"
+                  markerWidth="10"
+                  markerHeight="8"
+                  refX="9"
+                  refY="4"
                   orient="auto"
                 >
-                  <polygon points="0 0, 8 3, 0 6" fill="#64748b" />
+                  <polygon points="0 0, 10 4, 0 8" fill="#475569" />
                 </marker>
                 <marker
                   id="arrowhead-critical"
-                  markerWidth="8"
-                  markerHeight="6"
-                  refX="7"
-                  refY="3"
+                  markerWidth="10"
+                  markerHeight="8"
+                  refX="9"
+                  refY="4"
                   orient="auto"
                 >
-                  <polygon points="0 0, 8 3, 0 6" fill="#ef4444" />
+                  <polygon points="0 0, 10 4, 0 8" fill="#ef4444" />
                 </marker>
               </defs>
               {/* Vertical connector lines */}
@@ -1010,6 +1224,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                   strokeDasharray="4 3"
                 />
               ))}
+              {/* Dependency lines — orthogonal paths */}
               {depPaths.map(
                 (dep) =>
                   dep && (
@@ -1019,12 +1234,32 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                       fill="none"
                       stroke={dep.isCritical ? '#ef4444' : '#475569'}
                       strokeWidth={dep.isCritical ? 2 : 1.5}
-                      strokeDasharray={dep.isCritical ? 'none' : '4 3'}
                       markerEnd={dep.isCritical ? 'url(#arrowhead-critical)' : 'url(#arrowhead)'}
-                      opacity={0.7}
                     />
                   )
               )}
+              {/* Temporary dependency drag line */}
+              {depDrag && (() => {
+                const positions = getItemPositions();
+                const sourcePos = positions.find((p) => p.id === depDrag.sourceId);
+                if (!sourcePos) return null;
+                const startX = depDrag.sourceSide === 'end' ? sourcePos.rightX : sourcePos.leftX;
+                const startY = sourcePos.centerY;
+                const endX = depDrag.mouseX;
+                const endY = depDrag.mouseY;
+                // Simple orthogonal temp line: horizontal then vertical
+                const path = `M ${startX} ${startY} L ${endX} ${startY} L ${endX} ${endY}`;
+                return (
+                  <path
+                    d={path}
+                    fill="none"
+                    stroke="#475569"
+                    strokeWidth={1.5}
+                    strokeDasharray="6 3"
+                    opacity={0.6}
+                  />
+                );
+              })()}
             </svg>
 
             {/* ─── Render independent items (below timescale only) ─── */}
@@ -1263,6 +1498,7 @@ interface TaskBarProps {
   translateX: number;
   isSelected: boolean;
   isDragging: boolean;
+  isHovered: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onClickBar: () => void;
   onClickSection: (section: 'title' | 'date' | 'duration' | 'percentComplete') => void;
@@ -1271,9 +1507,14 @@ interface TaskBarProps {
   onCommitEdit: (field: string, value: string) => void;
   onCancelEdit: () => void;
   onOpenDatePicker: (anchorEl: HTMLElement) => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  onHandleMouseDown: (side: 'start' | 'end', e: React.MouseEvent) => void;
+  isDepDragTarget: boolean;
+  depDragTargetSide: 'start' | 'end' | null;
 }
 
-function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker }: TaskBarProps) {
+function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: TaskBarProps) {
   const isEditing = (field: string) => editingField?.itemId === item.id && editingField?.field === field;
   const style = item.taskStyle;
   const barHeight = style.thickness;
@@ -1372,7 +1613,98 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
         transform: `translateX(${translateX}px)`,
       }}
       onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
+      {/* Dependency drag target highlight */}
+      {isDepDragTarget && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              inset: -3,
+              border: '2px dashed #475569',
+              borderRadius: borderRadius + 2,
+              pointerEvents: 'none',
+              zIndex: 50,
+            }}
+          />
+          {depDragTargetSide === 'start' && (
+            <div
+              style={{
+                position: 'absolute',
+                left: -2,
+                top: -3,
+                bottom: -3,
+                width: 4,
+                backgroundColor: '#334155',
+                borderRadius: 2,
+                pointerEvents: 'none',
+                zIndex: 51,
+              }}
+            />
+          )}
+          {depDragTargetSide === 'end' && (
+            <div
+              style={{
+                position: 'absolute',
+                right: -2,
+                top: -3,
+                bottom: -3,
+                width: 4,
+                backgroundColor: '#334155',
+                borderRadius: 2,
+                pointerEvents: 'none',
+                zIndex: 51,
+              }}
+            />
+          )}
+        </>
+      )}
+
+      {/* Connector handle circles — visible on hover or select */}
+      {(isHovered || isSelected) && (
+        <>
+          {/* Left (start) handle */}
+          <div
+            title="Click+drag to add dependency"
+            onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
+            style={{
+              position: 'absolute',
+              left: -4,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: 'white',
+              border: '2px solid #1e293b',
+              cursor: 'crosshair',
+              zIndex: 52,
+              pointerEvents: 'auto',
+            }}
+          />
+          {/* Right (end) handle */}
+          <div
+            title="Click+drag to add dependency"
+            onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
+            style={{
+              position: 'absolute',
+              right: -4,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: 'white',
+              border: '2px solid #1e293b',
+              cursor: 'crosshair',
+              zIndex: 52,
+              pointerEvents: 'auto',
+            }}
+          />
+        </>
+      )}
       <div
         className="w-full h-full relative overflow-hidden cursor-pointer hover:outline hover:outline-1 hover:outline-red-400"
         style={{
@@ -1614,6 +1946,7 @@ interface MilestoneItemProps {
   translateX: number;
   isSelected: boolean;
   isDragging: boolean;
+  isHovered: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onClickIcon: () => void;
   onClickLabel: () => void;
@@ -1623,9 +1956,14 @@ interface MilestoneItemProps {
   onCommitEdit: (field: string, value: string) => void;
   onCancelEdit: () => void;
   onOpenDatePicker: (anchorEl: HTMLElement) => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  onHandleMouseDown: (side: 'start' | 'end', e: React.MouseEvent) => void;
+  isDepDragTarget: boolean;
+  depDragTargetSide: 'start' | 'end' | null;
 }
 
-function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker }: MilestoneItemProps) {
+function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: MilestoneItemProps) {
   const isEditingTitle = editingField?.itemId === item.id && editingField?.field === 'milestoneTitle';
   const style = item.milestoneStyle;
   const isIndependent = item.swimlaneId === null;
@@ -1715,7 +2053,48 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         transform: `translateX(${translateX}px)`,
       }}
         onMouseDown={onMouseDown}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
+        {/* Dependency drag target highlight */}
+        {isDepDragTarget && (
+          <div
+            style={{
+              position: 'absolute',
+              left: -3,
+              right: -3,
+              top: isAbove ? undefined : -3,
+              bottom: isAbove ? -3 : undefined,
+              width: style.size + 6,
+              height: style.size + 6,
+              border: '2px dashed #475569',
+              borderRadius: 4,
+              pointerEvents: 'none',
+              zIndex: 50,
+            }}
+          />
+        )}
+        {/* Connector handle circle — center of icon */}
+        {(isHovered || isSelected) && (
+          <div
+            title="Click+drag to add dependency"
+            onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
+            style={{
+              position: 'absolute',
+              left: style.size / 2 - 4,
+              top: isAbove ? undefined : style.size / 2 - 4,
+              bottom: isAbove ? style.size / 2 - 4 : undefined,
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: 'white',
+              border: '2px solid #1e293b',
+              cursor: 'crosshair',
+              zIndex: 52,
+              pointerEvents: 'auto',
+            }}
+          />
+        )}
         <div className="flex flex-col items-center gap-px">
           {isAbove ? (
             <>
@@ -1767,7 +2146,44 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         transform: `translateX(${translateX}px)`,
       }}
       onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
+      {/* Dependency drag target highlight */}
+      {isDepDragTarget && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: -3,
+            width: style.size + 6,
+            height: style.size + 6,
+            border: '2px dashed #475569',
+            borderRadius: 4,
+            pointerEvents: 'none',
+            zIndex: 50,
+          }}
+        />
+      )}
+      {/* Connector handle circle — center of milestone */}
+      {(isHovered || isSelected) && (
+        <div
+          title="Click+drag to add dependency"
+          onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
+          style={{
+            position: 'absolute',
+            left: style.size / 2 - 4,
+            top: style.size / 2 - 4,
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: 'white',
+            border: '2px solid #1e293b',
+            cursor: 'crosshair',
+            zIndex: 52,
+            pointerEvents: 'auto',
+          }}
+        />
+      )}
       <div
         className={`relative cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 ${isSelected ? 'drop-shadow-lg' : ''}`}
         style={{
