@@ -123,10 +123,16 @@ function routeDepLink(
     // Normal case: vertical segment to the right of predecessor
     let turnX = fromX + offset;
 
-    // Push turnX right past any obstacle whose bar extends to or past turnX
-    for (const o of blockingObs) {
-      if (o.rightX + PAD > turnX) {
-        turnX = o.rightX + PAD;
+    // Push turnX right past any obstacle whose bar the vertical segment would cross.
+    // Iterate because pushing past one obstacle may land inside another.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const o of blockingObs) {
+        if (turnX >= o.leftX - PAD && turnX <= o.rightX + PAD) {
+          turnX = o.rightX + PAD;
+          changed = true;
+        }
       }
     }
 
@@ -145,9 +151,14 @@ function routeDepLink(
     const enterX = toX - offset;
 
     // Push exitX right past obstacles
-    for (const o of blockingObs) {
-      if (o.rightX + PAD > exitX) {
-        exitX = o.rightX + PAD;
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const o of blockingObs) {
+        if (exitX >= o.leftX - PAD && exitX <= o.rightX + PAD) {
+          exitX = o.rightX + PAD;
+          changed = true;
+        }
       }
     }
 
