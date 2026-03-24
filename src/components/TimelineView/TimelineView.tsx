@@ -91,6 +91,71 @@ const OUTLINE_THICKNESS_MAP: Record<OutlineThickness, number> = { none: 0, thin:
 const SWIMLANE_PADDING_TOP = 10;
 const SWIMLANE_PADDING_BOTTOM = 10;
 
+// ─── Obstacle-avoidance routing for dependency links ─────────────────────────
+// Given a from/to point and a list of obstacle rects, compute an orthogonal
+// path that avoids crossing through bars between the predecessor and successor.
+interface ObstacleRect { leftX: number; rightX: number; topY: number; bottomY: number }
+
+function routeDepLink(
+  fromX: number, fromY: number,
+  toX: number, toY: number,
+  obstacles: ObstacleRect[],
+  offset: number = 12,
+): string {
+  // Same row — straight horizontal
+  if (fromY === toY) {
+    return `M ${fromX} ${fromY} L ${toX} ${toY}`;
+  }
+
+  const minY = Math.min(fromY, toY);
+  const maxY = Math.max(fromY, toY);
+  const gap = toX - fromX;
+  const PAD = 8; // clearance between vertical segment and obstacle right edge
+
+  // Find obstacles whose rows vertically overlap the corridor between from and to
+  // (exclusive of from/to rows — use a small inset so we don't match their own rows)
+  const inset = 2;
+  const blockingObs = obstacles.filter(
+    (o) => o.bottomY > minY + inset && o.topY < maxY - inset
+  );
+
+  if (gap >= offset) {
+    // Normal case: vertical segment to the right of predecessor
+    let turnX = fromX + offset;
+
+    // Push turnX right past any obstacle whose bar extends to or past turnX
+    for (const o of blockingObs) {
+      if (o.rightX + PAD > turnX) {
+        turnX = o.rightX + PAD;
+      }
+    }
+
+    // If turnX is still left of toX, simple L-shape
+    if (turnX < toX) {
+      return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${toY} L ${toX} ${toY}`;
+    }
+
+    // turnX pushed past toX — need Z-shape: go right, down, then left back in
+    const enterX = toX - offset;
+    const midY = (fromY + toY) / 2;
+    return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${midY} L ${enterX} ${midY} L ${enterX} ${toY} L ${toX} ${toY}`;
+  } else {
+    // Close/overlapping: reverse-S routing
+    let exitX = fromX + offset;
+    const enterX = toX - offset;
+
+    // Push exitX right past obstacles
+    for (const o of blockingObs) {
+      if (o.rightX + PAD > exitX) {
+        exitX = o.rightX + PAD;
+      }
+    }
+
+    const midY = (fromY + toY) / 2;
+    return `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${midY} L ${enterX} ${midY} L ${enterX} ${toY} L ${toX} ${toY}`;
+  }
+}
+
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
   switch (shape) {
     case 'rectangle': return { borderRadius: 0 };
@@ -515,6 +580,35 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const depPaths = useMemo(() => {
     if (!showDependencies) return [];
     const OFFSET = 12; // horizontal offset before first vertical turn
+
+    // Helper: get an item's row-top Y in canvas coordinates
+    const getItemRowTopY = (item: ProjectItem) => {
+      if (item.type === 'milestone' && item.swimlaneId === null && item.milestoneStyle.position === 'above') {
+        return 0;
+      }
+      if (!swimlaneIds.has(item.swimlaneId)) {
+        return INDEPENDENT_SECTION_PADDING + getRowY(item);
+      }
+      const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
+      if (!sl) return 0;
+      return sl.contentY + getRowY(item);
+    };
+
+    // Build obstacle rects for all visible items (row-based: topY to topY + ROW_BASE)
+    const allObstacles: { id: string; leftX: number; rightX: number; topY: number; bottomY: number }[] = [];
+    for (const item of visibleItems) {
+      const rowTop = getItemRowTopY(item);
+      if (item.type === 'task') {
+        const xStart = itemToX(item.startDate);
+        const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+        allObstacles.push({ id: item.id, leftX: xStart, rightX: xStart + barWidth, topY: rowTop, bottomY: rowTop + ROW_BASE });
+      } else {
+        const cx = itemToX(item.startDate);
+        const sz = item.milestoneStyle.size;
+        allObstacles.push({ id: item.id, leftX: cx - sz / 2, rightX: cx + sz / 2, topY: rowTop, bottomY: rowTop + ROW_BASE });
+      }
+    }
+
     return dependencies
       .filter((dep) => dep.visible !== false)
       .map((dep) => {
@@ -522,59 +616,26 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const to = visibleItems.find((i) => i.id === dep.toId);
         if (!from || !to) return null;
 
-        const getItemY = (item: ProjectItem) => {
-          if (item.type === 'milestone' && item.swimlaneId === null && item.milestoneStyle.position === 'above') {
-            return 0;
-          }
-          if (!swimlaneIds.has(item.swimlaneId)) {
-            return INDEPENDENT_SECTION_PADDING + getRowY(item) + getRowH(item) / 2;
-          }
-          const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
-          if (!sl) return 0;
-          return sl.contentY + getRowY(item) + getRowH(item) / 2;
-        };
-
         // FS: exit right edge center of predecessor, enter left edge center of successor
         const fromX = from.type === 'milestone'
           ? itemToX(from.startDate) + from.milestoneStyle.size / 2
           : itemToX(from.startDate) + differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom;
-        const fromY = getItemY(from);
+        const fromY = getItemRowTopY(from) + ROW_BASE / 2;
         const toX = to.type === 'milestone'
           ? itemToX(to.startDate) - to.milestoneStyle.size / 2
           : itemToX(to.startDate);
-        const toY = getItemY(to);
+        const toY = getItemRowTopY(to) + ROW_BASE / 2;
 
         const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
 
-        let path: string;
-        const gap = toX - fromX;
-
-        if (gap >= OFFSET) {
-          // There's horizontal space: vertical segment hugs predecessor
-          if (fromY === toY) {
-            // Same row: straight horizontal line
-            path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
-          } else {
-            // L-shape: right (small offset) → drop to target row → right into successor
-            const turnX = fromX + OFFSET;
-            path = `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${toY} L ${toX} ${toY}`;
-          }
-        } else {
-          // Close/overlapping: "reverse S" routing
-          // right (small offset) → down to midpoint → left (go back) → down to target row → right into successor
-          const exitX = fromX + OFFSET;
-          const enterX = toX - OFFSET;
-          const midY = (fromY + toY) / 2;
-          // If same row, offset midY by half the row height
-          const rowH = Math.max(getRowH(from), getRowH(to));
-          const actualMidY = fromY === toY ? fromY + rowH / 2 : midY;
-          path = `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${actualMidY} L ${enterX} ${actualMidY} L ${enterX} ${toY} L ${toX} ${toY}`;
-        }
+        // Exclude from/to items from obstacles
+        const obstacles = allObstacles.filter((o) => o.id !== from.id && o.id !== to.id);
+        const path = routeDepLink(fromX, fromY, toX, toY, obstacles, OFFSET);
 
         return { path, isCritical, key: `${dep.fromId}-${dep.toId}` };
       })
       .filter(Boolean);
-  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, getRowH]);
+  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, getRowH, zoom]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
   const verticalConnectors = useMemo(() => {
@@ -1345,21 +1406,29 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                   endY = depDrag.mouseY;
                 }
 
-                // Orthogonal routing matching the committed dependency routing logic
-                const gap = endX - fromX;
                 let path: string;
-                if (gap >= TEMP_OFFSET) {
-                  if (fromY === endY) {
-                    path = `M ${fromX} ${fromY} L ${endX} ${endY}`;
-                  } else {
-                    const turnX = fromX + TEMP_OFFSET;
-                    path = `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${endY} L ${endX} ${endY}`;
-                  }
+                if (showArrow) {
+                  // Locked on target — use obstacle-avoidance routing
+                  const obstacles: ObstacleRect[] = positions
+                    .filter((p) => p.id !== depDrag.sourceId && p.id !== depDrag.targetId)
+                    .map((p) => ({ leftX: p.leftX, rightX: p.rightX, topY: p.centerY - ROW_BASE / 2, bottomY: p.centerY + ROW_BASE / 2 }));
+                  path = routeDepLink(fromX, fromY, endX, endY, obstacles, TEMP_OFFSET);
                 } else {
-                  const exitX = fromX + TEMP_OFFSET;
-                  const enterX = endX - TEMP_OFFSET;
-                  const midY = fromY === endY ? fromY + ROW_HEIGHT / 2 : (fromY + endY) / 2;
-                  path = `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${midY} L ${enterX} ${midY} L ${enterX} ${endY} L ${endX} ${endY}`;
+                  // Free-dragging — simple orthogonal routing
+                  const gap = endX - fromX;
+                  if (gap >= TEMP_OFFSET) {
+                    if (fromY === endY) {
+                      path = `M ${fromX} ${fromY} L ${endX} ${endY}`;
+                    } else {
+                      const turnX = fromX + TEMP_OFFSET;
+                      path = `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${endY} L ${endX} ${endY}`;
+                    }
+                  } else {
+                    const exitX = fromX + TEMP_OFFSET;
+                    const enterX = endX - TEMP_OFFSET;
+                    const midY = fromY === endY ? fromY + ROW_BASE / 2 : (fromY + endY) / 2;
+                    path = `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${midY} L ${enterX} ${midY} L ${enterX} ${endY} L ${endX} ${endY}`;
+                  }
                 }
 
                 return (
