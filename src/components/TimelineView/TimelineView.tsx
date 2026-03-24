@@ -354,7 +354,7 @@ export const TimelineView = forwardRef<TimelineViewHandle>(function TimelineView
     const clamped = Math.max(2, Math.min(30, idealZoom));
     if (clamped !== zoom) setZoom(clamped);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [totalDays]);
 
   const totalWidth = totalDays * zoom;
 
