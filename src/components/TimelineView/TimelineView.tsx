@@ -765,11 +765,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const existing = dependencies.find((d) => d.fromId === fromId && d.toId === toId);
         if (existing) {
           if (existing.type !== 'finish-to-start') {
-            updateDependency(fromId, toId, { type: 'finish-to-start' });
+            updateDependency(fromId, toId, { type: 'finish-to-start', forceSchedule: true });
           }
           // else: same FS already exists, ignore
         } else {
-          addDependency(fromId, toId, { type: 'finish-to-start' });
+          addDependency(fromId, toId, { type: 'finish-to-start', forceSchedule: true });
         }
       }
     };
@@ -1667,38 +1667,36 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, isHove
         <>
           {/* Left (start) handle */}
           <div
+            className="dep-handle"
             title="Click+drag to add dependency"
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
             style={{
               position: 'absolute',
-              left: -4,
+              left: -5,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: 8,
-              height: 8,
+              width: 10,
+              height: 10,
               borderRadius: '50%',
-              backgroundColor: 'white',
-              border: '2px solid #1e293b',
-              cursor: 'crosshair',
+              cursor: 'pointer',
               zIndex: 52,
               pointerEvents: 'auto',
             }}
           />
           {/* Right (end) handle */}
           <div
+            className="dep-handle"
             title="Click+drag to add dependency"
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
             style={{
               position: 'absolute',
-              right: -4,
+              right: -5,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: 8,
-              height: 8,
+              width: 10,
+              height: 10,
               borderRadius: '50%',
-              backgroundColor: 'white',
-              border: '2px solid #1e293b',
-              cursor: 'crosshair',
+              cursor: 'pointer',
               zIndex: 52,
               pointerEvents: 'auto',
             }}
@@ -2077,19 +2075,18 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         {/* Connector handle circle — center of icon */}
         {(isHovered || isSelected) && (
           <div
+            className="dep-handle"
             title="Click+drag to add dependency"
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
             style={{
               position: 'absolute',
-              left: style.size / 2 - 4,
-              top: isAbove ? undefined : style.size / 2 - 4,
-              bottom: isAbove ? style.size / 2 - 4 : undefined,
-              width: 8,
-              height: 8,
+              left: style.size / 2 - 5,
+              top: isAbove ? undefined : style.size / 2 - 5,
+              bottom: isAbove ? style.size / 2 - 5 : undefined,
+              width: 10,
+              height: 10,
               borderRadius: '50%',
-              backgroundColor: 'white',
-              border: '2px solid #1e293b',
-              cursor: 'crosshair',
+              cursor: 'pointer',
               zIndex: 52,
               pointerEvents: 'auto',
             }}
@@ -2167,18 +2164,17 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
       {/* Connector handle circle — center of milestone */}
       {(isHovered || isSelected) && (
         <div
+          className="dep-handle"
           title="Click+drag to add dependency"
           onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
           style={{
             position: 'absolute',
-            left: style.size / 2 - 4,
-            top: style.size / 2 - 4,
-            width: 8,
-            height: 8,
+            left: style.size / 2 - 5,
+            top: style.size / 2 - 5,
+            width: 10,
+            height: 10,
             borderRadius: '50%',
-            backgroundColor: 'white',
-            border: '2px solid #1e293b',
-            cursor: 'crosshair',
+            cursor: 'pointer',
             zIndex: 52,
             pointerEvents: 'auto',
           }}

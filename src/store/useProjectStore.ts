@@ -205,9 +205,9 @@ interface ProjectActions {
   reorderSwimlane: (id: string, newOrder: number) => void;
 
   // Dependencies
-  addDependency: (fromId: string, toId: string, options?: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible'>>) => void;
+  addDependency: (fromId: string, toId: string, options?: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible'>> & { forceSchedule?: boolean }) => void;
   removeDependency: (fromId: string, toId: string) => void;
-  updateDependency: (fromId: string, toId: string, updates: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible'>>) => void;
+  updateDependency: (fromId: string, toId: string, updates: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible'>> & { forceSchedule?: boolean }) => void;
   toggleDependencyVisibility: (fromId: string, toId: string) => void;
   setItemDependencies: (itemId: string, deps: Dependency[]) => void;
 
@@ -814,11 +814,13 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       visible: options?.visible ?? true,
     }];
     let newItems = state.items;
-    if (state.dependencySettings.schedulingMode !== 'manual') {
+    if (options?.forceSchedule || state.dependencySettings.schedulingMode !== 'manual') {
       const isStrict = state.dependencySettings.schedulingMode === 'automatic-strict';
-      const effectiveMode: DependencyConflictMode = isStrict
+      const effectiveMode: DependencyConflictMode = options?.forceSchedule && state.dependencySettings.schedulingMode === 'manual'
         ? 'dont-allow'
-        : state.dependencySettings.conflictMode;
+        : isStrict
+          ? 'dont-allow'
+          : state.dependencySettings.conflictMode;
       const result = scheduleDependents([toId], newItems, newDeps, effectiveMode, isStrict);
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
@@ -841,11 +843,13 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       d.fromId === fromId && d.toId === toId ? { ...d, ...updates } : d
     );
     let newItems = state.items;
-    if (state.dependencySettings.schedulingMode !== 'manual') {
+    if (updates?.forceSchedule || state.dependencySettings.schedulingMode !== 'manual') {
       const isStrict = state.dependencySettings.schedulingMode === 'automatic-strict';
-      const effectiveMode: DependencyConflictMode = isStrict
+      const effectiveMode: DependencyConflictMode = updates?.forceSchedule && state.dependencySettings.schedulingMode === 'manual'
         ? 'dont-allow'
-        : state.dependencySettings.conflictMode;
+        : isStrict
+          ? 'dont-allow'
+          : state.dependencySettings.conflictMode;
       const result = scheduleDependents([toId], newItems, newDeps, effectiveMode, isStrict);
       newItems = result.items;
       newDeps = applyLagAdjustments(newDeps, result.lagAdjustments);
