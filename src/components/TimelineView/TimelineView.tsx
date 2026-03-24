@@ -502,15 +502,15 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         let path: string;
         const gap = toX - fromX;
 
-        if (gap >= OFFSET * 2) {
-          // Plenty of horizontal space: L-shape or Z-shape
+        if (gap >= OFFSET) {
+          // There's horizontal space: vertical segment hugs predecessor
           if (fromY === toY) {
             // Same row: straight horizontal line
             path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
           } else {
-            // Z-shape: right → down/up → right
-            const midX = fromX + gap / 2;
-            path = `M ${fromX} ${fromY} L ${midX} ${fromY} L ${midX} ${toY} L ${toX} ${toY}`;
+            // L-shape: right (small offset) → drop to target row → right into successor
+            const turnX = fromX + OFFSET;
+            path = `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${toY} L ${toX} ${toY}`;
           }
         } else {
           // Close/overlapping: "reverse S" routing
@@ -802,12 +802,34 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     return { item, daysDelta, snappedOffsetPx, newStart, newEnd };
   }, [draggingId, dragOffset, zoom, items]);
 
+  // ─── Dependency drag preview: compute where the target would move ────────
+  // For FS: successor start = predecessor endDate + 1 day
+  const depDragPreview = useMemo<{ targetId: string; offsetPx: number } | null>(() => {
+    if (!depDrag?.targetId) return null;
+    // Determine fromId/toId based on FS convention (same logic as onUp)
+    const fromId = depDrag.sourceSide === 'end' ? depDrag.sourceId : depDrag.targetId;
+    const toId = depDrag.sourceSide === 'end' ? depDrag.targetId : depDrag.sourceId;
+    const predecessor = visibleItems.find((i) => i.id === fromId);
+    const successor = visibleItems.find((i) => i.id === toId);
+    if (!predecessor || !successor) return null;
+    // FS constraint: successor starts the day after predecessor ends
+    const constrainedStart = addDays(parseISO(predecessor.endDate), 1);
+    const currentStart = parseISO(successor.startDate);
+    const daysDelta = differenceInDays(constrainedStart, currentStart);
+    if (daysDelta <= 0) return null; // Already at or after constraint — no move needed
+    return { targetId: toId, offsetPx: daysDelta * zoom };
+  }, [depDrag, visibleItems, zoom]);
+
   const renderItem = (item: ProjectItem, yBase: number) => {
     const x = itemToX(item.startDate);
     const y = yBase + getRow(item) * ROW_HEIGHT;
     const isDragging = draggingId === item.id;
     // Snap to day grid during drag so the bar doesn't jump on drop
-    const translateX = isDragging ? Math.round(dragOffset / zoom) * zoom : 0;
+    let translateX = isDragging ? Math.round(dragOffset / zoom) * zoom : 0;
+    // Apply dependency drag preview offset
+    if (depDragPreview && item.id === depDragPreview.targetId) {
+      translateX += depDragPreview.offsetPx;
+    }
     const isSelected = selectedItemId === item.id;
     const isHovered = hoveredItemId === item.id;
     const isDepDragTarget = depDrag?.targetId === item.id;
@@ -913,7 +935,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 if (s.showDate) stackH += Math.ceil(s.dateFontSize * 1.25) + 1;
                 const ay = aboveHeight - stackH - aboveRowGap;
                 const isDraggingItem = draggingId === item.id;
-                const txl = isDraggingItem ? Math.round(dragOffset / zoom) * zoom : 0;
+                let txl = isDraggingItem ? Math.round(dragOffset / zoom) * zoom : 0;
+                if (depDragPreview && item.id === depDragPreview.targetId) txl += depDragPreview.offsetPx;
                 const isSel = selectedItemId === item.id;
                 return (
                   <MilestoneItem
@@ -1243,23 +1266,59 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
               )}
               {/* Temporary dependency drag line */}
               {depDrag && (() => {
+                const TEMP_OFFSET = 12;
                 const positions = getItemPositions();
                 const sourcePos = positions.find((p) => p.id === depDrag.sourceId);
                 if (!sourcePos) return null;
-                const startX = depDrag.sourceSide === 'end' ? sourcePos.rightX : sourcePos.leftX;
-                const startY = sourcePos.centerY;
-                const endX = depDrag.mouseX;
-                const endY = depDrag.mouseY;
-                // Simple orthogonal temp line: horizontal then vertical
-                const path = `M ${startX} ${startY} L ${endX} ${startY} L ${endX} ${endY}`;
+                const fromX = depDrag.sourceSide === 'end' ? sourcePos.rightX : sourcePos.leftX;
+                const fromY = sourcePos.centerY;
+
+                // If locked onto a target, route to its (possibly previewed) left edge
+                let endX: number;
+                let endY: number;
+                let showArrow = false;
+                if (depDrag.targetId) {
+                  const targetPos = positions.find((p) => p.id === depDrag.targetId);
+                  if (targetPos) {
+                    const previewOff = depDragPreview?.targetId === depDrag.targetId ? depDragPreview.offsetPx : 0;
+                    endX = (depDrag.targetSide === 'end' ? targetPos.rightX : targetPos.leftX) + previewOff;
+                    endY = targetPos.centerY;
+                    showArrow = true;
+                  } else {
+                    endX = depDrag.mouseX;
+                    endY = depDrag.mouseY;
+                  }
+                } else {
+                  endX = depDrag.mouseX;
+                  endY = depDrag.mouseY;
+                }
+
+                // Orthogonal routing matching the committed dependency routing logic
+                const gap = endX - fromX;
+                let path: string;
+                if (gap >= TEMP_OFFSET) {
+                  if (fromY === endY) {
+                    path = `M ${fromX} ${fromY} L ${endX} ${endY}`;
+                  } else {
+                    const turnX = fromX + TEMP_OFFSET;
+                    path = `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${endY} L ${endX} ${endY}`;
+                  }
+                } else {
+                  const exitX = fromX + TEMP_OFFSET;
+                  const enterX = endX - TEMP_OFFSET;
+                  const midY = fromY === endY ? fromY + ROW_HEIGHT / 2 : (fromY + endY) / 2;
+                  path = `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${midY} L ${enterX} ${midY} L ${enterX} ${endY} L ${endX} ${endY}`;
+                }
+
                 return (
                   <path
                     d={path}
                     fill="none"
                     stroke="#475569"
                     strokeWidth={1.5}
-                    strokeDasharray="6 3"
-                    opacity={0.6}
+                    strokeDasharray={showArrow ? undefined : '6 3'}
+                    markerEnd={showArrow ? 'url(#arrowhead)' : undefined}
+                    opacity={showArrow ? 0.8 : 0.6}
                   />
                 );
               })()}
@@ -1614,6 +1673,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, isHove
         width: w,
         height: barHeight,
         transform: `translateX(${translateX}px)`,
+        transition: isDepDragTarget && translateX !== 0 ? 'transform 150ms ease-out' : undefined,
       }}
       onMouseDown={onMouseDown}
       onMouseEnter={onMouseEnter}
@@ -2052,6 +2112,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           left: x - style.size / 2,
           top: iconTop,
         transform: `translateX(${translateX}px)`,
+        transition: isDepDragTarget && translateX !== 0 ? 'transform 150ms ease-out' : undefined,
       }}
         onMouseDown={onMouseDown}
         onMouseEnter={onMouseEnter}
@@ -2144,6 +2205,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         left: x - style.size / 2,
         top: iconTop,
         transform: `translateX(${translateX}px)`,
+        transition: isDepDragTarget && translateX !== 0 ? 'transform 150ms ease-out' : undefined,
       }}
       onMouseDown={onMouseDown}
       onMouseEnter={onMouseEnter}
