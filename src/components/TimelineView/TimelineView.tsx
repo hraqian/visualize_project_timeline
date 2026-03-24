@@ -244,6 +244,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
   const containerRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(ref, () => ({
     getExportElement: () => exportRef.current,
   }));
@@ -265,6 +266,9 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     targetSide: 'start' | 'end' | null;
   } | null>(null);
   const depDragRef = useRef<{ sourceId: string; sourceSide: 'start' | 'end'; startX: number; startY: number } | null>(null);
+  // Keep a ref to the latest depDrag value so onUp always reads fresh data
+  const depDragLatestRef = useRef(depDrag);
+  depDragLatestRef.current = depDrag;
 
   const sortedSwimlanes = useMemo(
     () => [...swimlanes].sort((a, b) => a.order - b.order),
@@ -677,13 +681,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     (sourceId: string, sourceSide: 'start' | 'end', e: React.MouseEvent) => {
       e.stopPropagation();
       e.preventDefault();
-      const scrollEl = containerRef.current;
-      if (!scrollEl) return;
-      const rect = scrollEl.getBoundingClientRect();
-      const scrollLeft = scrollEl.scrollLeft;
-      const scrollTop = scrollEl.scrollTop;
-      const mouseX = e.clientX - rect.left + scrollLeft;
-      const mouseY = e.clientY - rect.top + scrollTop;
+      const canvasEl = canvasRef.current;
+      if (!canvasEl) return;
+      const rect = canvasEl.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
       depDragRef.current = { sourceId, sourceSide, startX: mouseX, startY: mouseY };
       setDepDrag({ sourceId, sourceSide, mouseX, mouseY, targetId: null, targetSide: null });
     },
@@ -693,16 +695,16 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   // Dep drag mousemove/mouseup
   useEffect(() => {
     if (!depDrag) return;
-    const scrollEl = containerRef.current;
-    if (!scrollEl) return;
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
 
     const positions = getItemPositions();
 
     const onMove = (e: MouseEvent) => {
       if (!depDragRef.current) return;
-      const rect = scrollEl.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left + scrollEl.scrollLeft;
-      const mouseY = e.clientY - rect.top + scrollEl.scrollTop;
+      const rect = canvasEl.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
       // Hit-test: find closest item within threshold
       const HIT_THRESHOLD = 20;
@@ -751,7 +753,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
     const onUp = () => {
       if (!depDragRef.current) return;
-      const currentDrag = depDrag;
+      // Read from the ref to avoid stale closure issues
+      const currentDrag = depDragLatestRef.current;
       depDragRef.current = null;
       setDepDrag(null);
 
@@ -1082,7 +1085,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
            </div>
 
           {/* ─── Canvas: grid, swimlane bands, items ─── */}
-          <div className="relative" style={{ height: canvasHeight }}>
+          <div ref={canvasRef} className="relative" style={{ height: canvasHeight }}>
             {/* Grid lines */}
             {tierLabels.length > 0 &&
               tierLabels[tierLabels.length - 1].labels.map((label, i) => {
