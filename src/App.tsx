@@ -553,10 +553,10 @@ function DepToggleSwitch({ on, disabled }: { on: boolean; disabled?: boolean }) 
 // Small SVG showing two mini bars with a dep link connecting at the specified points.
 
 function ConnectionPointIllustration({ fromPoint, toPoint }: { fromPoint: ConnectionPoint; toPoint: ConnectionPoint }) {
-  const W = 190;
+  const W = 250;
   const H = 80;
   const barH = 14;
-  const barW = 48;
+  const barW = 52;
   const bar1X = 20;
   const bar1Y = 14;
   const bar2X = W - 20 - barW;
@@ -737,7 +737,7 @@ function ConnectionPointButton({
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
             padding: '10px 10px',
             zIndex: 30,
-            width: 230,
+            width: 280,
           }}
         >
           {/* Top row: From select + To select + Auto checkbox */}
