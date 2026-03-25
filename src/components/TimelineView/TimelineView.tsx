@@ -142,10 +142,9 @@ function routeDepLink(
     return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${gapY} L ${enterX} ${gapY} L ${enterX} ${toY} L ${toX} ${toY}`;
   }
 
-  // ── Non-side routing: build orthogonal path based on exit/entry directions ─
+  // ── Non-side routing with obstacle avoidance ──────────────────────────────
   // Strategy: extend from the anchor in its exit direction by `offset`, then
-  // route orthogonally (one or two turns) to the target's entry approach point,
-  // then enter from the target's entry direction.
+  // route orthogonally to the target's entry approach point, avoiding obstacles.
 
   // Compute the "exit point" — a short stub in the exit direction
   let ex = fromX, ey = fromY;
@@ -165,33 +164,91 @@ function routeDepLink(
   const exitHoriz = (fromDir === 'left' || fromDir === 'right');
   const entryHoriz = (toDir === 'left' || toDir === 'right');
 
+  // Helper: push an X coordinate right to avoid obstacles within a Y range
+  const avoidObsX = (x: number, minY: number, maxY: number): number => {
+    const inset = 2;
+    const blocking = obstacles.filter(
+      (o) => o.bottomY > minY + inset && o.topY < maxY - inset
+    );
+    let changed = true;
+    let iterations = 0;
+    while (changed && iterations < 100) {
+      changed = false;
+      iterations++;
+      for (const o of blocking) {
+        if (x >= o.leftX - PAD && x < o.rightX + PAD) {
+          x = o.rightX + PAD;
+          changed = true;
+        }
+      }
+    }
+    return x;
+  };
+
+  // Helper: push a Y coordinate to avoid obstacles within an X range
+  // Pushes in the direction away from fromY (i.e., further toward toY or further away from bars)
+  const avoidObsY = (y: number, minX: number, maxX: number, preferDown: boolean): number => {
+    const blocking = obstacles.filter(
+      (o) => o.rightX > minX + 2 && o.leftX < maxX - 2
+    );
+    let changed = true;
+    let iterations = 0;
+    while (changed && iterations < 100) {
+      changed = false;
+      iterations++;
+      for (const o of blocking) {
+        if (y >= o.topY - PAD && y < o.bottomY + PAD) {
+          y = preferDown ? o.bottomY + PAD : o.topY - PAD;
+          changed = true;
+        }
+      }
+    }
+    return y;
+  };
+
   const pts: [number, number][] = [[fromX, fromY]];
 
   if (exitHoriz && entryHoriz) {
-    // Both horizontal: exit stub → vertical to entry Y → horizontal to entry stub → target
-    pts.push([ex, ey]);
-    pts.push([ex, ny]);
+    // Both horizontal: exit stub → vertical → entry stub → target
+    // The vertical segment at ex can collide with obstacles
+    const vertX = avoidObsX(ex, Math.min(ey, ny), Math.max(ey, ny));
+    pts.push([vertX, ey]);
+    pts.push([vertX, ny]);
     pts.push([nx, ny]);
   } else if (!exitHoriz && !entryHoriz) {
-    // Both vertical: exit stub → horizontal to entry X → vertical to entry stub → target
-    pts.push([ex, ey]);
-    pts.push([nx, ey]);
+    // Both vertical: exit stub → horizontal → entry stub → target
+    // The horizontal segment at ey can collide with obstacles
+    const horizY = avoidObsY(ey, Math.min(ex, nx), Math.max(ex, nx), toY > fromY);
+    pts.push([ex, horizY]);
+    pts.push([nx, horizY]);
     pts.push([nx, ny]);
   } else if (exitHoriz && !entryHoriz) {
-    // Exit horizontal, enter vertical: exit stub → horizontal to target X → vertical to entry stub
-    pts.push([ex, ey]);
-    pts.push([nx, ey]);
+    // Exit horizontal, enter vertical: exit stub → horizontal to target X → vertical to entry
+    // The horizontal segment at ey and the vertical segment at nx can collide
+    const horizY = avoidObsY(ey, Math.min(ex, nx), Math.max(ex, nx), toY > fromY);
+    pts.push([ex, horizY]);
+    pts.push([nx, horizY]);
     pts.push([nx, ny]);
   } else {
-    // Exit vertical, enter horizontal: exit stub → vertical to entry Y → horizontal to entry stub
-    pts.push([ex, ey]);
-    pts.push([ex, ny]);
+    // Exit vertical, enter horizontal: exit stub → vertical to entry Y → horizontal to entry
+    // The vertical segment at ex and the horizontal segment at ny can collide
+    const vertX = avoidObsX(ex, Math.min(ey, ny), Math.max(ey, ny));
+    pts.push([vertX, ey]);
+    pts.push([vertX, ny]);
     pts.push([nx, ny]);
   }
 
   pts.push([toX, toY]);
 
-  return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
+  // Deduplicate consecutive identical points
+  const deduped: [number, number][] = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i][0] !== pts[i - 1][0] || pts[i][1] !== pts[i - 1][1]) {
+      deduped.push(pts[i]);
+    }
+  }
+
+  return deduped.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
 }
 
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
