@@ -164,6 +164,7 @@ interface ProjectActions {
   setActiveView: (view: ActiveView) => void;
   setSelectedItem: (id: string | null) => void;
   setSelectedSwimlane: (id: string | null) => void;
+  setSelectedDepKey: (key: string | null) => void;
   setStylePaneSection: (section: StylePaneSection | null) => void;
   setZoom: (zoom: number) => void;
   setTaskLayout: (layout: TaskLayout) => void;
@@ -333,6 +334,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   activeView: 'data',
   selectedItemId: null,
   selectedSwimlaneId: null,
+  selectedDepKey: null,
   stylePaneSection: null,
   showCriticalPath: false,
   showDependencies: false,
@@ -346,8 +348,9 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
   // ─── View ────────────────────────────────────────────────────────────
   setActiveView: (view) => set({ activeView: view }),
-  setSelectedItem: (id) => set({ selectedItemId: id, selectedSwimlaneId: null }),
-  setSelectedSwimlane: (id) => set({ selectedSwimlaneId: id, selectedItemId: null, stylePaneSection: 'swimlaneTitle' }),
+  setSelectedItem: (id) => set({ selectedItemId: id, selectedSwimlaneId: null, selectedDepKey: null }),
+  setSelectedSwimlane: (id) => set({ selectedSwimlaneId: id, selectedItemId: null, selectedDepKey: null, stylePaneSection: 'swimlaneTitle' }),
+  setSelectedDepKey: (key) => set({ selectedDepKey: key, selectedItemId: null, selectedSwimlaneId: null, stylePaneSection: null }),
   setStylePaneSection: (section) => set({ stylePaneSection: section }),
   setZoom: (zoom) => set({ zoom: Math.max(2, Math.min(30, zoom)) }),
   setTaskLayout: (layout) => set({ taskLayout: layout }),
@@ -382,6 +385,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       activeView: 'data',
       selectedItemId: null,
       selectedSwimlaneId: null,
+      selectedDepKey: null,
       stylePaneSection: null,
       checkedItemIds: [],
       selectedTierIndex: null,
@@ -412,6 +416,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       activeView: 'data',
       selectedItemId: null,
       selectedSwimlaneId: null,
+      selectedDepKey: null,
       stylePaneSection: null,
       showCriticalPath: false,
       showDependencies: depDefaults.enabled,

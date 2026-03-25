@@ -380,6 +380,7 @@ export interface ProjectState {
   activeView: ActiveView;
   selectedItemId: string | null;
   selectedSwimlaneId: string | null;
+  selectedDepKey: string | null; // selected dependency link key ("fromId-toId")
   stylePaneSection: StylePaneSection | null; // which collapsible section is expanded in StylePane
   showCriticalPath: boolean;
   showDependencies: boolean; // master toggle — controls dep lines on timeline + Predecessors column in DataView

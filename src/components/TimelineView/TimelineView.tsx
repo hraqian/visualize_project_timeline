@@ -329,8 +329,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const depDragLatestRef = useRef(depDrag);
   depDragLatestRef.current = depDrag;
 
-  // ─── Selected dependency link (for deletion) ──────────────────────────────
-  const [selectedDepKey, setSelectedDepKey] = useState<string | null>(null);
+  const selectedDepKey = useProjectStore((s) => s.selectedDepKey);
+  const setSelectedDepKey = useProjectStore((s) => s.setSelectedDepKey);
 
   const sortedSwimlanes = useMemo(
     () => [...swimlanes].sort((a, b) => a.order - b.order),
@@ -891,11 +891,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [selectedDepKey, removeDependency, depPaths]);
 
-  // Clear dep selection when an item or swimlane is selected
-  useEffect(() => {
-    if (selectedItemId || selectedSwimlaneId) setSelectedDepKey(null);
-  }, [selectedItemId, selectedSwimlaneId]);
-
   // ─── Render helpers ────────────────────────────────────────────────
 
   const belowMilestoneGap = 4; // px between timescale bar bottom edge and milestone top edge
@@ -1394,9 +1389,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedDepKey(dep.key);
-                          setSelectedItem(null);
-                          setSelectedSwimlane(null);
-                          setStylePaneSection(null);
                         }}
                       />
                       {/* Visible path */}

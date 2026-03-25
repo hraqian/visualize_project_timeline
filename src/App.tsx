@@ -24,6 +24,8 @@ import {
   Undo2,
   Redo2,
   Link2,
+  EyeOff,
+  Trash2,
 } from 'lucide-react';
 import type { ActiveView } from '@/types';
 
@@ -47,6 +49,11 @@ function App() {
   const setShowDependencies = useProjectStore((s) => s.setShowDependencies);
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
   const pendingConflicts = useProjectStore((s) => s.pendingConflicts);
+  const selectedDepKey = useProjectStore((s) => s.selectedDepKey);
+  const setSelectedDepKey = useProjectStore((s) => s.setSelectedDepKey);
+  const dependencies = useProjectStore((s) => s.dependencies);
+  const removeDependency = useProjectStore((s) => s.removeDependency);
+  const updateDependency = useProjectStore((s) => s.updateDependency);
 
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(projectName);
@@ -253,6 +260,38 @@ function App() {
                 <Plus size={14} />
                 Swimlane
               </button>
+              {/* Dep link actions — shown when a dependency link is selected */}
+              {selectedDepKey && (
+                <>
+                  <div className="w-px h-6 bg-[var(--color-border)] mx-1" />
+                  <button
+                    onClick={() => {
+                      const dep = dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey);
+                      if (dep) {
+                        updateDependency(dep.fromId, dep.toId, { visible: false });
+                        setSelectedDepKey(null);
+                      }
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
+                  >
+                    <EyeOff size={14} />
+                    Hide
+                  </button>
+                  <button
+                    onClick={() => {
+                      const dep = dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey);
+                      if (dep) {
+                        removeDependency(dep.fromId, dep.toId);
+                        setSelectedDepKey(null);
+                      }
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-danger)] border border-[var(--color-border)] hover:bg-red-50 transition-all"
+                  >
+                    <Trash2 size={14} />
+                    Delete
+                  </button>
+                </>
+              )}
             </>
           ) : (
             <AddDropdownButton onAdd={(type) => {
