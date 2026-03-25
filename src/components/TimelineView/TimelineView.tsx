@@ -606,11 +606,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     }
 
     return dependencies
-      .filter((dep) => dep.visible !== false)
       .map((dep) => {
         const from = visibleItems.find((i) => i.id === dep.fromId);
         const to = visibleItems.find((i) => i.id === dep.toId);
         if (!from || !to) return null;
+        const isHidden = dep.visible === false;
 
         // FS: exit right edge center of predecessor, enter left edge center of successor
         const fromX = from.type === 'milestone'
@@ -628,7 +628,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const obstacles = allObstacles.filter((o) => o.id !== from.id && o.id !== to.id);
         const path = routeDepLink(fromX, fromY, toX, toY, obstacles, OFFSET);
 
-        return { path, isCritical, key: `${dep.fromId}-${dep.toId}`, fromId: dep.fromId, toId: dep.toId };
+        return { path, isCritical, isHidden, key: `${dep.fromId}-${dep.toId}`, fromId: dep.fromId, toId: dep.toId };
       })
       .filter(Boolean);
   }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, getRowH, zoom]);
@@ -1356,6 +1356,16 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 >
                   <polygon points="0 0, 10 4, 0 8" fill="#3b82f6" />
                 </marker>
+                <marker
+                  id="arrowhead-hidden"
+                  markerWidth="10"
+                  markerHeight="8"
+                  refX="9"
+                  refY="4"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 10 4, 0 8" fill="#94a3b8" />
+                </marker>
               </defs>
               {/* Vertical connector lines */}
               {verticalConnectors.map((c) => (
@@ -1375,10 +1385,10 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 (dep) => {
                   if (!dep) return null;
                   const isDepSelected = selectedDepKey === dep.key;
-                  const stroke = isDepSelected ? '#3b82f6' : dep.isCritical ? '#ef4444' : '#475569';
-                  const markerEnd = isDepSelected ? 'url(#arrowhead-selected)' : dep.isCritical ? 'url(#arrowhead-critical)' : 'url(#arrowhead)';
+                  const stroke = isDepSelected ? '#3b82f6' : dep.isHidden ? '#94a3b8' : dep.isCritical ? '#ef4444' : '#475569';
+                  const markerEnd = isDepSelected ? 'url(#arrowhead-selected)' : dep.isHidden ? 'url(#arrowhead-hidden)' : dep.isCritical ? 'url(#arrowhead-critical)' : 'url(#arrowhead)';
                   return (
-                    <g key={dep.key}>
+                    <g key={dep.key} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
                       {/* Invisible fat hit area for clicking */}
                       <path
                         d={dep.path}
@@ -1397,6 +1407,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                         fill="none"
                         stroke={stroke}
                         strokeWidth={isDepSelected ? 2.5 : dep.isCritical ? 2 : 1.5}
+                        strokeDasharray={dep.isHidden ? '4 3' : undefined}
                         markerEnd={markerEnd}
                       />
                     </g>

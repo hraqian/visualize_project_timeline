@@ -24,6 +24,7 @@ import {
   Undo2,
   Redo2,
   Link2,
+  Eye,
   EyeOff,
   Trash2,
 } from 'lucide-react';
@@ -261,43 +262,48 @@ function App() {
                 Swimlane
               </button>
               {/* Dep link actions — always visible, disabled when no dep selected */}
-              <div className="w-px h-6 bg-[var(--color-border)] mx-1" />
-              <button
-                disabled={!selectedDepKey}
-                onClick={() => {
-                  const dep = dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey);
-                  if (dep) {
-                    updateDependency(dep.fromId, dep.toId, { visible: false });
-                    setSelectedDepKey(null);
-                  }
-                }}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--color-border)] transition-all ${
-                  selectedDepKey
-                    ? 'text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] cursor-pointer'
-                    : 'text-[var(--color-text-muted)] cursor-default'
-                }`}
-              >
-                <EyeOff size={14} />
-                Hide
-              </button>
-              <button
-                disabled={!selectedDepKey}
-                onClick={() => {
-                  const dep = dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey);
-                  if (dep) {
-                    removeDependency(dep.fromId, dep.toId);
-                    setSelectedDepKey(null);
-                  }
-                }}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--color-border)] transition-all ${
-                  selectedDepKey
-                    ? 'text-[var(--color-danger)] hover:bg-red-50 cursor-pointer'
-                    : 'text-[var(--color-text-muted)] cursor-default'
-                }`}
-              >
-                <Trash2 size={14} />
-                Delete
-              </button>
+              {(() => {
+                const selectedDep = selectedDepKey ? dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey) : null;
+                const isHidden = selectedDep?.visible === false;
+                return (
+                  <>
+                    <div className="w-px h-6 bg-[var(--color-border)] mx-1" />
+                    <button
+                      disabled={!selectedDepKey}
+                      onClick={() => {
+                        if (selectedDep) {
+                          updateDependency(selectedDep.fromId, selectedDep.toId, { visible: isHidden ? true : false });
+                        }
+                      }}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--color-border)] transition-all ${
+                        selectedDepKey
+                          ? 'text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] cursor-pointer'
+                          : 'text-[var(--color-text-muted)] cursor-default'
+                      }`}
+                    >
+                      {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                      {isHidden ? 'Show' : 'Hide'}
+                    </button>
+                    <button
+                      disabled={!selectedDepKey}
+                      onClick={() => {
+                        if (selectedDep) {
+                          removeDependency(selectedDep.fromId, selectedDep.toId);
+                          setSelectedDepKey(null);
+                        }
+                      }}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--color-border)] transition-all ${
+                        selectedDepKey
+                          ? 'text-[var(--color-danger)] hover:bg-red-50 cursor-pointer'
+                          : 'text-[var(--color-text-muted)] cursor-default'
+                      }`}
+                    >
+                      <Trash2 size={14} />
+                      Delete
+                    </button>
+                  </>
+                );
+              })()}
             </>
           ) : (
             <AddDropdownButton onAdd={(type) => {
