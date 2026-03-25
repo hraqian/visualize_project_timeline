@@ -553,14 +553,14 @@ function DepToggleSwitch({ on, disabled }: { on: boolean; disabled?: boolean }) 
 // Small SVG showing two mini bars with a dep link connecting at the specified points.
 
 function ConnectionPointIllustration({ fromPoint, toPoint }: { fromPoint: ConnectionPoint; toPoint: ConnectionPoint }) {
-  const W = 220;
-  const H = 100;
-  const barH = 18;
-  const barW = 56;
-  const bar1X = 24;
-  const bar1Y = 16;
-  const bar2X = W - 24 - barW;
-  const bar2Y = H - 16 - barH;
+  const W = 190;
+  const H = 80;
+  const barH = 14;
+  const barW = 48;
+  const bar1X = 20;
+  const bar1Y = 14;
+  const bar2X = W - 20 - barW;
+  const bar2Y = H - 14 - barH;
 
   // Compute from anchor
   let fx: number, fy: number;
@@ -590,33 +590,57 @@ function ConnectionPointIllustration({ fromPoint, toPoint }: { fromPoint: Connec
     ty = bar2Y + barH / 2;
   }
 
-  // Simple orthogonal path
+  // Build orthogonal path — always right angles, never diagonal
+  // Strategy: exit in the direction of the anchor, then route orthogonally to the target
+  const segments: [number, number][] = [[fx, fy]];
   const midX = (fx + tx) / 2;
-  const midY = (fy + ty) / 2;
-  let path: string;
 
   if (fp === 'side' && tp === 'side') {
-    path = `M ${fx} ${fy} L ${midX} ${fy} L ${midX} ${ty} L ${tx} ${ty}`;
-  } else if (fp === 'top' || fp === 'bottom') {
-    const exitY = fp === 'top' ? Math.min(fy - 10, midY) : Math.max(fy + 10, midY);
-    if (tp === 'top' || tp === 'bottom') {
-      const entryY = tp === 'top' ? Math.min(ty - 10, midY) : Math.max(ty + 10, midY);
-      path = `M ${fx} ${fy} L ${fx} ${exitY} L ${tx} ${entryY} L ${tx} ${ty}`;
-    } else {
-      path = `M ${fx} ${fy} L ${fx} ${exitY} L ${midX} ${exitY} L ${midX} ${ty} L ${tx} ${ty}`;
-    }
-  } else {
-    const entryY = tp === 'top' ? Math.min(ty - 10, midY) : Math.max(ty + 10, midY);
-    path = `M ${fx} ${fy} L ${midX} ${fy} L ${midX} ${entryY} L ${tx} ${entryY} L ${tx} ${ty}`;
+    // Side->Side: horizontal, vertical, horizontal
+    segments.push([midX, fy], [midX, ty], [tx, ty]);
+  } else if (fp === 'side' && tp === 'top') {
+    // Side->Top: go right to midX, then up to ty-8, right to tx, then down to ty
+    const gapY = ty - 8;
+    segments.push([midX, fy], [midX, gapY], [tx, gapY], [tx, ty]);
+  } else if (fp === 'side' && tp === 'bottom') {
+    // Side->Bottom: go right to midX, then down to ty+8, right to tx, then up to ty
+    const gapY = ty + 8;
+    segments.push([midX, fy], [midX, gapY], [tx, gapY], [tx, ty]);
+  } else if (fp === 'top' && tp === 'side') {
+    // Top->Side: go up to fy-8, then right to midX, down to ty, right to tx
+    const gapY = fy - 8;
+    segments.push([fx, gapY], [midX, gapY], [midX, ty], [tx, ty]);
+  } else if (fp === 'bottom' && tp === 'side') {
+    // Bottom->Side: go down to fy+8, then right to midX, down/up to ty, right to tx
+    const gapY = fy + 8;
+    segments.push([fx, gapY], [midX, gapY], [midX, ty], [tx, ty]);
+  } else if (fp === 'top' && tp === 'top') {
+    // Top->Top: both exit upward; go to min of both - 8, then across
+    const gapY = Math.min(fy, ty) - 8;
+    segments.push([fx, gapY], [tx, gapY], [tx, ty]);
+  } else if (fp === 'bottom' && tp === 'bottom') {
+    // Bottom->Bottom: both exit downward; go to max of both + 8, then across
+    const gapY = Math.max(fy, ty) + 8;
+    segments.push([fx, gapY], [tx, gapY], [tx, ty]);
+  } else if (fp === 'top' && tp === 'bottom') {
+    // Top->Bottom: up from source, across to tx, down to target
+    const gapY = fy - 8;
+    segments.push([fx, gapY], [tx, gapY], [tx, ty]);
+  } else if (fp === 'bottom' && tp === 'top') {
+    // Bottom->Top: down from source to midY, across to tx, up to target
+    const midY = (fy + ty) / 2;
+    segments.push([fx, midY], [tx, midY], [tx, ty]);
   }
+
+  const path = segments.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
 
   return (
     <svg width={W} height={H} style={{ display: 'block' }}>
-      <rect x={bar1X} y={bar1Y} width={barW} height={barH} rx={4} fill="#cbd5e1" />
-      <rect x={bar2X} y={bar2Y} width={barW} height={barH} rx={4} fill="#cbd5e1" />
+      <rect x={bar1X} y={bar1Y} width={barW} height={barH} rx={3} fill="#cbd5e1" />
+      <rect x={bar2X} y={bar2Y} width={barW} height={barH} rx={3} fill="#cbd5e1" />
       <defs>
-        <marker id="cp-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-          <polygon points="0 0, 8 3, 0 6" fill="#3b82f6" />
+        <marker id="cp-arrow" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+          <polygon points="0 0, 7 2.5, 0 5" fill="#3b82f6" />
         </marker>
       </defs>
       <path d={path} fill="none" stroke="#3b82f6" strokeWidth={1.5} markerEnd="url(#cp-arrow)" />
@@ -711,23 +735,23 @@ function ConnectionPointButton({
             border: '1px solid #e2e8f0',
             borderRadius: 8,
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            padding: '12px 14px',
+            padding: '10px 10px',
             zIndex: 30,
-            width: 260,
+            width: 230,
           }}
         >
           {/* Top row: From select + To select + Auto checkbox */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
             {/* From */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>From</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>From</span>
               <select
                 value={isAuto ? 'side' : fromPoint}
                 disabled={isAuto}
                 onChange={(e) => onChange(e.target.value as ConnectionPoint, toPoint)}
                 style={{
-                  fontSize: 12,
-                  padding: '3px 6px',
+                  fontSize: 11,
+                  padding: '2px 4px',
                   borderRadius: 4,
                   border: '1px solid #d1d5db',
                   background: isAuto ? '#f1f5f9' : 'white',
@@ -742,15 +766,15 @@ function ConnectionPointButton({
               </select>
             </div>
             {/* To */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>To</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>To</span>
               <select
                 value={isAuto ? 'side' : toPoint}
                 disabled={isAuto}
                 onChange={(e) => onChange(fromPoint, e.target.value as ConnectionPoint)}
                 style={{
-                  fontSize: 12,
-                  padding: '3px 6px',
+                  fontSize: 11,
+                  padding: '2px 4px',
                   borderRadius: 4,
                   border: '1px solid #d1d5db',
                   background: isAuto ? '#f1f5f9' : 'white',
@@ -765,14 +789,14 @@ function ConnectionPointButton({
               </select>
             </div>
             {/* Auto checkbox */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', marginLeft: 'auto' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer', marginLeft: 'auto' }}>
               <input
                 type="checkbox"
                 checked={isAuto}
                 onChange={handleAutoToggle}
-                style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#334155' }}
+                style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#334155' }}
               />
-              <span style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>Auto</span>
+              <span style={{ fontSize: 11, color: '#475569', fontWeight: 500 }}>Auto</span>
             </label>
           </div>
           {/* Illustration */}
