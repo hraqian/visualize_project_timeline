@@ -109,7 +109,6 @@ function routeDepLink(
 
   const minY = Math.min(fromY, toY);
   const maxY = Math.max(fromY, toY);
-  const gap = toX - fromX;
   const PAD = 8; // clearance between vertical segment and obstacle right edge
 
   // Find obstacles whose rows vertically overlap the corridor between from and to
@@ -119,54 +118,33 @@ function routeDepLink(
     (o) => o.bottomY > minY + inset && o.topY < maxY - inset
   );
 
-  if (gap >= offset) {
-    // Normal case: vertical segment to the right of predecessor
-    let turnX = fromX + offset;
-
-    // Push turnX right past any obstacle whose bar the vertical segment would cross.
-    // Iterate because pushing past one obstacle may land inside another.
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const o of blockingObs) {
-        if (turnX >= o.leftX - PAD && turnX <= o.rightX + PAD) {
-          turnX = o.rightX + PAD;
-          changed = true;
-        }
+  // Determine the vertical segment X: start at fromX + offset, push right past obstacles
+  let turnX = fromX + offset;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const o of blockingObs) {
+      if (turnX >= o.leftX - PAD && turnX <= o.rightX + PAD) {
+        turnX = o.rightX + PAD;
+        changed = true;
       }
     }
+  }
 
-    // If turnX is still left of toX, simple L-shape
-    if (turnX < toX) {
-      return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${toY} L ${toX} ${toY}`;
-    }
-
-    // turnX pushed past toX — need Z-shape: go right, down, then left back in
-    const enterX = toX - offset;
-    const midY = (fromY + toY) / 2;
-    return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${midY} L ${enterX} ${midY} L ${enterX} ${toY} L ${toX} ${toY}`;
-  } else {
-    // Close/overlapping: successor starts at or before predecessor ends.
-    // Route: right past all obstacles → down to toY → left into successor.
-    let turnX = fromX + offset;
-
-    // Push turnX right past all blocking obstacles
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const o of blockingObs) {
-        if (turnX >= o.leftX - PAD && turnX <= o.rightX + PAD) {
-          turnX = o.rightX + PAD;
-          changed = true;
-        }
-      }
-    }
-
-    // Also ensure turnX clears the successor's bar (if it extends past turnX)
-    // The successor leftX is toX, but the bar may extend rightward
-    // We need turnX to the right of any blocking bar so the vertical drop is clear
+  if (turnX < toX) {
+    // Simple L-shape: right → down → right into successor
     return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${toY} L ${toX} ${toY}`;
   }
+
+  // turnX >= toX: the vertical segment is to the right of the successor's entry.
+  // We need to route so the arrow always enters from the LEFT of the successor.
+  // Path: right to turnX → down to the gap above successor row → left to enterX → down to toY → right to toX
+  const goingDown = toY > fromY;
+  const enterX = toX - offset;
+  // gapY = the Y at the edge of the successor's row (just outside it)
+  const gapY = goingDown ? toY - ROW_BASE / 2 - PAD : toY + ROW_BASE / 2 + PAD;
+
+  return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${gapY} L ${enterX} ${gapY} L ${enterX} ${toY} L ${toX} ${toY}`;
 }
 
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
