@@ -260,38 +260,44 @@ function App() {
                 <Plus size={14} />
                 Swimlane
               </button>
-              {/* Dep link actions — shown when a dependency link is selected */}
-              {selectedDepKey && (
-                <>
-                  <div className="w-px h-6 bg-[var(--color-border)] mx-1" />
-                  <button
-                    onClick={() => {
-                      const dep = dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey);
-                      if (dep) {
-                        updateDependency(dep.fromId, dep.toId, { visible: false });
-                        setSelectedDepKey(null);
-                      }
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
-                  >
-                    <EyeOff size={14} />
-                    Hide
-                  </button>
-                  <button
-                    onClick={() => {
-                      const dep = dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey);
-                      if (dep) {
-                        removeDependency(dep.fromId, dep.toId);
-                        setSelectedDepKey(null);
-                      }
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-danger)] border border-[var(--color-border)] hover:bg-red-50 transition-all"
-                  >
-                    <Trash2 size={14} />
-                    Delete
-                  </button>
-                </>
-              )}
+              {/* Dep link actions — always visible, disabled when no dep selected */}
+              <div className="w-px h-6 bg-[var(--color-border)] mx-1" />
+              <button
+                disabled={!selectedDepKey}
+                onClick={() => {
+                  const dep = dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey);
+                  if (dep) {
+                    updateDependency(dep.fromId, dep.toId, { visible: false });
+                    setSelectedDepKey(null);
+                  }
+                }}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--color-border)] transition-all ${
+                  selectedDepKey
+                    ? 'text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] cursor-pointer'
+                    : 'text-[var(--color-text-muted)] cursor-default'
+                }`}
+              >
+                <EyeOff size={14} />
+                Hide
+              </button>
+              <button
+                disabled={!selectedDepKey}
+                onClick={() => {
+                  const dep = dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey);
+                  if (dep) {
+                    removeDependency(dep.fromId, dep.toId);
+                    setSelectedDepKey(null);
+                  }
+                }}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--color-border)] transition-all ${
+                  selectedDepKey
+                    ? 'text-[var(--color-danger)] hover:bg-red-50 cursor-pointer'
+                    : 'text-[var(--color-text-muted)] cursor-default'
+                }`}
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
             </>
           ) : (
             <AddDropdownButton onAdd={(type) => {
