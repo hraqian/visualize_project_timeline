@@ -146,24 +146,26 @@ function routeDepLink(
     const midY = (fromY + toY) / 2;
     return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${midY} L ${enterX} ${midY} L ${enterX} ${toY} L ${toX} ${toY}`;
   } else {
-    // Close/overlapping: reverse-S routing
-    let exitX = fromX + offset;
-    const enterX = toX - offset;
+    // Close/overlapping: successor starts at or before predecessor ends.
+    // Route: right past all obstacles → down to toY → left into successor.
+    let turnX = fromX + offset;
 
-    // Push exitX right past obstacles
+    // Push turnX right past all blocking obstacles
     let changed = true;
     while (changed) {
       changed = false;
       for (const o of blockingObs) {
-        if (exitX >= o.leftX - PAD && exitX <= o.rightX + PAD) {
-          exitX = o.rightX + PAD;
+        if (turnX >= o.leftX - PAD && turnX <= o.rightX + PAD) {
+          turnX = o.rightX + PAD;
           changed = true;
         }
       }
     }
 
-    const midY = (fromY + toY) / 2;
-    return `M ${fromX} ${fromY} L ${exitX} ${fromY} L ${exitX} ${midY} L ${enterX} ${midY} L ${enterX} ${toY} L ${toX} ${toY}`;
+    // Also ensure turnX clears the successor's bar (if it extends past turnX)
+    // The successor leftX is toX, but the bar may extend rightward
+    // We need turnX to the right of any blocking bar so the vertical drop is clear
+    return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${toY} L ${toX} ${toY}`;
   }
 }
 
