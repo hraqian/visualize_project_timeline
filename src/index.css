@@ -63,13 +63,10 @@
     background-color: var(--color-border-light);
   }
 
-  /* Dependency connector handle: solid by default, hollow on hover */
+  /* Dependency connector handle: solid black circle */
   .dep-handle {
     background-color: #1e293b;
     border: 2px solid #1e293b;
-  }
-  .dep-handle:hover {
-    background-color: white;
   }
 
   /* CollapsibleRow: dim + disable controls but keep ApplyToAll active */

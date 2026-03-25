@@ -808,38 +808,19 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      // Hit-test: find closest item within threshold
-      const HIT_THRESHOLD = 20;
+      // Hit-test: check if mouse is over any bar's bounding box (using ORIGINAL positions)
+      const HIT_PAD = 4; // small padding around bar for easier targeting
       let bestId: string | null = null;
       let bestSide: 'start' | 'end' | null = null;
-      let bestDist = Infinity;
       for (const pos of positions) {
         if (pos.id === depDragRef.current.sourceId) continue;
-        // Check if mouse is near the item vertically
-        if (Math.abs(mouseY - pos.centerY) > pos.barHeight / 2 + HIT_THRESHOLD) continue;
-        // Check left edge
-        const dLeft = Math.abs(mouseX - pos.leftX);
-        if (dLeft < HIT_THRESHOLD && dLeft < bestDist) {
-          bestDist = dLeft;
+        const inX = mouseX >= pos.leftX - HIT_PAD && mouseX <= pos.rightX + HIT_PAD;
+        const inY = mouseY >= pos.centerY - pos.barHeight / 2 - HIT_PAD && mouseY <= pos.centerY + pos.barHeight / 2 + HIT_PAD;
+        if (inX && inY) {
+          // For FS deps, always connect to 'start' side of target
           bestId = pos.id;
           bestSide = 'start';
-        }
-        // Check right edge
-        const dRight = Math.abs(mouseX - pos.rightX);
-        if (dRight < HIT_THRESHOLD && dRight < bestDist) {
-          bestDist = dRight;
-          bestId = pos.id;
-          bestSide = 'end';
-        }
-        // For milestones, also check center
-        if (pos.type === 'milestone') {
-          const cx = (pos.leftX + pos.rightX) / 2;
-          const dCenter = Math.sqrt((mouseX - cx) ** 2 + (mouseY - pos.centerY) ** 2);
-          if (dCenter < HIT_THRESHOLD && dCenter < bestDist) {
-            bestDist = dCenter;
-            bestId = pos.id;
-            bestSide = 'start';
-          }
+          break;
         }
       }
 
@@ -1839,8 +1820,8 @@ function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragg
         </>
       )}
 
-      {/* Connector handle circles — visible on hover or select */}
-      {(isHovered || isSelected) && (
+      {/* Connector handle circles — visible only when selected */}
+      {isSelected && (
         <>
           {/* Left (start) handle */}
           <div
@@ -1849,7 +1830,7 @@ function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragg
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
             style={{
               position: 'absolute',
-              left: -5,
+              left: -18,
               top: '50%',
               transform: 'translateY(-50%)',
               width: 10,
@@ -1867,7 +1848,7 @@ function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragg
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
             style={{
               position: 'absolute',
-              right: -5,
+              right: -18,
               top: '50%',
               transform: 'translateY(-50%)',
               width: 10,
@@ -2251,25 +2232,46 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
             }}
           />
         )}
-        {/* Connector handle circle — center of icon */}
-        {(isHovered || isSelected) && (
-          <div
-            className="dep-handle"
-            title="Click+drag to add dependency"
-            onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
-            style={{
-              position: 'absolute',
-              left: style.size / 2 - 5,
-              top: isAbove ? undefined : style.size / 2 - 5,
-              bottom: isAbove ? style.size / 2 - 5 : undefined,
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              cursor: 'pointer',
-              zIndex: 52,
-              pointerEvents: 'auto',
-            }}
-          />
+        {/* Connector handle circles — visible only when selected */}
+        {isSelected && (
+          <>
+            {/* Left handle */}
+            <div
+              className="dep-handle"
+              title="Click+drag to add dependency"
+              onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
+              style={{
+                position: 'absolute',
+                left: -18,
+                top: isAbove ? undefined : style.size / 2 - 5,
+                bottom: isAbove ? style.size / 2 - 5 : undefined,
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                cursor: 'pointer',
+                zIndex: 52,
+                pointerEvents: 'auto',
+              }}
+            />
+            {/* Right handle */}
+            <div
+              className="dep-handle"
+              title="Click+drag to add dependency"
+              onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
+              style={{
+                position: 'absolute',
+                right: -18,
+                top: isAbove ? undefined : style.size / 2 - 5,
+                bottom: isAbove ? style.size / 2 - 5 : undefined,
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                cursor: 'pointer',
+                zIndex: 52,
+                pointerEvents: 'auto',
+              }}
+            />
+          </>
         )}
         <div className="flex flex-col items-center gap-px">
           {isAbove ? (
@@ -2341,24 +2343,44 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
           }}
         />
       )}
-      {/* Connector handle circle — center of milestone */}
-      {(isHovered || isSelected) && (
-        <div
-          className="dep-handle"
-          title="Click+drag to add dependency"
-          onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
-          style={{
-            position: 'absolute',
-            left: style.size / 2 - 5,
-            top: style.size / 2 - 5,
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            cursor: 'pointer',
-            zIndex: 52,
-            pointerEvents: 'auto',
-          }}
-        />
+      {/* Connector handle circles — visible only when selected */}
+      {isSelected && (
+        <>
+          {/* Left handle */}
+          <div
+            className="dep-handle"
+            title="Click+drag to add dependency"
+            onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
+            style={{
+              position: 'absolute',
+              left: -18,
+              top: style.size / 2 - 5,
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              cursor: 'pointer',
+              zIndex: 52,
+              pointerEvents: 'auto',
+            }}
+          />
+          {/* Right handle */}
+          <div
+            className="dep-handle"
+            title="Click+drag to add dependency"
+            onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
+            style={{
+              position: 'absolute',
+              right: -18,
+              top: style.size / 2 - 5,
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              cursor: 'pointer',
+              zIndex: 52,
+              pointerEvents: 'auto',
+            }}
+          />
+        </>
       )}
       <div
         className={`relative cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 ${isSelected ? 'drop-shadow-lg' : ''}`}
