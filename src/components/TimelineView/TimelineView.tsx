@@ -140,7 +140,8 @@ function routeDepLink(
   // We need to route so the arrow always enters from the LEFT of the successor.
   // Path: right to turnX → down to the gap above successor row → left to enterX → down to toY → right to toX
   const goingDown = toY > fromY;
-  const enterX = toX - offset;
+  const ENTER_OFFSET = 24; // longer final leg so arrowhead is clearly visible
+  const enterX = toX - ENTER_OFFSET;
   // gapY = the Y at the edge of the successor's row (just outside it)
   const gapY = goingDown ? toY - ROW_BASE / 2 - PAD : toY + ROW_BASE / 2 + PAD;
 
