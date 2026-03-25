@@ -270,10 +270,16 @@ interface ProjectActions {
 type ProjectStore = ProjectState & ProjectActions;
 
 // Keys that represent saveable project data (changes to these mark the project dirty)
-const DIRTY_KEYS: Set<string> = new Set([
+// Keys that mark the project dirty (all saveable project data + settings)
+const SAVEABLE_KEYS: Set<string> = new Set([
   'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies',
   'statusLabels', 'columnVisibility', 'timescale', 'zoom', 'swimlaneSpacing', 'showCriticalPath', 'taskLayout',
   'showDependencies', 'dependencySettings',
+]);
+
+// Keys captured by undo/redo (only data edits, not view/display settings)
+const UNDOABLE_KEYS: Set<string> = new Set([
+  'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies', 'statusLabels',
 ]);
 
 // ─── Undo / Redo stacks (kept outside store to avoid triggering re-renders) ──
@@ -285,7 +291,7 @@ let isUndoRedoing = false;          // guard to prevent snapshotting during undo
 
 function takeSnapshot(state: ProjectStore): Snapshot {
   const snap: Snapshot = {};
-  for (const key of DIRTY_KEYS) {
+  for (const key of UNDOABLE_KEYS) {
     snap[key] = structuredClone((state as Record<string, unknown>)[key]);
   }
   return snap;
@@ -300,11 +306,13 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   const set: typeof _set = (partial, replace) => {
     _set((prev) => {
       const next = typeof partial === 'function' ? partial(prev) : partial;
+      const keys = Object.keys(next as object);
       // Check if any saveable key is being changed
-      const touchesSaveable = Object.keys(next as object).some((k) => DIRTY_KEYS.has(k));
+      const touchesSaveable = keys.some((k) => SAVEABLE_KEYS.has(k));
       if (touchesSaveable && !(next as Record<string, unknown>).hasOwnProperty('isDirty')) {
-        // Push undo snapshot (unless we're in an undo/redo operation)
-        if (!isUndoRedoing) {
+        // Push undo snapshot only when undoable keys are touched
+        const touchesUndoable = keys.some((k) => UNDOABLE_KEYS.has(k));
+        if (!isUndoRedoing && touchesUndoable) {
           undoStack.push(takeSnapshot(prev as unknown as ProjectStore));
           if (undoStack.length > MAX_UNDO) undoStack.shift();
           redoStack = [];
