@@ -235,6 +235,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const updateSwimlane = useProjectStore((s) => s.updateSwimlane);
   const addDependency = useProjectStore((s) => s.addDependency);
   const updateDependency = useProjectStore((s) => s.updateDependency);
+  const removeDependency = useProjectStore((s) => s.removeDependency);
 
   // ─── Inline editing state ──────────────────────────────────────────────────
   const [editingField, setEditingField] = useState<EditingField>(null);
@@ -327,6 +328,9 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   // Keep a ref to the latest depDrag value so onUp always reads fresh data
   const depDragLatestRef = useRef(depDrag);
   depDragLatestRef.current = depDrag;
+
+  // ─── Selected dependency link (for deletion) ──────────────────────────────
+  const [selectedDepKey, setSelectedDepKey] = useState<string | null>(null);
 
   const sortedSwimlanes = useMemo(
     () => [...swimlanes].sort((a, b) => a.order - b.order),
@@ -624,7 +628,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const obstacles = allObstacles.filter((o) => o.id !== from.id && o.id !== to.id);
         const path = routeDepLink(fromX, fromY, toX, toY, obstacles, OFFSET);
 
-        return { path, isCritical, key: `${dep.fromId}-${dep.toId}` };
+        return { path, isCritical, key: `${dep.fromId}-${dep.toId}`, fromId: dep.fromId, toId: dep.toId };
       })
       .filter(Boolean);
   }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, getRowH, zoom]);
@@ -868,6 +872,30 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     };
   }, [depDrag, getItemPositions, dependencies, addDependency, updateDependency]);
 
+  // ─── Keyboard: Delete/Backspace selected dep, Escape to deselect ──────────
+  useEffect(() => {
+    if (!selectedDepKey) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedDepKey(null);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Find the dep by key to get fromId/toId
+        const dep = depPaths.find((d) => d && d.key === selectedDepKey);
+        if (dep) {
+          removeDependency(dep.fromId, dep.toId);
+        }
+        setSelectedDepKey(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedDepKey, removeDependency, depPaths]);
+
+  // Clear dep selection when an item or swimlane is selected
+  useEffect(() => {
+    if (selectedItemId || selectedSwimlaneId) setSelectedDepKey(null);
+  }, [selectedItemId, selectedSwimlaneId]);
+
   // ─── Render helpers ────────────────────────────────────────────────
 
   const belowMilestoneGap = 4; // px between timescale bar bottom edge and milestone top edge
@@ -996,6 +1024,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           setSelectedSwimlane(null);
           setSelectedTierIndex(null);
           setStylePaneSection(null);
+          setSelectedDepKey(null);
         }}
       >
         <div style={{
@@ -1322,6 +1351,16 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 >
                   <polygon points="0 0, 10 4, 0 8" fill="#ef4444" />
                 </marker>
+                <marker
+                  id="arrowhead-selected"
+                  markerWidth="10"
+                  markerHeight="8"
+                  refX="9"
+                  refY="4"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 10 4, 0 8" fill="#3b82f6" />
+                </marker>
               </defs>
               {/* Vertical connector lines */}
               {verticalConnectors.map((c) => (
@@ -1336,19 +1375,41 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                   strokeDasharray="4 3"
                 />
               ))}
-              {/* Dependency lines — orthogonal paths */}
+              {/* Dependency lines — orthogonal paths with click-to-select */}
               {depPaths.map(
-                (dep) =>
-                  dep && (
-                    <path
-                      key={dep.key}
-                      d={dep.path}
-                      fill="none"
-                      stroke={dep.isCritical ? '#ef4444' : '#475569'}
-                      strokeWidth={dep.isCritical ? 2 : 1.5}
-                      markerEnd={dep.isCritical ? 'url(#arrowhead-critical)' : 'url(#arrowhead)'}
-                    />
-                  )
+                (dep) => {
+                  if (!dep) return null;
+                  const isDepSelected = selectedDepKey === dep.key;
+                  const stroke = isDepSelected ? '#3b82f6' : dep.isCritical ? '#ef4444' : '#475569';
+                  const markerEnd = isDepSelected ? 'url(#arrowhead-selected)' : dep.isCritical ? 'url(#arrowhead-critical)' : 'url(#arrowhead)';
+                  return (
+                    <g key={dep.key}>
+                      {/* Invisible fat hit area for clicking */}
+                      <path
+                        d={dep.path}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={12}
+                        style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDepKey(dep.key);
+                          setSelectedItem(null);
+                          setSelectedSwimlane(null);
+                          setStylePaneSection(null);
+                        }}
+                      />
+                      {/* Visible path */}
+                      <path
+                        d={dep.path}
+                        fill="none"
+                        stroke={stroke}
+                        strokeWidth={isDepSelected ? 2.5 : dep.isCritical ? 2 : 1.5}
+                        markerEnd={markerEnd}
+                      />
+                    </g>
+                  );
+                }
               )}
               {/* Temporary dependency drag line */}
               {depDrag && (() => {
