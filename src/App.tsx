@@ -284,29 +284,15 @@ function App() {
                       {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
                       {isHidden ? 'Show' : 'Hide'}
                     </button>
-                    <ConnectionPointDropdown
-                      label="From"
-                      value={selectedDep?.fromPoint ?? 'auto'}
-                      otherValue={selectedDep?.toPoint ?? 'auto'}
+                    <ConnectionPointButton
+                      fromPoint={selectedDep?.fromPoint ?? 'auto'}
+                      toPoint={selectedDep?.toPoint ?? 'auto'}
                       disabled={!selectedDepKey}
-                      onChange={(v) => {
+                      onChange={(fp, tp) => {
                         if (selectedDep) {
-                          updateDependency(selectedDep.fromId, selectedDep.toId, { fromPoint: v });
+                          updateDependency(selectedDep.fromId, selectedDep.toId, { fromPoint: fp, toPoint: tp });
                         }
                       }}
-                      isFrom
-                    />
-                    <ConnectionPointDropdown
-                      label="To"
-                      value={selectedDep?.toPoint ?? 'auto'}
-                      otherValue={selectedDep?.fromPoint ?? 'auto'}
-                      disabled={!selectedDepKey}
-                      onChange={(v) => {
-                        if (selectedDep) {
-                          updateDependency(selectedDep.fromId, selectedDep.toId, { toPoint: v });
-                        }
-                      }}
-                      isFrom={false}
                     />
                     <button
                       disabled={!selectedDepKey}
@@ -567,16 +553,14 @@ function DepToggleSwitch({ on, disabled }: { on: boolean; disabled?: boolean }) 
 // Small SVG showing two mini bars with a dep link connecting at the specified points.
 
 function ConnectionPointIllustration({ fromPoint, toPoint }: { fromPoint: ConnectionPoint; toPoint: ConnectionPoint }) {
-  const W = 160;
-  const H = 72;
-  // Two mini bars
-  const barH = 14;
-  const barW = 44;
-  const gap = 28;
-  const bar1X = 16;
-  const bar1Y = 14;
-  const bar2X = W - 16 - barW;
-  const bar2Y = H - 14 - barH;
+  const W = 220;
+  const H = 100;
+  const barH = 18;
+  const barW = 56;
+  const bar1X = 24;
+  const bar1Y = 16;
+  const bar2X = W - 24 - barW;
+  const bar2Y = H - 16 - barH;
 
   // Compute from anchor
   let fx: number, fy: number;
@@ -612,71 +596,59 @@ function ConnectionPointIllustration({ fromPoint, toPoint }: { fromPoint: Connec
   let path: string;
 
   if (fp === 'side' && tp === 'side') {
-    // Standard L-shape through midpoint
     path = `M ${fx} ${fy} L ${midX} ${fy} L ${midX} ${ty} L ${tx} ${ty}`;
   } else if (fp === 'top' || fp === 'bottom') {
-    // Exit vertically, then go horizontal, then vertical to target
-    const exitY = fp === 'top' ? Math.min(fy - 8, midY) : Math.max(fy + 8, midY);
+    const exitY = fp === 'top' ? Math.min(fy - 10, midY) : Math.max(fy + 10, midY);
     if (tp === 'top' || tp === 'bottom') {
-      const entryY = tp === 'top' ? Math.min(ty - 8, midY) : Math.max(ty + 8, midY);
+      const entryY = tp === 'top' ? Math.min(ty - 10, midY) : Math.max(ty + 10, midY);
       path = `M ${fx} ${fy} L ${fx} ${exitY} L ${tx} ${entryY} L ${tx} ${ty}`;
     } else {
       path = `M ${fx} ${fy} L ${fx} ${exitY} L ${midX} ${exitY} L ${midX} ${ty} L ${tx} ${ty}`;
     }
   } else {
-    // fp === 'side', tp === 'top' or 'bottom'
-    const entryY = tp === 'top' ? Math.min(ty - 8, midY) : Math.max(ty + 8, midY);
+    const entryY = tp === 'top' ? Math.min(ty - 10, midY) : Math.max(ty + 10, midY);
     path = `M ${fx} ${fy} L ${midX} ${fy} L ${midX} ${entryY} L ${tx} ${entryY} L ${tx} ${ty}`;
   }
 
   return (
     <svg width={W} height={H} style={{ display: 'block' }}>
-      {/* Bars */}
-      <rect x={bar1X} y={bar1Y} width={barW} height={barH} rx={3} fill="#334155" />
-      <rect x={bar2X} y={bar2Y} width={barW} height={barH} rx={3} fill="#334155" />
-      {/* Labels */}
-      <text x={bar1X + barW / 2} y={bar1Y + barH / 2 + 1} textAnchor="middle" dominantBaseline="central" fill="white" fontSize={8} fontFamily="Inter, system-ui" fontWeight={500}>From</text>
-      <text x={bar2X + barW / 2} y={bar2Y + barH / 2 + 1} textAnchor="middle" dominantBaseline="central" fill="white" fontSize={8} fontFamily="Inter, system-ui" fontWeight={500}>To</text>
-      {/* Dep link */}
+      <rect x={bar1X} y={bar1Y} width={barW} height={barH} rx={4} fill="#cbd5e1" />
+      <rect x={bar2X} y={bar2Y} width={barW} height={barH} rx={4} fill="#cbd5e1" />
       <defs>
         <marker id="cp-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-          <polygon points="0 0, 8 3, 0 6" fill="#475569" />
+          <polygon points="0 0, 8 3, 0 6" fill="#3b82f6" />
         </marker>
       </defs>
-      <path d={path} fill="none" stroke="#475569" strokeWidth={1.5} markerEnd="url(#cp-arrow)" />
-      {/* Anchor dots */}
-      <circle cx={fx} cy={fy} r={2.5} fill="#3b82f6" />
-      <circle cx={tx} cy={ty} r={2.5} fill="#3b82f6" />
+      <path d={path} fill="none" stroke="#3b82f6" strokeWidth={1.5} markerEnd="url(#cp-arrow)" />
     </svg>
   );
 }
 
-// ─── Connection Point Dropdown ───────────────────────────────────────────────
+// ─── Connection Point Button (single popup with From + To + Auto) ────────────
 
-const CONNECTION_POINT_OPTIONS: { value: ConnectionPoint; label: string }[] = [
-  { value: 'auto', label: 'Auto' },
+const CP_OPTIONS: { value: ConnectionPoint; label: string }[] = [
   { value: 'side', label: 'Side' },
   { value: 'top', label: 'Top' },
   { value: 'bottom', label: 'Bottom' },
 ];
 
-function ConnectionPointDropdown({
-  label,
-  value,
-  otherValue,
+function getPointLabel(p: ConnectionPoint): string {
+  if (p === 'auto') return 'Auto';
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+
+function ConnectionPointButton({
+  fromPoint,
+  toPoint,
   disabled,
   onChange,
-  isFrom,
 }: {
-  label: string;
-  value: ConnectionPoint;
-  otherValue: ConnectionPoint;
+  fromPoint: ConnectionPoint;
+  toPoint: ConnectionPoint;
   disabled: boolean;
-  onChange: (v: ConnectionPoint) => void;
-  isFrom: boolean;
+  onChange: (fp: ConnectionPoint, tp: ConnectionPoint) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [preview, setPreview] = useState<ConnectionPoint | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -687,7 +659,17 @@ function ConnectionPointDropdown({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const currentLabel = CONNECTION_POINT_OPTIONS.find((o) => o.value === value)?.label ?? 'Auto';
+  const isAuto = fromPoint === 'auto' && toPoint === 'auto';
+  const buttonLabel = isAuto ? 'Auto' : `${getPointLabel(fromPoint)}-${getPointLabel(toPoint)}`;
+
+  // When Auto is checked, both are 'auto'. When unchecked, default to 'side'/'side'.
+  const handleAutoToggle = () => {
+    if (isAuto) {
+      onChange('side', 'side');
+    } else {
+      onChange('auto', 'auto');
+    }
+  };
 
   return (
     <div style={{ position: 'relative' }} ref={ref}>
@@ -697,7 +679,7 @@ function ConnectionPointDropdown({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 4,
+          gap: 5,
           padding: '4px 10px',
           borderRadius: 6,
           fontSize: 13,
@@ -710,8 +692,12 @@ function ConnectionPointDropdown({
           whiteSpace: 'nowrap',
         }}
       >
-        <span style={{ color: disabled ? 'var(--color-text-muted)' : '#64748b', fontSize: 11, fontWeight: 400 }}>{label}:</span>
-        {currentLabel}
+        <svg width={14} height={14} viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
+          <rect x={1} y={1} width={5} height={4} rx={1} fill={disabled ? '#94a3b8' : '#475569'} />
+          <rect x={8} y={9} width={5} height={4} rx={1} fill={disabled ? '#94a3b8' : '#475569'} />
+          <path d="M 6 3 L 8 3 L 8 11 L 8 11" fill="none" stroke={disabled ? '#94a3b8' : '#475569'} strokeWidth={1} />
+        </svg>
+        {buttonLabel}
         <ChevronDown size={12} />
       </button>
       {open && (
@@ -725,52 +711,74 @@ function ConnectionPointDropdown({
             border: '1px solid #e2e8f0',
             borderRadius: 8,
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            padding: 8,
+            padding: '12px 14px',
             zIndex: 30,
-            minWidth: 180,
+            width: 260,
           }}
         >
-          {/* Illustration preview */}
-          <div style={{ marginBottom: 6, borderRadius: 6, background: '#f8fafc', padding: 4 }}>
-            <ConnectionPointIllustration
-              fromPoint={isFrom ? (preview ?? value) : otherValue}
-              toPoint={isFrom ? otherValue : (preview ?? value)}
-            />
-          </div>
-          {/* Options */}
-          {CONNECTION_POINT_OPTIONS.map((opt) => {
-            const isActive = opt.value === value;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => {
-                  onChange(opt.value);
-                  setOpen(false);
-                  setPreview(null);
-                }}
-                onMouseEnter={() => setPreview(opt.value)}
-                onMouseLeave={() => setPreview(null)}
+          {/* Top row: From select + To select + Auto checkbox */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            {/* From */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>From</span>
+              <select
+                value={isAuto ? 'side' : fromPoint}
+                disabled={isAuto}
+                onChange={(e) => onChange(e.target.value as ConnectionPoint, toPoint)}
                 style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '6px 10px',
+                  fontSize: 12,
+                  padding: '3px 6px',
                   borderRadius: 4,
-                  fontSize: 13,
-                  fontWeight: isActive ? 600 : 400,
-                  color: isActive ? '#1e293b' : '#475569',
-                  background: isActive ? '#f1f5f9' : 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'background 0.1s',
+                  border: '1px solid #d1d5db',
+                  background: isAuto ? '#f1f5f9' : 'white',
+                  color: isAuto ? '#94a3b8' : '#334155',
+                  cursor: isAuto ? 'default' : 'pointer',
+                  outline: 'none',
                 }}
-                onMouseOver={(e) => { if (!isActive) (e.currentTarget.style.background = '#f8fafc'); }}
-                onMouseOut={(e) => { if (!isActive) (e.currentTarget.style.background = 'transparent'); }}
               >
-                {opt.label}
-              </button>
-            );
-          })}
+                {CP_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            {/* To */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>To</span>
+              <select
+                value={isAuto ? 'side' : toPoint}
+                disabled={isAuto}
+                onChange={(e) => onChange(fromPoint, e.target.value as ConnectionPoint)}
+                style={{
+                  fontSize: 12,
+                  padding: '3px 6px',
+                  borderRadius: 4,
+                  border: '1px solid #d1d5db',
+                  background: isAuto ? '#f1f5f9' : 'white',
+                  color: isAuto ? '#94a3b8' : '#334155',
+                  cursor: isAuto ? 'default' : 'pointer',
+                  outline: 'none',
+                }}
+              >
+                {CP_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            {/* Auto checkbox */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', marginLeft: 'auto' }}>
+              <input
+                type="checkbox"
+                checked={isAuto}
+                onChange={handleAutoToggle}
+                style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#334155' }}
+              />
+              <span style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>Auto</span>
+            </label>
+          </div>
+          {/* Illustration */}
+          <div style={{ borderRadius: 6, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
+            <ConnectionPointIllustration fromPoint={fromPoint} toPoint={toPoint} />
+          </div>
         </div>
       )}
     </div>
