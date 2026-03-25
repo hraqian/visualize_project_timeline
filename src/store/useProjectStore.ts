@@ -206,9 +206,9 @@ interface ProjectActions {
   reorderSwimlane: (id: string, newOrder: number) => void;
 
   // Dependencies
-  addDependency: (fromId: string, toId: string, options?: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible'>> & { forceSchedule?: boolean }) => void;
+  addDependency: (fromId: string, toId: string, options?: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible' | 'fromPoint' | 'toPoint'>> & { forceSchedule?: boolean }) => void;
   removeDependency: (fromId: string, toId: string) => void;
-  updateDependency: (fromId: string, toId: string, updates: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible'>> & { forceSchedule?: boolean }) => void;
+  updateDependency: (fromId: string, toId: string, updates: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible' | 'fromPoint' | 'toPoint'>> & { forceSchedule?: boolean }) => void;
   toggleDependencyVisibility: (fromId: string, toId: string) => void;
   setItemDependencies: (itemId: string, deps: Dependency[]) => void;
 
@@ -825,6 +825,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       lag: options?.lag ?? 0,
       lagUnit: options?.lagUnit ?? 'd',
       visible: options?.visible ?? true,
+      fromPoint: options?.fromPoint,
+      toPoint: options?.toPoint,
     }];
     let newItems = state.items;
     if (options?.forceSchedule || state.dependencySettings.schedulingMode !== 'manual') {

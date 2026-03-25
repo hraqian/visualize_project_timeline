@@ -28,7 +28,7 @@ import {
   EyeOff,
   Trash2,
 } from 'lucide-react';
-import type { ActiveView } from '@/types';
+import type { ActiveView, ConnectionPoint } from '@/types';
 
 function App() {
   const activeView = useProjectStore((s) => s.activeView);
@@ -284,6 +284,30 @@ function App() {
                       {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
                       {isHidden ? 'Show' : 'Hide'}
                     </button>
+                    <ConnectionPointDropdown
+                      label="From"
+                      value={selectedDep?.fromPoint ?? 'auto'}
+                      otherValue={selectedDep?.toPoint ?? 'auto'}
+                      disabled={!selectedDepKey}
+                      onChange={(v) => {
+                        if (selectedDep) {
+                          updateDependency(selectedDep.fromId, selectedDep.toId, { fromPoint: v });
+                        }
+                      }}
+                      isFrom
+                    />
+                    <ConnectionPointDropdown
+                      label="To"
+                      value={selectedDep?.toPoint ?? 'auto'}
+                      otherValue={selectedDep?.fromPoint ?? 'auto'}
+                      disabled={!selectedDepKey}
+                      onChange={(v) => {
+                        if (selectedDep) {
+                          updateDependency(selectedDep.fromId, selectedDep.toId, { toPoint: v });
+                        }
+                      }}
+                      isFrom={false}
+                    />
                     <button
                       disabled={!selectedDepKey}
                       onClick={() => {
@@ -535,6 +559,220 @@ function DepToggleSwitch({ on, disabled }: { on: boolean; disabled?: boolean }) 
           on ? 'translate-x-[14px]' : 'translate-x-0.5'
         }`}
       />
+    </div>
+  );
+}
+
+// ─── Connection Point Illustration ───────────────────────────────────────────
+// Small SVG showing two mini bars with a dep link connecting at the specified points.
+
+function ConnectionPointIllustration({ fromPoint, toPoint }: { fromPoint: ConnectionPoint; toPoint: ConnectionPoint }) {
+  const W = 160;
+  const H = 72;
+  // Two mini bars
+  const barH = 14;
+  const barW = 44;
+  const gap = 28;
+  const bar1X = 16;
+  const bar1Y = 14;
+  const bar2X = W - 16 - barW;
+  const bar2Y = H - 14 - barH;
+
+  // Compute from anchor
+  let fx: number, fy: number;
+  const fp = fromPoint === 'auto' ? 'side' : fromPoint;
+  if (fp === 'top') {
+    fx = bar1X + barW / 2;
+    fy = bar1Y;
+  } else if (fp === 'bottom') {
+    fx = bar1X + barW / 2;
+    fy = bar1Y + barH;
+  } else {
+    fx = bar1X + barW;
+    fy = bar1Y + barH / 2;
+  }
+
+  // Compute to anchor
+  let tx: number, ty: number;
+  const tp = toPoint === 'auto' ? 'side' : toPoint;
+  if (tp === 'top') {
+    tx = bar2X + barW / 2;
+    ty = bar2Y;
+  } else if (tp === 'bottom') {
+    tx = bar2X + barW / 2;
+    ty = bar2Y + barH;
+  } else {
+    tx = bar2X;
+    ty = bar2Y + barH / 2;
+  }
+
+  // Simple orthogonal path
+  const midX = (fx + tx) / 2;
+  const midY = (fy + ty) / 2;
+  let path: string;
+
+  if (fp === 'side' && tp === 'side') {
+    // Standard L-shape through midpoint
+    path = `M ${fx} ${fy} L ${midX} ${fy} L ${midX} ${ty} L ${tx} ${ty}`;
+  } else if (fp === 'top' || fp === 'bottom') {
+    // Exit vertically, then go horizontal, then vertical to target
+    const exitY = fp === 'top' ? Math.min(fy - 8, midY) : Math.max(fy + 8, midY);
+    if (tp === 'top' || tp === 'bottom') {
+      const entryY = tp === 'top' ? Math.min(ty - 8, midY) : Math.max(ty + 8, midY);
+      path = `M ${fx} ${fy} L ${fx} ${exitY} L ${tx} ${entryY} L ${tx} ${ty}`;
+    } else {
+      path = `M ${fx} ${fy} L ${fx} ${exitY} L ${midX} ${exitY} L ${midX} ${ty} L ${tx} ${ty}`;
+    }
+  } else {
+    // fp === 'side', tp === 'top' or 'bottom'
+    const entryY = tp === 'top' ? Math.min(ty - 8, midY) : Math.max(ty + 8, midY);
+    path = `M ${fx} ${fy} L ${midX} ${fy} L ${midX} ${entryY} L ${tx} ${entryY} L ${tx} ${ty}`;
+  }
+
+  return (
+    <svg width={W} height={H} style={{ display: 'block' }}>
+      {/* Bars */}
+      <rect x={bar1X} y={bar1Y} width={barW} height={barH} rx={3} fill="#334155" />
+      <rect x={bar2X} y={bar2Y} width={barW} height={barH} rx={3} fill="#334155" />
+      {/* Labels */}
+      <text x={bar1X + barW / 2} y={bar1Y + barH / 2 + 1} textAnchor="middle" dominantBaseline="central" fill="white" fontSize={8} fontFamily="Inter, system-ui" fontWeight={500}>From</text>
+      <text x={bar2X + barW / 2} y={bar2Y + barH / 2 + 1} textAnchor="middle" dominantBaseline="central" fill="white" fontSize={8} fontFamily="Inter, system-ui" fontWeight={500}>To</text>
+      {/* Dep link */}
+      <defs>
+        <marker id="cp-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#475569" />
+        </marker>
+      </defs>
+      <path d={path} fill="none" stroke="#475569" strokeWidth={1.5} markerEnd="url(#cp-arrow)" />
+      {/* Anchor dots */}
+      <circle cx={fx} cy={fy} r={2.5} fill="#3b82f6" />
+      <circle cx={tx} cy={ty} r={2.5} fill="#3b82f6" />
+    </svg>
+  );
+}
+
+// ─── Connection Point Dropdown ───────────────────────────────────────────────
+
+const CONNECTION_POINT_OPTIONS: { value: ConnectionPoint; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'side', label: 'Side' },
+  { value: 'top', label: 'Top' },
+  { value: 'bottom', label: 'Bottom' },
+];
+
+function ConnectionPointDropdown({
+  label,
+  value,
+  otherValue,
+  disabled,
+  onChange,
+  isFrom,
+}: {
+  label: string;
+  value: ConnectionPoint;
+  otherValue: ConnectionPoint;
+  disabled: boolean;
+  onChange: (v: ConnectionPoint) => void;
+  isFrom: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<ConnectionPoint | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const currentLabel = CONNECTION_POINT_OPTIONS.find((o) => o.value === value)?.label ?? 'Auto';
+
+  return (
+    <div style={{ position: 'relative' }} ref={ref}>
+      <button
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(!open)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '4px 10px',
+          borderRadius: 6,
+          fontSize: 13,
+          fontWeight: 500,
+          border: '1px solid var(--color-border)',
+          background: 'transparent',
+          color: disabled ? 'var(--color-text-muted)' : 'var(--color-text)',
+          cursor: disabled ? 'default' : 'pointer',
+          transition: 'all 0.15s',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <span style={{ color: disabled ? 'var(--color-text-muted)' : '#64748b', fontSize: 11, fontWeight: 400 }}>{label}:</span>
+        {currentLabel}
+        <ChevronDown size={12} />
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: '100%',
+            marginTop: 4,
+            background: 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: 8,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            padding: 8,
+            zIndex: 30,
+            minWidth: 180,
+          }}
+        >
+          {/* Illustration preview */}
+          <div style={{ marginBottom: 6, borderRadius: 6, background: '#f8fafc', padding: 4 }}>
+            <ConnectionPointIllustration
+              fromPoint={isFrom ? (preview ?? value) : otherValue}
+              toPoint={isFrom ? otherValue : (preview ?? value)}
+            />
+          </div>
+          {/* Options */}
+          {CONNECTION_POINT_OPTIONS.map((opt) => {
+            const isActive = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                  setPreview(null);
+                }}
+                onMouseEnter={() => setPreview(opt.value)}
+                onMouseLeave={() => setPreview(null)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '6px 10px',
+                  borderRadius: 4,
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                  color: isActive ? '#1e293b' : '#475569',
+                  background: isActive ? '#f1f5f9' : 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background 0.1s',
+                }}
+                onMouseOver={(e) => { if (!isActive) (e.currentTarget.style.background = '#f8fafc'); }}
+                onMouseOut={(e) => { if (!isActive) (e.currentTarget.style.background = 'transparent'); }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -230,6 +230,8 @@ export type DependencyType = 'finish-to-start' | 'start-to-start' | 'finish-to-f
 
 export type LagUnit = 'd' | 'w' | 'm';
 
+export type ConnectionPoint = 'auto' | 'side' | 'top' | 'bottom';
+
 export interface Dependency {
   fromId: string;
   toId: string;
@@ -237,6 +239,8 @@ export interface Dependency {
   lag: number;       // positive = lag, negative = lead, in lagUnit
   lagUnit: LagUnit;  // 'd' = days, 'w' = weeks, 'm' = months
   visible: boolean;  // whether the link is shown on the timeline
+  fromPoint?: ConnectionPoint;  // where the link exits the predecessor ('auto' = system picks)
+  toPoint?: ConnectionPoint;    // where the link enters the successor ('auto' = system picks)
 }
 
 // ─── Timescale Types ─────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { MilestoneIconComponent } from '@/components/common/MilestoneIconCompone
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { DatePickerPopover } from './DatePickerPopover';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig, DependencyType } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig, DependencyType, ConnectionPoint } from '@/types';
 
 // ─── Types for inline editing ────────────────────────────────────────────────
 
@@ -622,15 +622,52 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         if (!from || !to) return null;
         const isHidden = dep.visible === false;
 
-        // FS: exit right edge center of predecessor, enter left edge center of successor
-        const fromX = from.type === 'milestone'
-          ? itemToX(from.startDate) + from.milestoneStyle.size / 2
-          : itemToX(from.startDate) + differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom;
-        const fromY = getItemRowTopY(from) + ROW_BASE / 2;
-        const toX = to.type === 'milestone'
-          ? itemToX(to.startDate) - to.milestoneStyle.size / 2
-          : itemToX(to.startDate);
-        const toY = getItemRowTopY(to) + ROW_BASE / 2;
+        const fromRowTop = getItemRowTopY(from);
+        const toRowTop = getItemRowTopY(to);
+        const fp = dep.fromPoint ?? 'auto';
+        const tp = dep.toPoint ?? 'auto';
+
+        // Compute from anchor
+        let fromX: number;
+        let fromY: number;
+        if (fp === 'top') {
+          fromX = from.type === 'milestone'
+            ? itemToX(from.startDate)
+            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom) / 2;
+          fromY = fromRowTop;
+        } else if (fp === 'bottom') {
+          fromX = from.type === 'milestone'
+            ? itemToX(from.startDate)
+            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom) / 2;
+          fromY = fromRowTop + ROW_BASE;
+        } else {
+          // 'auto' or 'side' — FS default: right edge center of predecessor
+          fromX = from.type === 'milestone'
+            ? itemToX(from.startDate) + from.milestoneStyle.size / 2
+            : itemToX(from.startDate) + differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom;
+          fromY = fromRowTop + ROW_BASE / 2;
+        }
+
+        // Compute to anchor
+        let toX: number;
+        let toY: number;
+        if (tp === 'top') {
+          toX = to.type === 'milestone'
+            ? itemToX(to.startDate)
+            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * zoom + zoom) / 2;
+          toY = toRowTop;
+        } else if (tp === 'bottom') {
+          toX = to.type === 'milestone'
+            ? itemToX(to.startDate)
+            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * zoom + zoom) / 2;
+          toY = toRowTop + ROW_BASE;
+        } else {
+          // 'auto' or 'side' — FS default: left edge center of successor
+          toX = to.type === 'milestone'
+            ? itemToX(to.startDate) - to.milestoneStyle.size / 2
+            : itemToX(to.startDate);
+          toY = toRowTop + ROW_BASE / 2;
+        }
 
         const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
 
