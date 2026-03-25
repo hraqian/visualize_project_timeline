@@ -328,6 +328,14 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   // Keep a ref to the latest depDrag value so onUp always reads fresh data
   const depDragLatestRef = useRef(depDrag);
   depDragLatestRef.current = depDrag;
+  // Refs for stable access in dep drag effect (avoids re-running effect on every change)
+  const getItemPositionsRef = useRef<typeof getItemPositions>(null!);
+  const dependenciesRef = useRef(dependencies);
+  dependenciesRef.current = dependencies;
+  const addDependencyRef = useRef(addDependency);
+  addDependencyRef.current = addDependency;
+  const updateDependencyRef = useRef(updateDependency);
+  updateDependencyRef.current = updateDependency;
 
   const selectedDepKey = useProjectStore((s) => s.selectedDepKey);
   const setSelectedDepKey = useProjectStore((s) => s.setSelectedDepKey);
@@ -782,6 +790,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     }
     return positions;
   }, [visibleItems, swimlaneIds, swimlaneLayout, getRowY, getRowH, itemToX, zoom]);
+  getItemPositionsRef.current = getItemPositions;
 
   const handleDepHandleMouseDown = useCallback(
     (sourceId: string, sourceSide: 'start' | 'end', e: React.MouseEvent) => {
@@ -799,12 +808,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   );
 
   // Dep drag mousemove/mouseup
+  const depDragActive = !!depDrag;
   useEffect(() => {
-    if (!depDrag) return;
+    if (!depDragActive) return;
     const canvasEl = canvasRef.current;
     if (!canvasEl) return;
-
-    const positions = getItemPositions();
 
     const onMove = (e: MouseEvent) => {
       if (!depDragRef.current) return;
@@ -813,6 +821,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       const mouseY = e.clientY - rect.top;
 
       // Hit-test: check if mouse is over any bar's bounding box (using ORIGINAL positions)
+      const positions = getItemPositionsRef.current();
       const HIT_PAD = 4; // small padding around bar for easier targeting
       let bestId: string | null = null;
       let bestSide: 'start' | 'end' | null = null;
@@ -852,14 +861,15 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const toId = currentDrag.sourceSide === 'end' ? currentDrag.targetId : currentDrag.sourceId;
 
         // Check if dependency already exists
-        const existing = dependencies.find((d) => d.fromId === fromId && d.toId === toId);
+        const deps = dependenciesRef.current;
+        const existing = deps.find((d) => d.fromId === fromId && d.toId === toId);
         if (existing) {
           if (existing.type !== 'finish-to-start') {
-            updateDependency(fromId, toId, { type: 'finish-to-start', forceSchedule: true });
+            updateDependencyRef.current(fromId, toId, { type: 'finish-to-start', forceSchedule: true });
           }
           // else: same FS already exists, ignore
         } else {
-          addDependency(fromId, toId, { type: 'finish-to-start', forceSchedule: true });
+          addDependencyRef.current(fromId, toId, { type: 'finish-to-start', forceSchedule: true });
         }
       }
     };
@@ -870,7 +880,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [depDrag, getItemPositions, dependencies, addDependency, updateDependency]);
+  }, [depDragActive]);
 
   // ─── Keyboard: Delete/Backspace selected dep, Escape to deselect ──────────
   useEffect(() => {
