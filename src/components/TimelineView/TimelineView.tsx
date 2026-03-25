@@ -121,10 +121,12 @@ function routeDepLink(
   // Determine the vertical segment X: start at fromX + offset, push right past obstacles
   let turnX = fromX + offset;
   let changed = true;
-  while (changed) {
+  let iterations = 0;
+  while (changed && iterations < 100) {
     changed = false;
+    iterations++;
     for (const o of blockingObs) {
-      if (turnX >= o.leftX - PAD && turnX <= o.rightX + PAD) {
+      if (turnX >= o.leftX - PAD && turnX < o.rightX + PAD) {
         turnX = o.rightX + PAD;
         changed = true;
       }
@@ -814,8 +816,16 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     const canvasEl = canvasRef.current;
     if (!canvasEl) return;
 
+    let lastClientX = -1;
+    let lastClientY = -1;
+
     const onMove = (e: MouseEvent) => {
       if (!depDragRef.current) return;
+      // Skip if raw client coords haven't changed (avoids re-render from synthetic mousemove)
+      if (e.clientX === lastClientX && e.clientY === lastClientY) return;
+      lastClientX = e.clientX;
+      lastClientY = e.clientY;
+
       const rect = canvasEl.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
