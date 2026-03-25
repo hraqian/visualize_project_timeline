@@ -71,4 +71,10 @@
   .dep-handle:hover {
     background-color: white;
   }
+
+  /* CollapsibleRow: dim + disable controls but keep ApplyToAll active */
+  .style-pane-disabled > * > *:not(:last-child) {
+    opacity: 0.4;
+    pointer-events: none;
+  }
 }

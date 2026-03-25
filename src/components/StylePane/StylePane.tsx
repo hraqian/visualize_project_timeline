@@ -647,8 +647,7 @@ function CollapsibleRow({
       </div>
       {expanded && children && (
         <div
-          className="px-4 pb-4 pt-1"
-          style={toggle && !toggle.checked ? { opacity: 0.4, pointerEvents: 'none' } : undefined}
+          className={`px-4 pb-4 pt-1${toggle && !toggle.checked ? ' style-pane-disabled' : ''}`}
         >
           {children}
         </div>
@@ -3510,7 +3509,7 @@ function ApplyToAllBox({
   }, [expanded]);
 
   return (
-    <div className="border border-[var(--color-border)] rounded-lg p-3" style={{ pointerEvents: 'auto', opacity: 1 }}>
+    <div className="border border-[var(--color-border)] rounded-lg p-3">
       <button
         ref={triggerRef}
         onClick={() => setExpanded(!expanded)}
