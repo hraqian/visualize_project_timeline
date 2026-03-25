@@ -96,58 +96,102 @@ const SWIMLANE_PADDING_BOTTOM = 10;
 // path that avoids crossing through bars between the predecessor and successor.
 interface ObstacleRect { leftX: number; rightX: number; topY: number; bottomY: number }
 
+type AnchorDir = 'right' | 'left' | 'top' | 'bottom';
+
 function routeDepLink(
   fromX: number, fromY: number,
   toX: number, toY: number,
   obstacles: ObstacleRect[],
   offset: number = 12,
+  fromDir: AnchorDir = 'right',
+  toDir: AnchorDir = 'left',
 ): string {
-  // Same row — straight horizontal
-  if (fromY === toY) {
-    return `M ${fromX} ${fromY} L ${toX} ${toY}`;
-  }
+  const PAD = 8;
 
-  const minY = Math.min(fromY, toY);
-  const maxY = Math.max(fromY, toY);
-  const PAD = 8; // clearance between vertical segment and obstacle right edge
-
-  // Find obstacles whose rows vertically overlap the corridor between from and to
-  // (exclusive of from/to rows — use a small inset so we don't match their own rows)
-  const inset = 2;
-  const blockingObs = obstacles.filter(
-    (o) => o.bottomY > minY + inset && o.topY < maxY - inset
-  );
-
-  // Determine the vertical segment X: start at fromX + offset, push right past obstacles
-  let turnX = fromX + offset;
-  let changed = true;
-  let iterations = 0;
-  while (changed && iterations < 100) {
-    changed = false;
-    iterations++;
-    for (const o of blockingObs) {
-      if (turnX >= o.leftX - PAD && turnX < o.rightX + PAD) {
-        turnX = o.rightX + PAD;
-        changed = true;
+  // ── Side-to-side (original logic) ──────────────────────────────────────────
+  if (fromDir === 'right' && toDir === 'left') {
+    if (fromY === toY) {
+      return `M ${fromX} ${fromY} L ${toX} ${toY}`;
+    }
+    const minY = Math.min(fromY, toY);
+    const maxY = Math.max(fromY, toY);
+    const inset = 2;
+    const blockingObs = obstacles.filter(
+      (o) => o.bottomY > minY + inset && o.topY < maxY - inset
+    );
+    let turnX = fromX + offset;
+    let changed = true;
+    let iterations = 0;
+    while (changed && iterations < 100) {
+      changed = false;
+      iterations++;
+      for (const o of blockingObs) {
+        if (turnX >= o.leftX - PAD && turnX < o.rightX + PAD) {
+          turnX = o.rightX + PAD;
+          changed = true;
+        }
       }
     }
+    if (turnX < toX) {
+      return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${toY} L ${toX} ${toY}`;
+    }
+    const goingDown = toY > fromY;
+    const ENTER_OFFSET = 24;
+    const enterX = toX - ENTER_OFFSET;
+    const gapY = goingDown ? toY - ROW_BASE / 2 - PAD : toY + ROW_BASE / 2 + PAD;
+    return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${gapY} L ${enterX} ${gapY} L ${enterX} ${toY} L ${toX} ${toY}`;
   }
 
-  if (turnX < toX) {
-    // Simple L-shape: right → down → right into successor
-    return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${toY} L ${toX} ${toY}`;
+  // ── Non-side routing: build orthogonal path based on exit/entry directions ─
+  // Strategy: extend from the anchor in its exit direction by `offset`, then
+  // route orthogonally (one or two turns) to the target's entry approach point,
+  // then enter from the target's entry direction.
+
+  // Compute the "exit point" — a short stub in the exit direction
+  let ex = fromX, ey = fromY;
+  if (fromDir === 'right') ex = fromX + offset;
+  else if (fromDir === 'left') ex = fromX - offset;
+  else if (fromDir === 'top') ey = fromY - offset;
+  else if (fromDir === 'bottom') ey = fromY + offset;
+
+  // Compute the "entry point" — a short stub before the target in its entry direction
+  let nx = toX, ny = toY;
+  if (toDir === 'left') nx = toX - offset;
+  else if (toDir === 'right') nx = toX + offset;
+  else if (toDir === 'top') ny = toY - offset;
+  else if (toDir === 'bottom') ny = toY + offset;
+
+  // Determine if exit is horizontal or vertical
+  const exitHoriz = (fromDir === 'left' || fromDir === 'right');
+  const entryHoriz = (toDir === 'left' || toDir === 'right');
+
+  const pts: [number, number][] = [[fromX, fromY]];
+
+  if (exitHoriz && entryHoriz) {
+    // Both horizontal: exit stub → vertical to entry Y → horizontal to entry stub → target
+    pts.push([ex, ey]);
+    pts.push([ex, ny]);
+    pts.push([nx, ny]);
+  } else if (!exitHoriz && !entryHoriz) {
+    // Both vertical: exit stub → horizontal to entry X → vertical to entry stub → target
+    pts.push([ex, ey]);
+    pts.push([nx, ey]);
+    pts.push([nx, ny]);
+  } else if (exitHoriz && !entryHoriz) {
+    // Exit horizontal, enter vertical: exit stub → horizontal to target X → vertical to entry stub
+    pts.push([ex, ey]);
+    pts.push([nx, ey]);
+    pts.push([nx, ny]);
+  } else {
+    // Exit vertical, enter horizontal: exit stub → vertical to entry Y → horizontal to entry stub
+    pts.push([ex, ey]);
+    pts.push([ex, ny]);
+    pts.push([nx, ny]);
   }
 
-  // turnX >= toX: the vertical segment is to the right of the successor's entry.
-  // We need to route so the arrow always enters from the LEFT of the successor.
-  // Path: right to turnX → down to the gap above successor row → left to enterX → down to toY → right to toX
-  const goingDown = toY > fromY;
-  const ENTER_OFFSET = 24; // longer final leg so arrowhead is clearly visible
-  const enterX = toX - ENTER_OFFSET;
-  // gapY = the Y at the edge of the successor's row (just outside it)
-  const gapY = goingDown ? toY - ROW_BASE / 2 - PAD : toY + ROW_BASE / 2 + PAD;
+  pts.push([toX, toY]);
 
-  return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${gapY} L ${enterX} ${gapY} L ${enterX} ${toY} L ${toX} ${toY}`;
+  return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
 }
 
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
@@ -669,11 +713,15 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           toY = toRowTop + ROW_BASE / 2;
         }
 
+        // Determine anchor directions for routing
+        const fromDir: AnchorDir = (fp === 'top') ? 'top' : (fp === 'bottom') ? 'bottom' : 'right';
+        const toDir: AnchorDir = (tp === 'top') ? 'top' : (tp === 'bottom') ? 'bottom' : 'left';
+
         const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
 
         // Exclude from/to items from obstacles
         const obstacles = allObstacles.filter((o) => o.id !== from.id && o.id !== to.id);
-        const path = routeDepLink(fromX, fromY, toX, toY, obstacles, OFFSET);
+        const path = routeDepLink(fromX, fromY, toX, toY, obstacles, OFFSET, fromDir, toDir);
 
         return { path, isCritical, isHidden, key: `${dep.fromId}-${dep.toId}`, fromId: dep.fromId, toId: dep.toId };
       })
