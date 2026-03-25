@@ -3510,7 +3510,7 @@ function ApplyToAllBox({
   }, [expanded]);
 
   return (
-    <div className="border border-[var(--color-border)] rounded-lg p-3">
+    <div className="border border-[var(--color-border)] rounded-lg p-3" style={{ pointerEvents: 'auto', opacity: 1 }}>
       <button
         ref={triggerRef}
         onClick={() => setExpanded(!expanded)}
