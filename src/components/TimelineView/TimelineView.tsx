@@ -210,32 +210,47 @@ function routeDepLink(
 
   if (exitHoriz && entryHoriz) {
     // Both horizontal: exit stub → vertical → entry stub → target
-    // The vertical segment at ex can collide with obstacles
     const vertX = avoidObsX(ex, Math.min(ey, ny), Math.max(ey, ny));
     pts.push([vertX, ey]);
     pts.push([vertX, ny]);
     pts.push([nx, ny]);
   } else if (!exitHoriz && !entryHoriz) {
     // Both vertical: exit stub → horizontal → entry stub → target
-    // The horizontal segment at ey can collide with obstacles
+    // Avoid obstacles on the horizontal segment
     const horizY = avoidObsY(ey, Math.min(ex, nx), Math.max(ex, nx), toY > fromY);
     pts.push([ex, horizY]);
     pts.push([nx, horizY]);
     pts.push([nx, ny]);
   } else if (exitHoriz && !entryHoriz) {
-    // Exit horizontal, enter vertical: exit stub → horizontal to target X → vertical to entry
-    // The horizontal segment at ey and the vertical segment at nx can collide
-    const horizY = avoidObsY(ey, Math.min(ex, nx), Math.max(ex, nx), toY > fromY);
-    pts.push([ex, horizY]);
-    pts.push([nx, horizY]);
-    pts.push([nx, ny]);
+    // Exit horizontal (right), enter vertical (top/bottom)
+    // Path: (fromX,fromY) → (ex,ey) → horizontal to turnX → vertical down/up → (toX,ny) → (toX,toY)
+    // The vertical segment may pass through obstacles — push its X right if needed
+    const vertX = avoidObsX(nx, Math.min(ey, ny), Math.max(ey, ny));
+    pts.push([ex, ey]);
+    if (vertX !== nx) {
+      // Vertical was pushed right — need extra turns to reach toX
+      pts.push([vertX, ey]);
+      pts.push([vertX, ny]);
+      pts.push([nx, ny]);
+    } else {
+      pts.push([nx, ey]);
+      pts.push([nx, ny]);
+    }
   } else {
-    // Exit vertical, enter horizontal: exit stub → vertical to entry Y → horizontal to entry
-    // The vertical segment at ex and the horizontal segment at ny can collide
-    const vertX = avoidObsX(ex, Math.min(ey, ny), Math.max(ey, ny));
-    pts.push([vertX, ey]);
-    pts.push([vertX, ny]);
-    pts.push([nx, ny]);
+    // Exit vertical (top/bottom), enter horizontal (left)
+    // Path: (fromX,fromY) → (ex,ey) → vertical to turnY → horizontal to (nx,ny) → (toX,toY)
+    // The horizontal segment may pass through obstacles — push its Y if needed
+    const horizY = avoidObsY(ny, Math.min(ex, nx), Math.max(ex, nx), toY > fromY);
+    if (horizY !== ny) {
+      pts.push([ex, ey]);
+      pts.push([ex, horizY]);
+      pts.push([nx, horizY]);
+      pts.push([nx, ny]);
+    } else {
+      pts.push([ex, ey]);
+      pts.push([ex, ny]);
+      pts.push([nx, ny]);
+    }
   }
 
   pts.push([toX, toY]);
