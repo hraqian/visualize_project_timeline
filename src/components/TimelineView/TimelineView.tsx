@@ -215,20 +215,32 @@ function routeDepLink(
     pts.push([vertX, ny]);
     pts.push([nx, ny]);
   } else if (!exitHoriz && !entryHoriz) {
-    // Both vertical: exit stub → horizontal → entry stub → target
-    // Avoid obstacles on the horizontal segment
-    const horizY = avoidObsY(ey, Math.min(ex, nx), Math.max(ex, nx), toY > fromY);
-    pts.push([ex, horizY]);
-    pts.push([nx, horizY]);
-    pts.push([nx, ny]);
+    // Both vertical (e.g., bottom→top, top→bottom, etc.)
+    // Path concept: vertical down from source → horizontal across → vertical up to target
+    // We need to check the vertical segments at ex (source X) and nx (target X) for obstacles.
+    // The first vertical goes from ey to some turn Y; the horizontal connects; the second
+    // vertical goes from turn Y to ny.
+    // But the first vertical is at ex (source center X) — if there's a bar directly below/above,
+    // we must push that X sideways. Same for the second vertical at nx.
+    const vert1X = avoidObsX(ex, Math.min(ey, ny), Math.max(ey, ny));
+    const vert2X = avoidObsX(nx, Math.min(ey, ny), Math.max(ey, ny));
+    // The horizontal segment connects vert1X to vert2X at a Y between ey and ny.
+    // Pick the midpoint of ey and ny, then avoid obstacles on it.
+    const midY = (ey + ny) / 2;
+    const horizY = avoidObsY(midY, Math.min(vert1X, vert2X), Math.max(vert1X, vert2X), toY > fromY);
+    pts.push([vert1X, ey]);
+    pts.push([vert1X, horizY]);
+    pts.push([vert2X, horizY]);
+    pts.push([vert2X, ny]);
   } else if (exitHoriz && !entryHoriz) {
     // Exit horizontal (right), enter vertical (top/bottom)
-    // Path: (fromX,fromY) → (ex,ey) → horizontal to turnX → vertical down/up → (toX,ny) → (toX,toY)
-    // The vertical segment may pass through obstacles — push its X right if needed
+    // Path: horizontal from source right edge → turn vertical → approach target from top/bottom
+    // The vertical segment can collide with obstacles — push its X right if needed.
+    // Start checking from ex (the exit stub X) since the vertical could be anywhere from ex to nx.
+    // Use nx as the preferred X (go straight to target X), but push right if obstacles block.
     const vertX = avoidObsX(nx, Math.min(ey, ny), Math.max(ey, ny));
     pts.push([ex, ey]);
     if (vertX !== nx) {
-      // Vertical was pushed right — need extra turns to reach toX
       pts.push([vertX, ey]);
       pts.push([vertX, ny]);
       pts.push([nx, ny]);
@@ -238,19 +250,12 @@ function routeDepLink(
     }
   } else {
     // Exit vertical (top/bottom), enter horizontal (left)
-    // Path: (fromX,fromY) → (ex,ey) → vertical to turnY → horizontal to (nx,ny) → (toX,toY)
-    // The horizontal segment may pass through obstacles — push its Y if needed
-    const horizY = avoidObsY(ny, Math.min(ex, nx), Math.max(ex, nx), toY > fromY);
-    if (horizY !== ny) {
-      pts.push([ex, ey]);
-      pts.push([ex, horizY]);
-      pts.push([nx, horizY]);
-      pts.push([nx, ny]);
-    } else {
-      pts.push([ex, ey]);
-      pts.push([ex, ny]);
-      pts.push([nx, ny]);
-    }
+    // Path: vertical from source → turn horizontal → approach target from left
+    // The vertical segment at ex can collide — push right if needed.
+    const vert1X = avoidObsX(ex, Math.min(ey, ny), Math.max(ey, ny));
+    pts.push([vert1X, ey]);
+    pts.push([vert1X, ny]);
+    pts.push([nx, ny]);
   }
 
   pts.push([toX, toY]);
