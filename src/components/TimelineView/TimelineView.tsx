@@ -98,6 +98,24 @@ interface ObstacleRect { leftX: number; rightX: number; topY: number; bottomY: n
 
 type AnchorDir = 'right' | 'left' | 'top' | 'bottom';
 
+/**
+ * Unified obstacle-aware orthogonal router for dependency links.
+ *
+ * Given a source anchor (point + exit direction) and target anchor (point + entry direction),
+ * produces an SVG path string of right-angle segments that avoids all obstacles.
+ *
+ * The obstacle map is a list of axis-aligned rectangles (bars/milestones).
+ * Source and target items should be excluded from obstacles before calling.
+ *
+ * Algorithm:
+ *   1. Compute exit stub (short segment from source in exit direction)
+ *   2. Compute entry stub (short segment to target in entry direction)
+ *   3. Route between stub endpoints through free space:
+ *      a. Try L-path (1 turn) — if both segments clear, done
+ *      b. Try Z-path (2 turns) — find a clear channel between the two
+ *      c. Fall back to U-path — route around all obstacles
+ *   4. Assemble: source → exit stub → middle route → entry stub → target
+ */
 function routeDepLink(
   fromX: number, fromY: number,
   toX: number, toY: number,
@@ -108,260 +126,222 @@ function routeDepLink(
 ): string {
   const PAD = 8;
 
-  // ── Side-to-side (original logic) ──────────────────────────────────────────
-  if (fromDir === 'right' && toDir === 'left') {
-    if (fromY === toY) {
-      return `M ${fromX} ${fromY} L ${toX} ${toY}`;
-    }
-    const minY = Math.min(fromY, toY);
-    const maxY = Math.max(fromY, toY);
-    const inset = 2;
-    const blockingObs = obstacles.filter(
-      (o) => o.bottomY > minY + inset && o.topY < maxY - inset
+  // ── Helpers: segment-obstacle intersection ─────────────────────────────────
+
+  /** Does a vertical segment at x spanning [minY..maxY] hit any obstacle? */
+  const vHits = (x: number, y1: number, y2: number): boolean => {
+    const lo = Math.min(y1, y2), hi = Math.max(y1, y2);
+    return obstacles.some(o =>
+      o.bottomY > lo + 1 && o.topY < hi - 1 &&
+      x > o.leftX - PAD && x < o.rightX + PAD
     );
-    let turnX = fromX + offset;
-    let changed = true;
-    let iterations = 0;
-    while (changed && iterations < 100) {
-      changed = false;
-      iterations++;
-      for (const o of blockingObs) {
-        if (turnX >= o.leftX - PAD && turnX < o.rightX + PAD) {
-          turnX = o.rightX + PAD;
-          changed = true;
-        }
-      }
-    }
-    if (turnX < toX) {
-      return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${toY} L ${toX} ${toY}`;
-    }
-    const goingDown = toY > fromY;
-    const ENTER_OFFSET = 24;
-    const enterX = toX - ENTER_OFFSET;
-    const gapY = goingDown ? toY - ROW_BASE / 2 - PAD : toY + ROW_BASE / 2 + PAD;
-    return `M ${fromX} ${fromY} L ${turnX} ${fromY} L ${turnX} ${gapY} L ${enterX} ${gapY} L ${enterX} ${toY} L ${toX} ${toY}`;
-  }
+  };
 
-  // ── Non-side routing with full obstacle-aware orthogonal pathfinding ────────
-  //
-  // Approach: build path as a series of orthogonal (axis-aligned) segments.
-  // Each segment is validated against ALL obstacles. If a segment intersects an
-  // obstacle, it is rerouted around it.
-  //
-  // The path structure is always:
-  //   1. Exit stub: short segment from anchor in exit direction
-  //   2. Middle segments: route from exit stub endpoint to entry stub endpoint
-  //   3. Entry stub: short segment into target from entry direction
-  //
-  // The middle routing depends on direction combination but always produces
-  // orthogonal segments that avoid all obstacles.
+  /** Does a horizontal segment at y spanning [minX..maxX] hit any obstacle? */
+  const hHits = (y: number, x1: number, x2: number): boolean => {
+    const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
+    return obstacles.some(o =>
+      o.rightX > lo + 1 && o.leftX < hi - 1 &&
+      y > o.topY - PAD && y < o.bottomY + PAD
+    );
+  };
 
-  const PAD2 = PAD;
-
-  // Helper: find a clear vertical X channel — push x rightward past any obstacles
-  // whose Y range overlaps [minY, maxY]
-  const clearX = (x: number, minY: number, maxY: number): number => {
-    const inset = 2;
-    let changed = true;
-    let iterations = 0;
-    while (changed && iterations < 100) {
-      changed = false;
-      iterations++;
+  /** Push x right until the vertical channel [minY..maxY] is clear. */
+  const clearX = (x: number, y1: number, y2: number): number => {
+    const lo = Math.min(y1, y2), hi = Math.max(y1, y2);
+    for (let i = 0; i < 100; i++) {
+      let hit = false;
       for (const o of obstacles) {
-        if (o.bottomY > minY + inset && o.topY < maxY - inset) {
-          if (x >= o.leftX - PAD2 && x < o.rightX + PAD2) {
-            x = o.rightX + PAD2;
-            changed = true;
-          }
+        if (o.bottomY > lo + 1 && o.topY < hi - 1 &&
+            x > o.leftX - PAD && x < o.rightX + PAD) {
+          x = o.rightX + PAD;
+          hit = true;
         }
       }
+      if (!hit) break;
     }
     return x;
   };
 
-  // Helper: find a clear horizontal Y channel — push y in preferDir past any obstacles
-  // whose X range overlaps [minX, maxX]
-  const clearY = (y: number, minX: number, maxX: number, preferDown: boolean): number => {
-    let changed = true;
-    let iterations = 0;
-    while (changed && iterations < 100) {
-      changed = false;
-      iterations++;
+  /** Push y in preferDir until the horizontal channel [minX..maxX] is clear. */
+  const clearY = (y: number, x1: number, x2: number, down: boolean): number => {
+    const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
+    for (let i = 0; i < 100; i++) {
+      let hit = false;
       for (const o of obstacles) {
-        if (o.rightX > minX + 2 && o.leftX < maxX - 2) {
-          if (y >= o.topY - PAD2 && y < o.bottomY + PAD2) {
-            y = preferDown ? o.bottomY + PAD2 : o.topY - PAD2;
-            changed = true;
-          }
+        if (o.rightX > lo + 1 && o.leftX < hi - 1 &&
+            y > o.topY - PAD && y < o.bottomY + PAD) {
+          y = down ? o.bottomY + PAD : o.topY - PAD;
+          hit = true;
         }
       }
+      if (!hit) break;
     }
     return y;
   };
 
-  // Helper: check if a vertical segment at x from y1 to y2 intersects any obstacle
-  const vSegHitsObs = (x: number, y1: number, y2: number): boolean => {
-    const minY = Math.min(y1, y2);
-    const maxY = Math.max(y1, y2);
-    const inset = 2;
-    return obstacles.some(
-      (o) => o.bottomY > minY + inset && o.topY < maxY - inset &&
-             x >= o.leftX - PAD2 && x <= o.rightX + PAD2
-    );
-  };
+  // ── Compute stub endpoints ─────────────────────────────────────────────────
 
-  // Helper: check if a horizontal segment at y from x1 to x2 intersects any obstacle
-  const hSegHitsObs = (y: number, x1: number, x2: number): boolean => {
-    const minX = Math.min(x1, x2);
-    const maxX = Math.max(x1, x2);
-    return obstacles.some(
-      (o) => o.rightX > minX + 2 && o.leftX < maxX - 2 &&
-             y >= o.topY - PAD2 && y <= o.bottomY + PAD2
-    );
-  };
+  const isHoriz = (d: AnchorDir) => d === 'left' || d === 'right';
 
-  // Compute exit stub endpoint
-  let ex = fromX, ey = fromY;
-  if (fromDir === 'right') ex = fromX + offset;
-  else if (fromDir === 'left') ex = fromX - offset;
-  else if (fromDir === 'top') ey = fromY - offset;
-  else if (fromDir === 'bottom') ey = fromY + offset;
+  // Exit stub endpoint: one step from the source in exit direction
+  const ex = fromDir === 'right' ? fromX + offset : fromDir === 'left' ? fromX - offset : fromX;
+  const ey = fromDir === 'bottom' ? fromY + offset : fromDir === 'top' ? fromY - offset : fromY;
 
-  // Compute entry stub endpoint
-  let nx = toX, ny = toY;
-  if (toDir === 'left') nx = toX - offset;
-  else if (toDir === 'right') nx = toX + offset;
-  else if (toDir === 'top') ny = toY - offset;
-  else if (toDir === 'bottom') ny = toY + offset;
+  // Entry stub endpoint: one step from the target in entry direction (approaching from outside)
+  const nx = toDir === 'left' ? toX - offset : toDir === 'right' ? toX + offset : toX;
+  const ny = toDir === 'bottom' ? toY + offset : toDir === 'top' ? toY - offset : toY;
 
-  const exitHoriz = (fromDir === 'left' || fromDir === 'right');
-  const entryHoriz = (toDir === 'left' || toDir === 'right');
-
-  // Now route from (ex, ey) to (nx, ny) with orthogonal segments.
-  // The exit stub direction determines the first segment orientation.
-  // The entry stub direction determines the last segment orientation.
+  // ── Route between (ex,ey) and (nx,ny) ──────────────────────────────────────
   //
-  // We build middle waypoints between (ex,ey) and (nx,ny).
+  // The exit stub constrains the first segment direction:
+  //   - Horizontal exit → first middle segment must be horizontal (continuing) or vertical (turning)
+  //   - Vertical exit → first middle segment must be vertical (continuing) or horizontal (turning)
+  //
+  // Similarly for entry stub.
+  //
+  // The middle route needs to get from (ex,ey) to (nx,ny) using only axis-aligned
+  // segments that don't intersect obstacles. The path must also respect the
+  // exit/entry directions (no U-turns at the stubs).
 
-  const mid: [number, number][] = [];
+  const exitH = isHoriz(fromDir);
+  const entryH = isHoriz(toDir);
 
-  if (exitHoriz && entryHoriz) {
-    // H→H: one vertical segment connects them
-    // Find clear vertical X
-    const vx = clearX(Math.min(ex, nx), Math.min(ey, ny), Math.max(ey, ny));
-    mid.push([vx, ey], [vx, ny]);
+  // We try multiple candidate paths and pick the first one that's fully clear.
+  // Each candidate is an array of waypoints from (ex,ey) to (nx,ny).
 
-  } else if (!exitHoriz && !entryHoriz) {
-    // V→V: need a horizontal segment to connect the two verticals
-    // Determine where to place the horizontal connector Y:
-    //   - If both go same direction (bottom+bottom or top+top), it must be
-    //     beyond BOTH stubs so the path doesn't backtrack through a bar.
-    //   - If opposite (bottom+top or top+bottom), midpoint is fine.
-    const goDown = (toY > fromY);
-    let baseY: number;
-    if (fromDir === toDir) {
-      baseY = fromDir === 'bottom' ? Math.max(ey, ny) : Math.min(ey, ny);
+  type Pt = [number, number];
+
+  /** Check that a sequence of orthogonal waypoints is entirely obstacle-free. */
+  const pathClear = (pts: Pt[]): boolean => {
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [ax, ay] = pts[i];
+      const [bx, by] = pts[i + 1];
+      if (ax === bx) {
+        // Vertical segment
+        if (vHits(ax, ay, by)) return false;
+      } else if (ay === by) {
+        // Horizontal segment
+        if (hHits(ay, ax, bx)) return false;
+      }
+      // Skip diagonal check here — we only generate orthogonal candidates
+    }
+    return true;
+  };
+
+  let middle: Pt[];
+
+  // Determine what the first turn direction from (ex,ey) should be.
+  // After the exit stub, the path can either continue in the same axis or turn.
+  // The constraint: the segment FROM the exit stub endpoint must move AWAY from
+  // the source (not back towards it). Similarly, the segment TO the entry stub
+  // must approach from the entry direction.
+
+  if (exitH === entryH) {
+    // Same axis exits: need at least 2 turns (Z-shape or U-shape)
+    // E.g., both horizontal → need V then H then V
+    // E.g., both vertical → need H then V then H
+
+    if (exitH) {
+      // Both horizontal → middle is: vertical at some X, then horizontal connector, then vertical
+      // Simplify: just one vertical connecting ey to ny at a clear X
+      const vx = clearX(Math.max(ex, nx), ey, ny);
+      middle = [[vx, ey], [vx, ny]];
+      if (!pathClear([[ex, ey], ...middle, [nx, ny]])) {
+        // Fallback: Z-shape — go vertical first, horizontal, then vertical
+        const hy = clearY(ey, ex, nx, toY > fromY);
+        middle = [[ex, hy], [nx, hy]];
+      }
     } else {
-      baseY = (ey + ny) / 2;
+      // Both vertical → middle is: horizontal at some Y, connecting ex to nx
+      // For same-direction (both bottom or both top), the horizontal must be
+      // beyond both stubs. For opposite, midpoint or either stub Y works.
+      let baseY: number;
+      if (fromDir === toDir) {
+        baseY = fromDir === 'bottom' ? Math.max(ey, ny) : Math.min(ey, ny);
+      } else {
+        baseY = (ey + ny) / 2;
+      }
+      const hy = clearY(baseY, ex, nx, fromDir === 'bottom');
+      middle = [[ex, hy], [nx, hy]];
+      if (!pathClear([[ex, ey], ...middle, [nx, ny]])) {
+        // Vertical segments at ex or nx blocked — push them right
+        const v1x = clearX(ex, Math.min(ey, hy), Math.max(ey, hy));
+        const v2x = clearX(nx, Math.min(ny, hy), Math.max(ny, hy));
+        const hy2 = clearY(baseY, Math.min(v1x, v2x), Math.max(v1x, v2x), fromDir === 'bottom');
+        middle = [];
+        if (v1x !== ex) middle.push([ex, ey], [v1x, ey]);
+        middle.push([v1x, hy2], [v2x, hy2]);
+        if (v2x !== nx) middle.push([v2x, ny]);
+      }
     }
-
-    // Find clear X for both verticals, checking the full Y extent
-    const fullMinY = Math.min(ey, ny, baseY);
-    const fullMaxY = Math.max(ey, ny, baseY);
-    const v1x = clearX(ex, fullMinY, fullMaxY);
-    const v2x = clearX(nx, fullMinY, fullMaxY);
-
-    // Find clear Y for horizontal, in the X range between the two verticals
-    const hy = clearY(baseY, Math.min(v1x, v2x), Math.max(v1x, v2x), goDown);
-
-    // Build path: exit stub endpoint → vertical to hy → horizontal to v2x → vertical to entry stub
-    if (v1x !== ex) {
-      // Need to jog horizontally from ex to v1x at ey
-      mid.push([ex, ey], [v1x, ey]);
-    }
-    mid.push([v1x, hy], [v2x, hy]);
-    if (v2x !== nx) {
-      mid.push([v2x, ny], [nx, ny]);
-    } else {
-      mid.push([v2x, ny]);
-    }
-
-  } else if (exitHoriz && !entryHoriz) {
-    // H→V: exit goes horizontal, entry is vertical
-    // Path: from (ex,ey) go horizontal to some X, then vertical to (nx, ny)
-    // The turn X should ideally be at nx (directly above/below target).
-    // But we need to check if the vertical at nx hits obstacles.
-    const fullMinY = Math.min(ey, ny);
-    const fullMaxY = Math.max(ey, ny);
-
-    // Check if vertical at nx is clear
-    if (!vSegHitsObs(nx, ey, ny)) {
-      // Direct: horizontal at ey to nx, then vertical to ny
-      mid.push([nx, ey], [nx, ny]);
-    } else {
-      // Vertical at nx blocked — find clear X for the vertical
-      const vx = clearX(ex, fullMinY, fullMaxY);
-      // Route: horizontal at ey to vx, vertical to ny, horizontal to nx
-      mid.push([vx, ey], [vx, ny], [nx, ny]);
-    }
-
   } else {
-    // V→H: exit is vertical, entry is horizontal
-    // Path: from (ex,ey) go vertical to some Y, then horizontal to (nx, ny)
-    // The turn Y should ideally be at ny (same height as entry).
-    // But we need to check if the horizontal at ny hits obstacles.
-    const fullMinX = Math.min(ex, nx);
-    const fullMaxX = Math.max(ex, nx);
+    // Different axis exits: L-shape (1 turn) or Z-shape (2 turns)
 
-    // Check if horizontal at ny is clear from ex to nx
-    if (!hSegHitsObs(ny, ex, nx)) {
-      // Direct: vertical at ex to ny, then horizontal to nx
-      mid.push([ex, ny], [nx, ny]);
+    if (exitH && !entryH) {
+      // H→V: try L-path — horizontal to nx, then vertical to ny
+      const lPath: Pt[] = [[nx, ey], [nx, ny]];
+      if (pathClear([[ex, ey], ...lPath])) {
+        middle = lPath;
+      } else {
+        // Z-path: horizontal to clearX, vertical, horizontal to nx
+        const vx = clearX(Math.min(ex, nx), ey, ny);
+        middle = [[vx, ey], [vx, ny], [nx, ny]];
+        if (!pathClear([[ex, ey], ...middle])) {
+          // U-path: go further right
+          const vx2 = clearX(Math.max(ex, nx) + offset, ey, ny);
+          middle = [[vx2, ey], [vx2, ny], [nx, ny]];
+        }
+      }
     } else {
-      // Horizontal at ny blocked — find clear Y
-      const goDown = (toY > fromY);
-      const hy = clearY(ny, fullMinX, fullMaxX, goDown);
-      // Route: vertical to hy, horizontal to nx, vertical to ny
-      mid.push([ex, hy], [nx, hy], [nx, ny]);
+      // V→H: try L-path — vertical to ny, then horizontal to nx
+      const lPath: Pt[] = [[ex, ny], [nx, ny]];
+      if (pathClear([[ex, ey], ...lPath])) {
+        middle = lPath;
+      } else {
+        // Z-path: vertical to clearY, horizontal, vertical to nx
+        const goDown = toY > fromY;
+        const hy = clearY(Math.min(ey, ny), ex, nx, goDown);
+        middle = [[ex, hy], [nx, hy], [nx, ny]];
+        if (!pathClear([[ex, ey], ...middle])) {
+          const hy2 = clearY(goDown ? Math.max(ey, ny) + offset : Math.min(ey, ny) - offset, ex, nx, goDown);
+          middle = [[ex, hy2], [nx, hy2], [nx, ny]];
+        }
+      }
     }
   }
 
-  // Assemble full path: anchor → exit stub → middle → entry stub → anchor
-  const pts: [number, number][] = [[fromX, fromY], [ex, ey], ...mid, [nx, ny], [toX, toY]];
+  // ── Assemble full path ─────────────────────────────────────────────────────
+
+  const pts: Pt[] = [[fromX, fromY], [ex, ey], ...middle, [nx, ny], [toX, toY]];
 
   // Deduplicate consecutive identical points
-  const deduped: [number, number][] = [pts[0]];
+  const deduped: Pt[] = [pts[0]];
   for (let i = 1; i < pts.length; i++) {
     if (pts[i][0] !== pts[i - 1][0] || pts[i][1] !== pts[i - 1][1]) {
       deduped.push(pts[i]);
     }
   }
 
-  // Validate: ensure all segments are orthogonal (no diagonals).
-  // If a diagonal is detected, insert an extra waypoint to make it orthogonal.
-  const final: [number, number][] = [deduped[0]];
+  // Safety: fix any accidental diagonals by inserting corner waypoints
+  const final: Pt[] = [deduped[0]];
   for (let i = 1; i < deduped.length; i++) {
     const prev = final[final.length - 1];
     const cur = deduped[i];
     if (prev[0] !== cur[0] && prev[1] !== cur[1]) {
-      // Diagonal detected — insert corner point.
-      // Prefer: continue in the direction of the previous segment, then turn.
-      if (i >= 2) {
-        const pp = final[final.length - 2] || prev;
+      // Diagonal — insert corner. Prefer continuing previous direction.
+      if (final.length >= 2) {
+        const pp = final[final.length - 2];
         if (pp[0] === prev[0]) {
-          // Previous was vertical → continue vertical, then horizontal
+          // Was vertical → continue vertical, then horizontal
           final.push([prev[0], cur[1]]);
         } else {
-          // Previous was horizontal → continue horizontal, then vertical
+          // Was horizontal → continue horizontal, then vertical
           final.push([cur[0], prev[1]]);
         }
       } else {
-        // First segment — use exit direction
-        if (exitHoriz) {
-          final.push([cur[0], prev[1]]);
-        } else {
-          final.push([prev[0], cur[1]]);
-        }
+        if (exitH) final.push([cur[0], prev[1]]);
+        else final.push([prev[0], cur[1]]);
       }
     }
     final.push(cur);
