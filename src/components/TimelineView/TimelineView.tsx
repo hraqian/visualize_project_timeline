@@ -216,22 +216,20 @@ function routeDepLink(
     pts.push([nx, ny]);
   } else if (!exitHoriz && !entryHoriz) {
     // Both vertical (e.g., bottom→top, top→bottom, etc.)
-    // Path concept: vertical down from source → horizontal across → vertical up to target
-    // We need to check the vertical segments at ex (source X) and nx (target X) for obstacles.
-    // The first vertical goes from ey to some turn Y; the horizontal connects; the second
-    // vertical goes from turn Y to ny.
-    // But the first vertical is at ex (source center X) — if there's a bar directly below/above,
-    // we must push that X sideways. Same for the second vertical at nx.
+    // Path: source → vertical exit stub → jog to vert1X if pushed → horizontal across → jog to nx → vertical entry stub → target
     const vert1X = avoidObsX(ex, Math.min(ey, ny), Math.max(ey, ny));
     const vert2X = avoidObsX(nx, Math.min(ey, ny), Math.max(ey, ny));
-    // The horizontal segment connects vert1X to vert2X at a Y between ey and ny.
-    // Pick the midpoint of ey and ny, then avoid obstacles on it.
     const midY = (ey + ny) / 2;
     const horizY = avoidObsY(midY, Math.min(vert1X, vert2X), Math.max(vert1X, vert2X), toY > fromY);
-    pts.push([vert1X, ey]);
+    // Exit stub: go straight in exit direction first
+    pts.push([ex, ey]);
+    // If pushed sideways, add horizontal jog
+    if (vert1X !== ex) pts.push([vert1X, ey]);
     pts.push([vert1X, horizY]);
     pts.push([vert2X, horizY]);
-    pts.push([vert2X, ny]);
+    // If target vertical was pushed, jog back to target X
+    if (vert2X !== nx) pts.push([vert2X, ny]);
+    pts.push([nx, ny]);
   } else if (exitHoriz && !entryHoriz) {
     // Exit horizontal (right), enter vertical (top/bottom)
     // Path: horizontal from source right edge → turn vertical → approach target from top/bottom
@@ -253,7 +251,10 @@ function routeDepLink(
     // Path: vertical from source → turn horizontal → approach target from left
     // The vertical segment at ex can collide — push right if needed.
     const vert1X = avoidObsX(ex, Math.min(ey, ny), Math.max(ey, ny));
-    pts.push([vert1X, ey]);
+    // Exit stub: go straight in exit direction first
+    pts.push([ex, ey]);
+    // If pushed sideways, add horizontal jog
+    if (vert1X !== ex) pts.push([vert1X, ey]);
     pts.push([vert1X, ny]);
     pts.push([nx, ny]);
   }
