@@ -749,6 +749,20 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const fp = dep.fromPoint ?? 'auto';
         const tp = dep.toPoint ?? 'auto';
 
+        // Compute actual bar/milestone vertical bounds within the row
+        const fromBarTop = from.type === 'task'
+          ? fromRowTop + (ROW_BASE - from.taskStyle.thickness) / 2
+          : fromRowTop + (ROW_BASE - from.milestoneStyle.size) / 2;
+        const fromBarBottom = from.type === 'task'
+          ? fromBarTop + from.taskStyle.thickness
+          : fromBarTop + from.milestoneStyle.size;
+        const toBarTop = to.type === 'task'
+          ? toRowTop + (ROW_BASE - to.taskStyle.thickness) / 2
+          : toRowTop + (ROW_BASE - to.milestoneStyle.size) / 2;
+        const toBarBottom = to.type === 'task'
+          ? toBarTop + to.taskStyle.thickness
+          : toBarTop + to.milestoneStyle.size;
+
         // Compute from anchor
         let fromX: number;
         let fromY: number;
@@ -756,12 +770,12 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           fromX = from.type === 'milestone'
             ? itemToX(from.startDate)
             : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom) / 2;
-          fromY = fromRowTop;
+          fromY = fromBarTop;
         } else if (fp === 'bottom') {
           fromX = from.type === 'milestone'
             ? itemToX(from.startDate)
             : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom) / 2;
-          fromY = fromRowTop + ROW_BASE;
+          fromY = fromBarBottom;
         } else {
           // 'auto' or 'side' — FS default: right edge center of predecessor
           fromX = from.type === 'milestone'
@@ -777,12 +791,12 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           toX = to.type === 'milestone'
             ? itemToX(to.startDate)
             : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * zoom + zoom) / 2;
-          toY = toRowTop;
+          toY = toBarTop;
         } else if (tp === 'bottom') {
           toX = to.type === 'milestone'
             ? itemToX(to.startDate)
             : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * zoom + zoom) / 2;
-          toY = toRowTop + ROW_BASE;
+          toY = toBarBottom;
         } else {
           // 'auto' or 'side' — FS default: left edge center of successor
           toX = to.type === 'milestone'
