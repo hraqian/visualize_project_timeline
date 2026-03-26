@@ -215,12 +215,25 @@ function routeDepLink(
     pts.push([vertX, ny]);
     pts.push([nx, ny]);
   } else if (!exitHoriz && !entryHoriz) {
-    // Both vertical (e.g., bottom→top, top→bottom, etc.)
-    // Path: source → vertical exit stub → jog to vert1X if pushed → horizontal across → jog to nx → vertical entry stub → target
+    // Both vertical (e.g., bottom→top, top→bottom, bottom→bottom, top→top)
+    // The horizontal connector Y must respect exit/entry directions so the path
+    // never backtracks through a bar:
+    //   bottom→top:    connector between ey (below source) and ny (above target) — use midpoint
+    //   top→bottom:    connector between ey (above source) and ny (below target) — use midpoint
+    //   bottom→bottom: connector must be below BOTH bars — use max(ey, ny)
+    //   top→top:       connector must be above BOTH bars — use min(ey, ny)
+    const sameDir = fromDir === toDir;
+    let baseHorizY: number;
+    if (sameDir) {
+      // Both exiting same direction — connector must be on the far side of both
+      baseHorizY = fromDir === 'bottom' ? Math.max(ey, ny) : Math.min(ey, ny);
+    } else {
+      // Opposite directions — midpoint works
+      baseHorizY = (ey + ny) / 2;
+    }
     const vert1X = avoidObsX(ex, Math.min(ey, ny), Math.max(ey, ny));
     const vert2X = avoidObsX(nx, Math.min(ey, ny), Math.max(ey, ny));
-    const midY = (ey + ny) / 2;
-    const horizY = avoidObsY(midY, Math.min(vert1X, vert2X), Math.max(vert1X, vert2X), toY > fromY);
+    const horizY = avoidObsY(baseHorizY, Math.min(vert1X, vert2X), Math.max(vert1X, vert2X), toY > fromY);
     // Exit stub: go straight in exit direction first
     pts.push([ex, ey]);
     // If pushed sideways, add horizontal jog
