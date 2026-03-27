@@ -1731,18 +1731,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
           {/* ─── Canvas: grid, swimlane bands, items ─── */}
           <div ref={canvasRef} className="relative" style={{ height: canvasHeight }}>
-            {/* Grid lines */}
-            {tierLabels.length > 0 &&
-              tierLabels[tierLabels.length - 1].labels.map((label, i) => {
-                const x = differenceInDays(label.startDate, parseISO(origin)) * zoom;
-                return (
-                  <div
-                    key={i}
-                    className="absolute top-0 bottom-0 border-l border-[var(--color-border)]/15"
-                    style={{ left: x }}
-                  />
-                );
-              })}
+
 
             {/* ─── Swimlane bands (bg + colored badge) ─── */}
             {swimlaneLayout.map(({ swimlane, y, height }) => {
