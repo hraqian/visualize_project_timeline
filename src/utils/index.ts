@@ -314,6 +314,11 @@ export function buildVisibleTierCells(
   const fullCellWidth = rawCells.length > 1 ? Math.max(...rawCells.map(c => c.widthFrac)) : 1;
   const cells = rawCells.filter(c => c.widthFrac >= fullCellWidth * 0.01);
 
+  // Drop trailing partial cell (less than half a full cell) to avoid clipped labels
+  if (cells.length > 1 && cells[cells.length - 1].widthFrac < fullCellWidth * 0.5) {
+    cells.pop();
+  }
+
   // Prefix first visible label for sequential units (e.g., "Week 9", "Day 1")
   if (cells.length > 0 && (unit === 'week' || unit === 'day')) {
     const prefix = unit === 'week' ? 'Week ' : 'Day ';
