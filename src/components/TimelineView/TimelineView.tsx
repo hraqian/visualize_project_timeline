@@ -152,11 +152,11 @@ function routeDepLink(
   const hHits = (y: number, x1: number, x2: number) => hHitsIn(allObs, y, x1, x2);
 
   /** Push x rightward until the vertical channel y1↔y2 is clear. */
-  const clearRight = (x: number, y1: number, y2: number): number => {
+  const clearRight = (x: number, y1: number, y2: number, obs: ObstacleRect[] = allObs): number => {
     const lo = Math.min(y1, y2), hi = Math.max(y1, y2);
     for (let i = 0; i < 100; i++) {
       let hit = false;
-      for (const o of allObs) {
+      for (const o of obs) {
         if (o.bottomY > lo + 1 && o.topY < hi - 1 &&
             x > o.leftX - PAD && x < o.rightX + PAD) {
           x = o.rightX + PAD;
@@ -169,11 +169,11 @@ function routeDepLink(
   };
 
   /** Push x leftward until the vertical channel y1↔y2 is clear. */
-  const clearLeft = (x: number, y1: number, y2: number): number => {
+  const clearLeft = (x: number, y1: number, y2: number, obs: ObstacleRect[] = allObs): number => {
     const lo = Math.min(y1, y2), hi = Math.max(y1, y2);
     for (let i = 0; i < 100; i++) {
       let hit = false;
-      for (const o of allObs) {
+      for (const o of obs) {
         if (o.bottomY > lo + 1 && o.topY < hi - 1 &&
             x > o.leftX - PAD && x < o.rightX + PAD) {
           x = o.leftX - PAD;
@@ -186,11 +186,11 @@ function routeDepLink(
   };
 
   /** Push y downward until the horizontal channel x1↔x2 is clear. */
-  const clearDown = (y: number, x1: number, x2: number): number => {
+  const clearDown = (y: number, x1: number, x2: number, obs: ObstacleRect[] = allObs): number => {
     const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
     for (let i = 0; i < 100; i++) {
       let hit = false;
-      for (const o of allObs) {
+      for (const o of obs) {
         if (o.rightX > lo + 1 && o.leftX < hi - 1 &&
             y > o.topY - PAD && y < o.bottomY + PAD) {
           y = o.bottomY + PAD;
@@ -203,11 +203,11 @@ function routeDepLink(
   };
 
   /** Push y upward until the horizontal channel x1↔x2 is clear. */
-  const clearUp = (y: number, x1: number, x2: number): number => {
+  const clearUp = (y: number, x1: number, x2: number, obs: ObstacleRect[] = allObs): number => {
     const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
     for (let i = 0; i < 100; i++) {
       let hit = false;
-      for (const o of allObs) {
+      for (const o of obs) {
         if (o.rightX > lo + 1 && o.leftX < hi - 1 &&
             y > o.topY - PAD && y < o.bottomY + PAD) {
           y = o.topY - PAD;
@@ -276,11 +276,12 @@ function routeDepLink(
 
     // If zero distance, check if obstacles block the perpendicular path.
     // If so, extend past the obstacle to allow a detour.
+    // Use 'obstacles' (excluding target) to avoid over-detouring.
     if (isH && Math.abs(base - cx) < 1) {
       if (Math.abs(cy - goalY) >= 1 && vHits(cx, cy, goalY)) {
         if (dir === 'right') {
           let ext = cx;
-          for (const o of allObs) {
+          for (const o of obstacles) {
             if (cx > o.leftX - PAD && cx < o.rightX + PAD &&
                 o.topY < Math.max(cy, goalY) - 1 && o.bottomY > Math.min(cy, goalY) + 1) {
               ext = Math.max(ext, o.rightX + PAD);
@@ -289,7 +290,7 @@ function routeDepLink(
           return ext;
         } else {
           let ext = cx;
-          for (const o of allObs) {
+          for (const o of obstacles) {
             if (cx > o.leftX - PAD && cx < o.rightX + PAD &&
                 o.topY < Math.max(cy, goalY) - 1 && o.bottomY > Math.min(cy, goalY) + 1) {
               ext = Math.min(ext, o.leftX - PAD);
@@ -303,7 +304,7 @@ function routeDepLink(
       if (Math.abs(cx - goalX) >= 1 && hHits(cy, cx, goalX)) {
         if (dir === 'down') {
           let ext = cy;
-          for (const o of allObs) {
+          for (const o of obstacles) {
             if (cy > o.topY - PAD && cy < o.bottomY + PAD &&
                 o.leftX < Math.max(cx, goalX) - 1 && o.rightX > Math.min(cx, goalX) + 1) {
               ext = Math.max(ext, o.bottomY + PAD);
@@ -312,7 +313,7 @@ function routeDepLink(
           return ext;
         } else {
           let ext = cy;
-          for (const o of allObs) {
+          for (const o of obstacles) {
             if (cy > o.topY - PAD && cy < o.bottomY + PAD &&
                 o.leftX < Math.max(cx, goalX) - 1 && o.rightX > Math.min(cx, goalX) + 1) {
               ext = Math.min(ext, o.topY - PAD);
@@ -411,11 +412,12 @@ function routeDepLink(
 
     if (!moved) {
       // Stuck: force a detour perpendicular to clear obstacles.
+      // Use 'obstacles' (excluding target) to avoid over-detouring past the target bar.
       if (lastAxis === 'h') {
         // Push horizontally past obstacles blocking the vertical path.
         let chLo = Math.min(cy, goalY), chHi = Math.max(cy, goalY);
         if (chHi - chLo < 1) {
-          for (const o of allObs) {
+          for (const o of obstacles) {
             if (cx > o.leftX - PAD && cx < o.rightX + PAD &&
                 cy > o.topY - PAD && cy < o.bottomY + PAD) {
               chLo = Math.min(chLo, o.topY - PAD);
@@ -425,8 +427,8 @@ function routeDepLink(
         }
         const dx = goalX - cx;
         const newX = dx >= 0
-          ? clearRight(cx, chLo, chHi)
-          : clearLeft(cx, chLo, chHi);
+          ? clearRight(cx, chLo, chHi, obstacles)
+          : clearLeft(cx, chLo, chHi, obstacles);
         if (Math.abs(newX - cx) >= 1) {
           pts.push([newX, cy]);
           cx = newX;
@@ -438,7 +440,7 @@ function routeDepLink(
         // Push vertically past obstacles blocking the horizontal path.
         let chLo = Math.min(cx, goalX), chHi = Math.max(cx, goalX);
         if (chHi - chLo < 1) {
-          for (const o of allObs) {
+          for (const o of obstacles) {
             if (cy > o.topY - PAD && cy < o.bottomY + PAD &&
                 cx > o.leftX - PAD && cx < o.rightX + PAD) {
               chLo = Math.min(chLo, o.leftX - PAD);
@@ -448,8 +450,8 @@ function routeDepLink(
         }
         const dy = goalY - cy;
         const newY = dy >= 0
-          ? clearDown(cy, chLo, chHi)
-          : clearUp(cy, chLo, chHi);
+          ? clearDown(cy, chLo, chHi, obstacles)
+          : clearUp(cy, chLo, chHi, obstacles);
         if (Math.abs(newY - cy) >= 1) {
           pts.push([cx, newY]);
           cy = newY;
@@ -463,12 +465,13 @@ function routeDepLink(
 
   // ── Final arrival at approach point (obstacle-aware) ────────────────────────
   if (Math.abs(cx - goalX) >= 1 || Math.abs(cy - goalY) >= 1) {
+    // Use 'obstacles' (excluding target) for detour computation to avoid over-detouring.
     const arriveH = (targetX: number) => {
       if (Math.abs(targetX - cx) < 1) return;
       if (hHits(cy, cx, targetX)) {
         const detourY = (targetX > cx)
-          ? clearDown(cy, Math.min(cx, targetX), Math.max(cx, targetX))
-          : clearUp(cy, Math.min(cx, targetX), Math.max(cx, targetX));
+          ? clearDown(cy, Math.min(cx, targetX), Math.max(cx, targetX), obstacles)
+          : clearUp(cy, Math.min(cx, targetX), Math.max(cx, targetX), obstacles);
         if (Math.abs(detourY - cy) >= 1) {
           pts.push([cx, detourY]);
           cy = detourY;
@@ -482,8 +485,8 @@ function routeDepLink(
       if (Math.abs(targetY - cy) < 1) return;
       if (vHits(cx, cy, targetY)) {
         const detourX = (targetY > cy)
-          ? clearRight(cx, Math.min(cy, targetY), Math.max(cy, targetY))
-          : clearLeft(cx, Math.min(cy, targetY), Math.max(cy, targetY));
+          ? clearRight(cx, Math.min(cy, targetY), Math.max(cy, targetY), obstacles)
+          : clearLeft(cx, Math.min(cy, targetY), Math.max(cy, targetY), obstacles);
         if (Math.abs(detourX - cx) >= 1) {
           pts.push([detourX, cy]);
           cx = detourX;
