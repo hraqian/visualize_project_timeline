@@ -92,495 +92,617 @@ const SWIMLANE_PADDING_TOP = 10;
 const SWIMLANE_PADDING_BOTTOM = 10;
 
 // ─── Obstacle-avoidance routing for dependency links ─────────────────────────
-// Given a from/to point and a list of obstacle rects, compute an orthogonal
-// path that avoids crossing through bars between the predecessor and successor.
+// Visibility-graph + Dijkstra router with proximity + bend penalties.
+// Three independent constants:
+//   GEOM_EPS  – tiny offset for candidate scanlines (hard geometry)
+//   PORT_OFFSET – how far glue ports sit outside the object boundary
+//   SOFT_ZONE – proximity penalty zone (soft preference only)
 interface ObstacleRect { leftX: number; rightX: number; topY: number; bottomY: number }
 
 type AnchorDir = 'right' | 'left' | 'top' | 'bottom';
 
-/**
- * Unified obstacle-aware orthogonal router for dependency links.
- *
- * Greedy pathfinder that routes segment-by-segment toward the target:
- *   1. Exit stub: short segment from source in fromDir
- *   2. At each step, pick the best direction toward the target (alternating
- *      H/V axes), check for obstacles, go as far as possible (stopping
- *      before the first obstacle if blocked)
- *   3. If stuck on both axes, force a detour perpendicular to clear obstacles
- *   4. Final arrival: obstacle-aware segments to reach the approach point
- *   5. Entry segment: approach point → target
- */
 function routeDepLink(
   fromX: number, fromY: number,
   toX: number, toY: number,
-  obstacles: ObstacleRect[],
-  offset: number = 12,
+  allObjects: ObstacleRect[],
+  startObj: ObstacleRect,
+  endObj: ObstacleRect,
   fromDir: AnchorDir = 'right',
   toDir: AnchorDir = 'left',
-  targetObs?: ObstacleRect,
 ): string {
-  const PAD = 8;
-  type Pt = [number, number];
+  type NodeKey = string;
+  type EdgeDir = 'H' | 'V' | 'S';
+  type GraphEdge = { key: NodeKey; cost: number; dir: EdgeDir };
+  type StateKey = string;
 
-  // Build full obstacle list: base obstacles + target (if provided).
-  // "allObs" is used for intermediate segments (must avoid target bar).
-  // "obstacles" alone is used for the final entry segment (allowed to cross target).
-  const allObs = targetObs ? [...obstacles, targetObs] : obstacles;
+  const GEOM_EPS = 0.5;
+  const HARD_PAD = 1;
+  const MIN_PORT_OFFSET = 3;
+  const MAX_PORT_OFFSET = 16;
+  const SOFT_ZONE = 28;
+  const PROXIMITY_WEIGHT = 1.25;
+  const BEND_PENALTY = 18;
+  const OUTER_MARGIN = 48;
+  const ANCHOR_DEVIATION_WEIGHT = 4;
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  const round3 = (n: number) => Math.round(n * 1000) / 1000;
+  const approxEq = (a: number, b: number) => Math.abs(a - b) <= GEOM_EPS;
+  const isHorizontalDir = (dir: AnchorDir) => dir === 'left' || dir === 'right';
+  const manhattan = (ax: number, ay: number, bx: number, by: number) => Math.abs(bx - ax) + Math.abs(by - ay);
 
-  /** Does a vertical segment at x from y1→y2 hit any obstacle in the given list? */
-  const vHitsIn = (obs: ObstacleRect[], x: number, y1: number, y2: number): boolean => {
-    const lo = Math.min(y1, y2), hi = Math.max(y1, y2);
-    return obs.some(o =>
-      o.bottomY > lo + 1 && o.topY < hi - 1 &&
-      x > o.leftX - PAD && x < o.rightX + PAD
-    );
-  };
+  const rectEq = (a: ObstacleRect, b: ObstacleRect) =>
+    approxEq(a.leftX, b.leftX) &&
+    approxEq(a.rightX, b.rightX) &&
+    approxEq(a.topY, b.topY) &&
+    approxEq(a.bottomY, b.bottomY);
 
-  /** Does a horizontal segment at y from x1→x2 hit any obstacle in the given list? */
-  const hHitsIn = (obs: ObstacleRect[], y: number, x1: number, x2: number): boolean => {
-    const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
-    return obs.some(o =>
-      o.rightX > lo + 1 && o.leftX < hi - 1 &&
-      y > o.topY - PAD && y < o.bottomY + PAD
-    );
-  };
+  const normalizeRect = (r: ObstacleRect): ObstacleRect => ({
+    leftX: Math.min(r.leftX, r.rightX),
+    rightX: Math.max(r.leftX, r.rightX),
+    topY: Math.min(r.topY, r.bottomY),
+    bottomY: Math.max(r.topY, r.bottomY),
+  });
 
-  // Convenience: check against all obstacles (including target)
-  const vHits = (x: number, y1: number, y2: number) => vHitsIn(allObs, x, y1, y2);
-  const hHits = (y: number, x1: number, x2: number) => hHitsIn(allObs, y, x1, x2);
+  const expandRect = (r: ObstacleRect, amount: number): ObstacleRect => ({
+    leftX: r.leftX - amount,
+    rightX: r.rightX + amount,
+    topY: r.topY - amount,
+    bottomY: r.bottomY + amount,
+  });
 
-  /** Push x rightward until the vertical channel y1↔y2 is clear. */
-  const clearRight = (x: number, y1: number, y2: number): number => {
-    const lo = Math.min(y1, y2), hi = Math.max(y1, y2);
-    for (let i = 0; i < 100; i++) {
-      let hit = false;
-      for (const o of allObs) {
-        if (o.bottomY > lo + 1 && o.topY < hi - 1 &&
-            x > o.leftX - PAD && x < o.rightX + PAD) {
-          x = o.rightX + PAD;
-          hit = true;
-        }
-      }
-      if (!hit) break;
+  const objects = allObjects.map(normalizeRect);
+  const startRect = normalizeRect(startObj);
+  const endRect = normalizeRect(endObj);
+
+  const nodeKey = (x: number, y: number): NodeKey => `${round3(x)},${round3(y)}`;
+
+  const pointInRect = (x: number, y: number, r: ObstacleRect): boolean =>
+    x >= r.leftX - GEOM_EPS &&
+    x <= r.rightX + GEOM_EPS &&
+    y >= r.topY - GEOM_EPS &&
+    y <= r.bottomY + GEOM_EPS;
+
+  const pointStrictlyInsideRect = (x: number, y: number, r: ObstacleRect): boolean =>
+    x > r.leftX &&
+    x < r.rightX &&
+    y > r.topY &&
+    y < r.bottomY;
+
+  const segmentHitsRect = (
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    rect: ObstacleRect,
+    extraPad: number = 0,
+  ): boolean => {
+    const r = expandRect(rect, extraPad);
+
+    if (approxEq(ax, bx)) {
+      const x = ax;
+      const lo = Math.min(ay, by);
+      const hi = Math.max(ay, by);
+      return (
+        x >= r.leftX - GEOM_EPS &&
+        x <= r.rightX + GEOM_EPS &&
+        hi >= r.topY - GEOM_EPS &&
+        lo <= r.bottomY + GEOM_EPS
+      );
     }
-    return x;
-  };
 
-  /** Push x leftward until the vertical channel y1↔y2 is clear. */
-  const clearLeft = (x: number, y1: number, y2: number): number => {
-    const lo = Math.min(y1, y2), hi = Math.max(y1, y2);
-    for (let i = 0; i < 100; i++) {
-      let hit = false;
-      for (const o of allObs) {
-        if (o.bottomY > lo + 1 && o.topY < hi - 1 &&
-            x > o.leftX - PAD && x < o.rightX + PAD) {
-          x = o.leftX - PAD;
-          hit = true;
-        }
-      }
-      if (!hit) break;
+    if (approxEq(ay, by)) {
+      const y = ay;
+      const lo = Math.min(ax, bx);
+      const hi = Math.max(ax, bx);
+      return (
+        y >= r.topY - GEOM_EPS &&
+        y <= r.bottomY + GEOM_EPS &&
+        hi >= r.leftX - GEOM_EPS &&
+        lo <= r.rightX + GEOM_EPS
+      );
     }
-    return x;
+
+    return true;
   };
 
-  /** Push y downward until the horizontal channel x1↔x2 is clear. */
-  const clearDown = (y: number, x1: number, x2: number): number => {
-    const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
-    for (let i = 0; i < 100; i++) {
-      let hit = false;
-      for (const o of allObs) {
-        if (o.rightX > lo + 1 && o.leftX < hi - 1 &&
-            y > o.topY - PAD && y < o.bottomY + PAD) {
-          y = o.bottomY + PAD;
-          hit = true;
-        }
-      }
-      if (!hit) break;
+  const pointInFreeSpace = (x: number, y: number): boolean => {
+    for (const rect of objects) {
+      if (pointInRect(x, y, expandRect(rect, HARD_PAD))) return false;
     }
-    return y;
+    return true;
   };
 
-  /** Push y upward until the horizontal channel x1↔x2 is clear. */
-  const clearUp = (y: number, x1: number, x2: number): number => {
-    const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
-    for (let i = 0; i < 100; i++) {
-      let hit = false;
-      for (const o of allObs) {
-        if (o.rightX > lo + 1 && o.leftX < hi - 1 &&
-            y > o.topY - PAD && y < o.bottomY + PAD) {
-          y = o.topY - PAD;
-          hit = true;
-        }
-      }
-      if (!hit) break;
+  const segmentClear = (ax: number, ay: number, bx: number, by: number): boolean => {
+    if (!approxEq(ax, bx) && !approxEq(ay, by)) return false;
+    for (const rect of objects) {
+      if (segmentHitsRect(ax, ay, bx, by, rect, HARD_PAD)) return false;
     }
-    return y;
+    return true;
   };
 
-  // ── Exit stub ──────────────────────────────────────────────────────────────
-  const pts: Pt[] = [[fromX, fromY]];
-  let cx = fromX, cy = fromY; // current position
+  const validGlueExit = (
+    obj: ObstacleRect,
+    glueX: number,
+    glueY: number,
+    portX: number,
+    portY: number,
+  ): boolean => {
+    if (!approxEq(glueX, portX) && !approxEq(glueY, portY)) return false;
+    if (!pointInFreeSpace(portX, portY)) return false;
 
-  // Move one step in exit direction
-  switch (fromDir) {
-    case 'right': cx = fromX + offset; break;
-    case 'left':  cx = fromX - offset; break;
-    case 'bottom':cy = fromY + offset; break;
-    case 'top':   cy = fromY - offset; break;
-  }
-  pts.push([cx, cy]);
+    const probeX = approxEq(glueX, portX)
+      ? glueX
+      : glueX + Math.sign(portX - glueX) * GEOM_EPS;
+    const probeY = approxEq(glueY, portY)
+      ? glueY
+      : glueY + Math.sign(portY - glueY) * GEOM_EPS;
 
-  // ── Approach point: where the greedy loop aims ─────────────────────────────
-  const ENTER_OFFSET = 24;
-  let goalX: number, goalY: number;
-  switch (toDir) {
-    case 'left':  goalX = toX - ENTER_OFFSET; goalY = toY; break;
-    case 'right': goalX = toX + ENTER_OFFSET; goalY = toY; break;
-    case 'top':   goalX = toX; goalY = toY - ENTER_OFFSET; break;
-    case 'bottom':goalX = toX; goalY = toY + ENTER_OFFSET; break;
-  }
+    for (const rect of objects) {
+      if (rectEq(rect, obj)) {
+        if (pointStrictlyInsideRect(probeX, probeY, rect)) return false;
+      } else {
+        if (segmentHitsRect(glueX, glueY, portX, portY, rect, HARD_PAD)) return false;
+      }
+    }
 
-  // ── Greedy pathfinder toward approach point ────────────────────────────────
-  type Dir = 'right' | 'left' | 'up' | 'down';
-  const exitIsH = fromDir === 'left' || fromDir === 'right';
-  let lastAxis: 'h' | 'v' = exitIsH ? 'h' : 'v';
+    return true;
+  };
 
-  /** Pick directions to try, ordered by priority (best first). */
-  const pickDirections = (): Dir[] => {
-    const dx = goalX - cx;
-    const dy = goalY - cy;
-    if (lastAxis === 'h') {
-      const primary: Dir = dy >= 0 ? 'down' : 'up';
-      const secondary: Dir = dy >= 0 ? 'up' : 'down';
-      return [primary, secondary];
+  const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+  const anchorInsetForSpan = (span: number) => Math.max(2, Math.min(8, span / 4));
+
+  const buildSideAnchors = (
+    obj: ObstacleRect,
+    preferredX: number,
+    preferredY: number,
+    dir: AnchorDir,
+    oppositeX: number,
+    oppositeY: number,
+  ): [number, number][] => {
+    const candidates = new Set<string>();
+    const addPoint = (x: number, y: number) => {
+      candidates.add(`${round3(x)},${round3(y)}`);
+    };
+
+    if (dir === 'top' || dir === 'bottom') {
+      const y = dir === 'top' ? obj.topY : obj.bottomY;
+      const insetX = anchorInsetForSpan(obj.rightX - obj.leftX);
+      const minX = Math.min((obj.leftX + obj.rightX) / 2, obj.leftX + insetX);
+      const maxX = Math.max((obj.leftX + obj.rightX) / 2, obj.rightX - insetX);
+      const midX = (obj.leftX + obj.rightX) / 2;
+
+      addPoint(clamp(preferredX, minX, maxX), y);
+      addPoint(clamp(oppositeX, minX, maxX), y);
+      addPoint(minX, y);
+      addPoint(midX, y);
+      addPoint(maxX, y);
+
+      for (const rect of objects) {
+        addPoint(clamp(rect.leftX - HARD_PAD - GEOM_EPS, minX, maxX), y);
+        addPoint(clamp(rect.rightX + HARD_PAD + GEOM_EPS, minX, maxX), y);
+      }
     } else {
-      const primary: Dir = dx >= 0 ? 'right' : 'left';
-      const secondary: Dir = dx >= 0 ? 'left' : 'right';
-      return [primary, secondary];
+      const x = dir === 'left' ? obj.leftX : obj.rightX;
+      const insetY = anchorInsetForSpan(obj.bottomY - obj.topY);
+      const minY = Math.min((obj.topY + obj.bottomY) / 2, obj.topY + insetY);
+      const maxY = Math.max((obj.topY + obj.bottomY) / 2, obj.bottomY - insetY);
+      const midY = (obj.topY + obj.bottomY) / 2;
+
+      addPoint(x, clamp(preferredY, minY, maxY));
+      addPoint(x, clamp(oppositeY, minY, maxY));
+      addPoint(x, minY);
+      addPoint(x, midY);
+      addPoint(x, maxY);
+
+      for (const rect of objects) {
+        addPoint(x, clamp(rect.topY - HARD_PAD - GEOM_EPS, minY, maxY));
+        addPoint(x, clamp(rect.bottomY + HARD_PAD + GEOM_EPS, minY, maxY));
+      }
     }
+
+    return Array.from(candidates)
+      .map((key) => key.split(',').map(Number) as [number, number])
+      .sort((a, b) => {
+        const da = Math.abs(a[0] - preferredX) + Math.abs(a[1] - preferredY);
+        const db = Math.abs(b[0] - preferredX) + Math.abs(b[1] - preferredY);
+        return da - db;
+      });
   };
 
-  /** How far to go in a direction. Extends past approach point when blocked. */
-  const goalForDir = (dir: Dir): number => {
-    const isH = dir === 'right' || dir === 'left';
-    const base = (() => {
+  const buildPorts = (obj: ObstacleRect, gx: number, gy: number, dir: AnchorDir): [number, number][] => {
+    const ports: [number, number][] = [];
+    const portForOffset = (offset: number): [number, number] => {
       switch (dir) {
-        case 'right': return Math.max(cx, goalX);
-        case 'left':  return Math.min(cx, goalX);
-        case 'down':  return Math.max(cy, goalY);
-        case 'up':    return Math.min(cy, goalY);
+        case 'left': return [gx - offset, gy];
+        case 'right': return [gx + offset, gy];
+        case 'top': return [gx, gy - offset];
+        case 'bottom': return [gx, gy + offset];
       }
-    })();
-
-    // If zero distance, check if obstacles block the perpendicular path.
-    // If so, extend past the obstacle to allow a detour.
-    if (isH && Math.abs(base - cx) < 1) {
-      if (Math.abs(cy - goalY) >= 1 && vHits(cx, cy, goalY)) {
-        if (dir === 'right') {
-          let ext = cx;
-          for (const o of allObs) {
-            if (cx > o.leftX - PAD && cx < o.rightX + PAD &&
-                o.topY < Math.max(cy, goalY) - 1 && o.bottomY > Math.min(cy, goalY) + 1) {
-              ext = Math.max(ext, o.rightX + PAD);
-            }
-          }
-          return ext;
-        } else {
-          let ext = cx;
-          for (const o of allObs) {
-            if (cx > o.leftX - PAD && cx < o.rightX + PAD &&
-                o.topY < Math.max(cy, goalY) - 1 && o.bottomY > Math.min(cy, goalY) + 1) {
-              ext = Math.min(ext, o.leftX - PAD);
-            }
-          }
-          return ext;
-        }
-      }
-    }
-    if (!isH && Math.abs(base - cy) < 1) {
-      if (Math.abs(cx - goalX) >= 1 && hHits(cy, cx, goalX)) {
-        if (dir === 'down') {
-          let ext = cy;
-          for (const o of allObs) {
-            if (cy > o.topY - PAD && cy < o.bottomY + PAD &&
-                o.leftX < Math.max(cx, goalX) - 1 && o.rightX > Math.min(cx, goalX) + 1) {
-              ext = Math.max(ext, o.bottomY + PAD);
-            }
-          }
-          return ext;
-        } else {
-          let ext = cy;
-          for (const o of allObs) {
-            if (cy > o.topY - PAD && cy < o.bottomY + PAD &&
-                o.leftX < Math.max(cx, goalX) - 1 && o.rightX > Math.min(cx, goalX) + 1) {
-              ext = Math.min(ext, o.topY - PAD);
-            }
-          }
-          return ext;
-        }
-      }
-    }
-
-    return base;
-  };
-
-  /** Try to move in a direction. Returns whether we actually moved. */
-  const tryMove = (dir: Dir): { moved: boolean } => {
-    const isH = dir === 'right' || dir === 'left';
-    let goal = goalForDir(dir);
-
-    // Don't move if already there
-    if (isH && Math.abs(goal - cx) < 1) return { moved: false };
-    if (!isH && Math.abs(goal - cy) < 1) return { moved: false };
-
-    if (isH) {
-      // Horizontal move at y=cy from cx toward goal
-      if (hHits(cy, cx, goal)) {
-        if (goal > cx) {
-          let stopX = goal;
-          for (const o of allObs) {
-            if (o.leftX < stopX - 1 && o.rightX > cx + 1 &&
-                cy > o.topY - PAD && cy < o.bottomY + PAD) {
-              stopX = Math.min(stopX, o.leftX - PAD);
-            }
-          }
-          goal = Math.max(stopX, cx);
-        } else {
-          let stopX = goal;
-          for (const o of allObs) {
-            if (o.rightX > stopX + 1 && o.leftX < cx - 1 &&
-                cy > o.topY - PAD && cy < o.bottomY + PAD) {
-              stopX = Math.max(stopX, o.rightX + PAD);
-            }
-          }
-          goal = Math.min(stopX, cx);
-        }
-      }
-      if (Math.abs(goal - cx) < 1) return { moved: false };
-      pts.push([goal, cy]);
-      cx = goal;
-      lastAxis = 'h';
-      return { moved: true };
-    } else {
-      // Vertical move at x=cx from cy toward goal
-      if (vHits(cx, cy, goal)) {
-        if (goal > cy) {
-          let stopY = goal;
-          for (const o of allObs) {
-            if (o.topY < stopY - 1 && o.bottomY > cy + 1 &&
-                cx > o.leftX - PAD && cx < o.rightX + PAD) {
-              stopY = Math.min(stopY, o.topY - PAD);
-            }
-          }
-          goal = Math.max(stopY, cy);
-        } else {
-          let stopY = goal;
-          for (const o of allObs) {
-            if (o.bottomY > stopY + 1 && o.topY < cy - 1 &&
-                cx > o.leftX - PAD && cx < o.rightX + PAD) {
-              stopY = Math.max(stopY, o.bottomY + PAD);
-            }
-          }
-          goal = Math.min(stopY, cy);
-        }
-      }
-      if (Math.abs(goal - cy) < 1) return { moved: false };
-      pts.push([cx, goal]);
-      cy = goal;
-      lastAxis = 'v';
-      return { moved: true };
-    }
-  };
-
-  // Main loop: keep moving toward approach point until we arrive or get stuck
-  for (let iter = 0; iter < 30; iter++) {
-    if (Math.abs(cx - goalX) < 1 && Math.abs(cy - goalY) < 1) break;
-
-    const dirs = pickDirections();
-    let moved = false;
-
-    for (const dir of dirs) {
-      const result = tryMove(dir);
-      if (result.moved) {
-        moved = true;
-        break;
-      }
-    }
-
-    if (!moved) {
-      // Stuck: force a detour perpendicular to clear obstacles.
-      // Try both directions and pick the shorter detour to avoid over-detouring.
-      if (lastAxis === 'h') {
-        // Push horizontally past obstacles blocking the vertical path.
-        let chLo = Math.min(cy, goalY), chHi = Math.max(cy, goalY);
-        if (chHi - chLo < 1) {
-          for (const o of allObs) {
-            if (cx > o.leftX - PAD && cx < o.rightX + PAD &&
-                cy > o.topY - PAD && cy < o.bottomY + PAD) {
-              chLo = Math.min(chLo, o.topY - PAD);
-              chHi = Math.max(chHi, o.bottomY + PAD);
-            }
-          }
-        }
-        const rX = clearRight(cx, chLo, chHi);
-        const lX = clearLeft(cx, chLo, chHi);
-        const rDist = Math.abs(rX - cx);
-        const lDist = Math.abs(lX - cx);
-        // Pick the direction with less displacement; if tied, prefer toward goalX
-        let newX: number;
-        if (rDist < 1 && lDist < 1) {
-          break; // truly stuck
-        } else if (rDist < 1) {
-          newX = lX;
-        } else if (lDist < 1) {
-          newX = rX;
-        } else {
-          const dx = goalX - cx;
-          newX = dx > 0 ? rX : dx < 0 ? lX : (rDist <= lDist ? rX : lX);
-        }
-        if (Math.abs(newX - cx) >= 1) {
-          pts.push([newX, cy]);
-          cx = newX;
-          lastAxis = 'h';
-        } else {
-          break;
-        }
-      } else {
-        // Push vertically past obstacles blocking the horizontal path.
-        let chLo = Math.min(cx, goalX), chHi = Math.max(cx, goalX);
-        if (chHi - chLo < 1) {
-          for (const o of allObs) {
-            if (cy > o.topY - PAD && cy < o.bottomY + PAD &&
-                cx > o.leftX - PAD && cx < o.rightX + PAD) {
-              chLo = Math.min(chLo, o.leftX - PAD);
-              chHi = Math.max(chHi, o.rightX + PAD);
-            }
-          }
-        }
-        const dY = clearDown(cy, chLo, chHi);
-        const uY = clearUp(cy, chLo, chHi);
-        const dDist = Math.abs(dY - cy);
-        const uDist = Math.abs(uY - cy);
-        let newY: number;
-        if (dDist < 1 && uDist < 1) {
-          break;
-        } else if (dDist < 1) {
-          newY = uY;
-        } else if (uDist < 1) {
-          newY = dY;
-        } else {
-          const dy = goalY - cy;
-          newY = dy > 0 ? dY : dy < 0 ? uY : (dDist <= uDist ? dY : uY);
-        }
-        if (Math.abs(newY - cy) >= 1) {
-          pts.push([cx, newY]);
-          cy = newY;
-          lastAxis = 'v';
-        } else {
-          break;
-        }
-      }
-    }
-  }
-
-  // ── Final arrival at approach point (obstacle-aware) ────────────────────────
-  if (Math.abs(cx - goalX) >= 1 || Math.abs(cy - goalY) >= 1) {
-    const arriveH = (targetX: number) => {
-      if (Math.abs(targetX - cx) < 1) return;
-      if (hHits(cy, cx, targetX)) {
-        // Try both directions, pick shorter detour
-        const dY = clearDown(cy, Math.min(cx, targetX), Math.max(cx, targetX));
-        const uY = clearUp(cy, Math.min(cx, targetX), Math.max(cx, targetX));
-        const dDist = Math.abs(dY - cy);
-        const uDist = Math.abs(uY - cy);
-        let detourY = cy;
-        if (dDist >= 1 || uDist >= 1) {
-          if (dDist < 1) detourY = uY;
-          else if (uDist < 1) detourY = dY;
-          else detourY = dDist <= uDist ? dY : uY;
-        }
-        if (Math.abs(detourY - cy) >= 1) {
-          pts.push([cx, detourY]);
-          cy = detourY;
-        }
-      }
-      pts.push([targetX, cy]);
-      cx = targetX;
     };
 
-    const arriveV = (targetY: number) => {
-      if (Math.abs(targetY - cy) < 1) return;
-      if (vHits(cx, cy, targetY)) {
-        // Try both directions, pick shorter detour
-        const rX = clearRight(cx, Math.min(cy, targetY), Math.max(cy, targetY));
-        const lX = clearLeft(cx, Math.min(cy, targetY), Math.max(cy, targetY));
-        const rDist = Math.abs(rX - cx);
-        const lDist = Math.abs(lX - cx);
-        let detourX = cx;
-        if (rDist >= 1 || lDist >= 1) {
-          if (rDist < 1) detourX = lX;
-          else if (lDist < 1) detourX = rX;
-          else detourX = rDist <= lDist ? rX : lX;
-        }
-        if (Math.abs(detourX - cx) >= 1) {
-          pts.push([detourX, cy]);
-          cx = detourX;
+    const clearanceInDir = (): number => {
+      let best = Infinity;
+
+      for (const rect of objects) {
+        if (rectEq(rect, obj)) continue;
+
+        if (isHorizontalDir(dir)) {
+          if (gy < rect.topY - GEOM_EPS || gy > rect.bottomY + GEOM_EPS) continue;
+          if (dir === 'right' && rect.leftX >= gx - GEOM_EPS) {
+            best = Math.min(best, rect.leftX - gx);
+          }
+          if (dir === 'left' && rect.rightX <= gx + GEOM_EPS) {
+            best = Math.min(best, gx - rect.rightX);
+          }
+        } else {
+          if (gx < rect.leftX - GEOM_EPS || gx > rect.rightX + GEOM_EPS) continue;
+          if (dir === 'bottom' && rect.topY >= gy - GEOM_EPS) {
+            best = Math.min(best, rect.topY - gy);
+          }
+          if (dir === 'top' && rect.bottomY <= gy + GEOM_EPS) {
+            best = Math.min(best, gy - rect.bottomY);
+          }
         }
       }
-      pts.push([cx, targetY]);
-      cy = targetY;
+
+      return best;
     };
 
-    if (Math.abs(cx - goalX) >= 1 && Math.abs(cy - goalY) >= 1) {
-      if (toDir === 'left' || toDir === 'right') {
-        arriveV(goalY);
-        arriveH(goalX);
-      } else {
-        arriveH(goalX);
-        arriveV(goalY);
+    const maxOffset = Math.max(0, Math.min(MAX_PORT_OFFSET, clearanceInDir() - HARD_PAD));
+    const candidateOffsets = new Set<number>();
+
+    for (const offset of [MIN_PORT_OFFSET, 4, 6, 8, 12, MAX_PORT_OFFSET]) {
+      if (offset <= maxOffset + GEOM_EPS) candidateOffsets.add(offset);
+    }
+    if (maxOffset > GEOM_EPS) candidateOffsets.add(Math.max(GEOM_EPS * 2, round3(maxOffset)));
+    if (candidateOffsets.size === 0 && maxOffset > GEOM_EPS * 2) {
+      candidateOffsets.add(round3(Math.max(GEOM_EPS * 2, maxOffset / 2)));
+    }
+
+    for (const offset of candidateOffsets) {
+      ports.push(portForOffset(offset));
+    }
+
+    return ports
+      .filter(([px, py]) => validGlueExit(obj, gx, gy, px, py))
+      .sort((a, b) => {
+        const da = Math.abs(a[0] - gx) + Math.abs(a[1] - gy);
+        const db = Math.abs(b[0] - gx) + Math.abs(b[1] - gy);
+        return da - db;
+      });
+  };
+
+  const startAnchors = buildSideAnchors(startRect, fromX, fromY, fromDir, toX, toY);
+  const endAnchors = buildSideAnchors(endRect, toX, toY, toDir, fromX, fromY);
+
+  const startPortToAnchor = new Map<string, [number, number]>();
+  const endPortToAnchor = new Map<string, [number, number]>();
+  const startPorts: [number, number][] = [];
+  const endPorts: [number, number][] = [];
+
+  for (const [gx, gy] of startAnchors) {
+    for (const port of buildPorts(startRect, gx, gy, fromDir)) {
+      const key = nodeKey(port[0], port[1]);
+      if (!startPortToAnchor.has(key)) {
+        startPorts.push(port);
+        startPortToAnchor.set(key, [gx, gy]);
       }
-    } else if (Math.abs(cx - goalX) >= 1) {
-      arriveH(goalX);
+    }
+  }
+
+  for (const [gx, gy] of endAnchors) {
+    for (const port of buildPorts(endRect, gx, gy, toDir)) {
+      const key = nodeKey(port[0], port[1]);
+      if (!endPortToAnchor.has(key)) {
+        endPorts.push(port);
+        endPortToAnchor.set(key, [gx, gy]);
+      }
+    }
+  }
+
+  if (startPorts.length === 0 || endPorts.length === 0) {
+    return '';
+  }
+
+  const xSet = new Set<number>();
+  const ySet = new Set<number>();
+  const addX = (x: number) => xSet.add(round3(x));
+  const addY = (y: number) => ySet.add(round3(y));
+
+  let minX = Math.min(fromX, toX);
+  let maxX = Math.max(fromX, toX);
+  let minY = Math.min(fromY, toY);
+  let maxY = Math.max(fromY, toY);
+
+  for (const rect of objects) {
+    minX = Math.min(minX, rect.leftX);
+    maxX = Math.max(maxX, rect.rightX);
+    minY = Math.min(minY, rect.topY);
+    maxY = Math.max(maxY, rect.bottomY);
+
+    addX(rect.leftX - HARD_PAD);
+    addX(rect.rightX + HARD_PAD);
+    addY(rect.topY - HARD_PAD);
+    addY(rect.bottomY + HARD_PAD);
+
+    addX(rect.leftX - MAX_PORT_OFFSET);
+    addX(rect.rightX + MAX_PORT_OFFSET);
+    addY(rect.topY - MAX_PORT_OFFSET);
+    addY(rect.bottomY + MAX_PORT_OFFSET);
+
+    addX(rect.leftX - SOFT_ZONE);
+    addX(rect.rightX + SOFT_ZONE);
+    addY(rect.topY - SOFT_ZONE);
+    addY(rect.bottomY + SOFT_ZONE);
+  }
+
+  addX(minX - OUTER_MARGIN);
+  addX(maxX + OUTER_MARGIN);
+  addY(minY - OUTER_MARGIN);
+  addY(maxY + OUTER_MARGIN);
+  addX(fromX);
+  addX(toX);
+  addY(fromY);
+  addY(toY);
+
+  for (const [px, py] of startPorts) {
+    addX(px);
+    addY(py);
+  }
+  for (const [px, py] of endPorts) {
+    addX(px);
+    addY(py);
+  }
+
+  const xs = Array.from(xSet).sort((a, b) => a - b);
+  const ys = Array.from(ySet).sort((a, b) => a - b);
+
+  const nodes = new Map<NodeKey, [number, number]>();
+  for (const x of xs) {
+    for (const y of ys) {
+      if (pointInFreeSpace(x, y)) {
+        nodes.set(nodeKey(x, y), [x, y]);
+      }
+    }
+  }
+  for (const point of startPorts) nodes.set(nodeKey(point[0], point[1]), point);
+  for (const point of endPorts) nodes.set(nodeKey(point[0], point[1]), point);
+
+  const segmentMinDist = (ax: number, ay: number, bx: number, by: number, rect: ObstacleRect): number => {
+    if (approxEq(ax, bx)) {
+      const x = ax;
+      const lo = Math.min(ay, by);
+      const hi = Math.max(ay, by);
+      if (hi >= rect.topY && lo <= rect.bottomY) {
+        if (x < rect.leftX) return rect.leftX - x;
+        if (x > rect.rightX) return x - rect.rightX;
+        return 0;
+      }
+      const dx = Math.max(0, rect.leftX - x, x - rect.rightX);
+      const dy = Math.min(Math.abs(lo - rect.bottomY), Math.abs(hi - rect.topY));
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    const y = ay;
+    const lo = Math.min(ax, bx);
+    const hi = Math.max(ax, bx);
+    if (hi >= rect.leftX && lo <= rect.rightX) {
+      if (y < rect.topY) return rect.topY - y;
+      if (y > rect.bottomY) return y - rect.bottomY;
+      return 0;
+    }
+    const dy = Math.max(0, rect.topY - y, y - rect.bottomY);
+    const dx = Math.min(Math.abs(lo - rect.rightX), Math.abs(hi - rect.leftX));
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const computeEdgeCost = (ax: number, ay: number, bx: number, by: number): number => {
+    const len = Math.abs(bx - ax) + Math.abs(by - ay);
+    let proxPenalty = 0;
+    for (const rect of objects) {
+      if (rectEq(rect, startRect) || rectEq(rect, endRect)) continue;
+      const dist = segmentMinDist(ax, ay, bx, by, rect);
+      if (dist < SOFT_ZONE) {
+        proxPenalty += (SOFT_ZONE - dist) * PROXIMITY_WEIGHT * (len / SOFT_ZONE);
+      }
+    }
+    return len + proxPenalty;
+  };
+
+  const graph = new Map<NodeKey, GraphEdge[]>();
+  const addEdge = (a: NodeKey, b: NodeKey, cost: number, dir: EdgeDir) => {
+    if (!graph.has(a)) graph.set(a, []);
+    if (!graph.has(b)) graph.set(b, []);
+    graph.get(a)!.push({ key: b, cost, dir });
+    graph.get(b)!.push({ key: a, cost, dir });
+  };
+
+  const byX = new Map<number, [number, number][]>();
+  const byY = new Map<number, [number, number][]>();
+  for (const [, point] of nodes) {
+    const col = byX.get(point[0]) ?? [];
+    col.push(point);
+    byX.set(point[0], col);
+
+    const row = byY.get(point[1]) ?? [];
+    row.push(point);
+    byY.set(point[1], row);
+  }
+
+  for (const [, col] of byX) {
+    col.sort((a, b) => a[1] - b[1]);
+    for (let i = 0; i < col.length - 1; i++) {
+      const a = col[i];
+      const b = col[i + 1];
+      if (segmentClear(a[0], a[1], b[0], b[1])) {
+        addEdge(nodeKey(a[0], a[1]), nodeKey(b[0], b[1]), computeEdgeCost(a[0], a[1], b[0], b[1]), 'V');
+      }
+    }
+  }
+
+  for (const [, row] of byY) {
+    row.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < row.length - 1; i++) {
+      const a = row[i];
+      const b = row[i + 1];
+      if (segmentClear(a[0], a[1], b[0], b[1])) {
+        addEdge(nodeKey(a[0], a[1]), nodeKey(b[0], b[1]), computeEdgeCost(a[0], a[1], b[0], b[1]), 'H');
+      }
+    }
+  }
+
+  const S = 'S';
+  const T = 'T';
+  graph.set(S, []);
+  graph.set(T, []);
+
+  const axisForDir = (dir: AnchorDir): EdgeDir => (isHorizontalDir(dir) ? 'H' : 'V');
+  const terminalEdgeCost = (point: [number, number], anchor: [number, number], preferredX: number, preferredY: number) =>
+    manhattan(point[0], point[1], anchor[0], anchor[1]) + manhattan(anchor[0], anchor[1], preferredX, preferredY) * ANCHOR_DEVIATION_WEIGHT;
+  const segmentMatchesDir = (a: [number, number], b: [number, number], dir: AnchorDir) =>
+    (dir === 'left' && approxEq(a[1], b[1]) && b[0] < a[0]) ||
+    (dir === 'right' && approxEq(a[1], b[1]) && b[0] > a[0]) ||
+    (dir === 'top' && approxEq(a[0], b[0]) && b[1] < a[1]) ||
+    (dir === 'bottom' && approxEq(a[0], b[0]) && b[1] > a[1]);
+
+  const fromAxis: EdgeDir = axisForDir(fromDir);
+  const toAxis: EdgeDir = axisForDir(toDir);
+
+  for (const point of startPorts) {
+    const key = nodeKey(point[0], point[1]);
+    const anchor = startPortToAnchor.get(key);
+    if (!anchor) continue;
+    graph.get(S)!.push({
+      key,
+      cost: terminalEdgeCost(point, anchor, fromX, fromY),
+      dir: fromAxis,
+    });
+  }
+
+  for (const point of endPorts) {
+    const key = nodeKey(point[0], point[1]);
+    const anchor = endPortToAnchor.get(key);
+    if (!anchor) continue;
+    if (!graph.has(key)) graph.set(key, []);
+    graph.get(key)!.push({
+      key: T,
+      cost: terminalEdgeCost(point, anchor, toX, toY),
+      dir: toAxis,
+    });
+  }
+
+  const stateKey = (node: NodeKey, dir: EdgeDir): StateKey => `${node}|${dir}`;
+  const stateNode = new Map<StateKey, NodeKey>();
+  const dist = new Map<StateKey, number>();
+  const prev = new Map<StateKey, StateKey>();
+  const startState = stateKey(S, 'S');
+  stateNode.set(startState, S);
+  dist.set(startState, 0);
+
+  const queue: { state: StateKey; cost: number }[] = [{ state: startState, cost: 0 }];
+  let reached: StateKey | null = null;
+
+  while (queue.length > 0) {
+    let minIdx = 0;
+    for (let i = 1; i < queue.length; i++) {
+      if (queue[i].cost < queue[minIdx].cost) minIdx = i;
+    }
+
+    const { state, cost } = queue[minIdx];
+    queue.splice(minIdx, 1);
+    if (cost > (dist.get(state) ?? Infinity)) continue;
+
+    const curNode = stateNode.get(state)!;
+    if (curNode === T) {
+      reached = state;
+      break;
+    }
+
+    const curDir = state.split('|')[1] as EdgeDir;
+    for (const edge of graph.get(curNode) ?? []) {
+      const bend = curDir !== 'S' && curDir !== edge.dir ? BEND_PENALTY : 0;
+      const nextCost = cost + edge.cost + bend;
+      const nextState = stateKey(edge.key, edge.key === T ? 'S' : edge.dir);
+      if (nextCost < (dist.get(nextState) ?? Infinity)) {
+        dist.set(nextState, nextCost);
+        prev.set(nextState, state);
+        stateNode.set(nextState, edge.key);
+        queue.push({ state: nextState, cost: nextCost });
+      }
+    }
+  }
+
+  if (!reached) {
+    return '';
+  }
+
+  const rawPath: [number, number][] = [];
+  let cursor: StateKey | undefined = reached;
+  while (cursor) {
+    const key = stateNode.get(cursor);
+    if (key && key !== S && key !== T) {
+      const point = nodes.get(key);
+      if (point) rawPath.unshift(point);
+    }
+    cursor = prev.get(cursor);
+  }
+
+  if (rawPath.length === 0) return '';
+
+  const chosenStartAnchor = startPortToAnchor.get(nodeKey(rawPath[0][0], rawPath[0][1]));
+  const chosenEndAnchor = endPortToAnchor.get(nodeKey(rawPath[rawPath.length - 1][0], rawPath[rawPath.length - 1][1]));
+  if (!chosenStartAnchor || !chosenEndAnchor) return '';
+
+  const fullPath: [number, number][] = [chosenStartAnchor, ...rawPath, chosenEndAnchor];
+  const deduped: [number, number][] = [];
+  for (const point of fullPath) {
+    const last = deduped[deduped.length - 1];
+    if (!last || !approxEq(last[0], point[0]) || !approxEq(last[1], point[1])) {
+      deduped.push(point);
+    }
+  }
+
+  if (deduped.length < 2) return '';
+
+  const simplified: [number, number][] = [deduped[0]];
+  for (let i = 1; i < deduped.length - 1; i++) {
+    const a = simplified[simplified.length - 1];
+    const b = deduped[i];
+    const c = deduped[i + 1];
+    if ((approxEq(a[0], b[0]) && approxEq(b[0], c[0])) || (approxEq(a[1], b[1]) && approxEq(b[1], c[1]))) {
+      continue;
+    }
+    simplified.push(b);
+  }
+  simplified.push(deduped[deduped.length - 1]);
+
+  if (simplified.length < 2) return '';
+
+  const first = simplified[0];
+  const second = simplified[1];
+  const beforeLast = simplified[simplified.length - 2];
+  const last = simplified[simplified.length - 1];
+
+  const firstSegOk = segmentMatchesDir(first, second, fromDir);
+  const lastSegOk = segmentMatchesDir(last, beforeLast, toDir);
+
+  if (!firstSegOk || !lastSegOk) return '';
+
+  for (let i = 0; i < simplified.length - 1; i++) {
+    const a = simplified[i];
+    const b = simplified[i + 1];
+    if (!approxEq(a[0], b[0]) && !approxEq(a[1], b[1])) return '';
+
+    if (i === 0) {
+      if (!validGlueExit(startRect, chosenStartAnchor[0], chosenStartAnchor[1], b[0], b[1])) return '';
+    } else if (i === simplified.length - 2) {
+      if (!validGlueExit(endRect, chosenEndAnchor[0], chosenEndAnchor[1], a[0], a[1])) return '';
     } else {
-      arriveV(goalY);
+      if (!segmentClear(a[0], a[1], b[0], b[1])) return '';
     }
   }
 
-  // ── Entry segment: approach point → target ─────────────────────────────────
-  pts.push([toX, toY]);
-
-  // ── Deduplicate consecutive identical points ───────────────────────────────
-  const deduped: Pt[] = [pts[0]];
-  for (let i = 1; i < pts.length; i++) {
-    if (pts[i][0] !== pts[i - 1][0] || pts[i][1] !== pts[i - 1][1]) {
-      deduped.push(pts[i]);
-    }
-  }
-
-  // Safety: fix any accidental diagonals by inserting corner waypoints
-  const final: Pt[] = [deduped[0]];
-  for (let i = 1; i < deduped.length; i++) {
-    const prev = final[final.length - 1];
-    const cur = deduped[i];
-    if (prev[0] !== cur[0] && prev[1] !== cur[1]) {
-      if (final.length >= 2) {
-        const pp = final[final.length - 2];
-        if (pp[0] === prev[0]) {
-          final.push([prev[0], cur[1]]);
-        } else {
-          final.push([cur[0], prev[1]]);
-        }
-      } else {
-        if (exitIsH) final.push([cur[0], prev[1]]);
-        else final.push([prev[0], cur[1]]);
-      }
-    }
-    final.push(cur);
-  }
-
-  return final.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ');
+  return simplified.map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${round3(point[0])} ${round3(point[1])}`).join(' ');
 }
 
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
@@ -1018,7 +1140,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   // Dependency lines SVG paths — orthogonal routing (right-angle segments only)
   const depPaths = useMemo(() => {
     if (!showDependencies) return [];
-    const OFFSET = 12; // horizontal offset before first vertical turn
 
     // Helper: get an item's row-top Y in canvas coordinates
     const getItemRowTopY = (item: ProjectItem) => {
@@ -1033,18 +1154,22 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       return sl.contentY + getRowY(item);
     };
 
-    // Build obstacle rects for all visible items (row-based: topY to topY + ROW_BASE)
+    // Build obstacle rects for all visible items using actual bar/milestone geometry
     const allObstacles: { id: string; leftX: number; rightX: number; topY: number; bottomY: number }[] = [];
     for (const item of visibleItems) {
       const rowTop = getItemRowTopY(item);
       if (item.type === 'task') {
         const xStart = itemToX(item.startDate);
         const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
-        allObstacles.push({ id: item.id, leftX: xStart, rightX: xStart + barWidth, topY: rowTop, bottomY: rowTop + ROW_BASE });
+        const barTop = rowTop + (ROW_BASE - item.taskStyle.thickness) / 2;
+        const barBottom = barTop + item.taskStyle.thickness;
+        allObstacles.push({ id: item.id, leftX: xStart, rightX: xStart + barWidth, topY: barTop, bottomY: barBottom });
       } else {
         const cx = itemToX(item.startDate);
         const sz = item.milestoneStyle.size;
-        allObstacles.push({ id: item.id, leftX: cx - sz / 2, rightX: cx + sz / 2, topY: rowTop, bottomY: rowTop + ROW_BASE });
+        const barTop = rowTop + (ROW_BASE - sz) / 2;
+        const barBottom = barTop + sz;
+        allObstacles.push({ id: item.id, leftX: cx - sz / 2, rightX: cx + sz / 2, topY: barTop, bottomY: barBottom });
       }
     }
 
@@ -1122,13 +1247,17 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
         const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
 
-        // Exclude source AND target from base obstacles.
-        // Target is passed separately as targetObs so routeDepLink can build
-        // allObs = obstacles + targetObs for intermediate segments (must avoid target)
-        // while using plain obstacles for the final entry segment (allowed to cross target).
-        const obstacles = allObstacles.filter((o) => o.id !== from.id && o.id !== to.id);
-        const targetObs = allObstacles.find((o) => o.id === to.id);
-        const path = routeDepLink(fromX, fromY, toX, toY, obstacles, OFFSET, fromDir, toDir, targetObs);
+        // Pass all obstacles + source/target object rects to the router
+        // IMPORTANT: startObj/endObj must be references INTO allObjRects (same objects)
+        // so that identity comparison (===) works in validGlueExit.
+        const startObsIdx = allObstacles.findIndex((o) => o.id === from.id);
+        const endObsIdx = allObstacles.findIndex((o) => o.id === to.id);
+        if (startObsIdx < 0 || endObsIdx < 0) return null;
+        const allObjRects: ObstacleRect[] = allObstacles.map(({ leftX, rightX, topY, bottomY }) => ({ leftX, rightX, topY, bottomY }));
+        const startObjRect = allObjRects[startObsIdx];
+        const endObjRect = allObjRects[endObsIdx];
+
+        const path = routeDepLink(fromX, fromY, toX, toY, allObjRects, startObjRect, endObjRect, fromDir, toDir);
 
         return { path, isCritical, isHidden, key: `${dep.fromId}-${dep.toId}`, fromId: dep.fromId, toId: dep.toId };
       })
@@ -1947,14 +2076,14 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 let path: string;
                 if (showArrow) {
                   // Locked on target — use obstacle-avoidance routing
-                  const obstacles: ObstacleRect[] = positions
-                    .filter((p) => p.id !== depDrag.sourceId && p.id !== depDrag.targetId)
-                    .map((p) => ({ leftX: p.leftX, rightX: p.rightX, topY: p.centerY - ROW_BASE / 2, bottomY: p.centerY + ROW_BASE / 2 }));
-                  const targetPos = positions.find((p) => p.id === depDrag.targetId);
-                  const dragTargetObs = targetPos
-                    ? { leftX: targetPos.leftX, rightX: targetPos.rightX, topY: targetPos.centerY - ROW_BASE / 2, bottomY: targetPos.centerY + ROW_BASE / 2 }
-                    : undefined;
-                  path = routeDepLink(fromX, fromY, endX, endY, obstacles, TEMP_OFFSET, 'right', 'left', dragTargetObs);
+                  // IMPORTANT: sourceObjRect/targetObjRect must be references INTO allObjRects
+                  const sourceIdx = positions.findIndex((p) => p.id === depDrag.sourceId);
+                  const targetIdx = positions.findIndex((p) => p.id === depDrag.targetId);
+                  const allObjRects: ObstacleRect[] = positions
+                    .map((p) => ({ leftX: p.leftX, rightX: p.rightX, topY: p.centerY - p.barHeight / 2, bottomY: p.centerY + p.barHeight / 2 }));
+                  const sourceObjRect = allObjRects[sourceIdx >= 0 ? sourceIdx : 0];
+                  const targetObjRect = allObjRects[targetIdx >= 0 ? targetIdx : 0];
+                  path = routeDepLink(fromX, fromY, endX, endY, allObjRects, sourceObjRect, targetObjRect, 'right', 'left');
                 } else {
                   // Free-dragging — simple orthogonal routing
                   const gap = endX - fromX;
