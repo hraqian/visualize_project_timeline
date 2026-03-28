@@ -44,6 +44,7 @@ import { parseISO, differenceInDays, format } from 'date-fns';
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
 import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
+import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -159,6 +160,26 @@ const MILESTONE_DATE_POSITIONS: { id: LabelPosition; label: string }[] = [
   { id: 'right', label: 'Right' },
 ];
 
+const DEP_LINE_DASH_OPTIONS = [
+  { id: 'solid', label: 'Solid', dasharray: undefined },
+  { id: 'dashed', label: 'Dashed', dasharray: '6 4' },
+  { id: 'dotted', label: 'Dotted', dasharray: '2 4' },
+  { id: 'long-dashed', label: 'Long dashed', dasharray: '10 6' },
+  { id: 'dash-dot', label: 'Dash dot', dasharray: '8 4 2 4' },
+  { id: 'long-dot', label: 'Long dot', dasharray: '10 4 2 4' },
+] as const;
+
+type DependencyDashOptionId = (typeof DEP_LINE_DASH_OPTIONS)[number]['id'];
+
+const DEP_ARROW_SIZE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
+const DEP_ARROW_TYPE_OPTIONS = [
+  { id: 'standard', label: 'End Arrow' },
+  { id: 'open', label: 'Open Arrow' },
+  { id: 'diamond', label: 'Diamond' },
+  { id: 'circle', label: 'Circle' },
+  { id: 'none', label: 'No Arrow' },
+] as const;
+
 type MainTab = 'items' | 'timescale' | 'design';
 type ItemSubTab = 'task' | 'milestone' | 'swimlane' | 'dependency';
 
@@ -167,6 +188,7 @@ type ItemSubTab = 'task' | 'milestone' | 'swimlane' | 'dependency';
 export function StylePane() {
   const selectedItemId = useProjectStore((s) => s.selectedItemId);
   const selectedSwimlaneId = useProjectStore((s) => s.selectedSwimlaneId);
+  const selectedDepKey = useProjectStore((s) => s.selectedDepKey);
   const items = useProjectStore((s) => s.items);
   const swimlanes = useProjectStore((s) => s.swimlanes);
   const updateTaskStyle = useProjectStore((s) => s.updateTaskStyle);
@@ -185,6 +207,11 @@ export function StylePane() {
   // Auto-switch tab when a section is activated (e.g. clicking tier row or task bar)
   const timescaleSections = ['scale', 'todayMarker', 'elapsedTime', 'leftEndCap', 'rightEndCap'];
   useEffect(() => {
+    if (selectedDepKey) {
+      setMainTab('items');
+      return;
+    }
+
     if (stylePaneSection) {
       if (timescaleSections.includes(stylePaneSection)) {
         setMainTab('timescale');
@@ -192,25 +219,27 @@ export function StylePane() {
         setMainTab('items');
       }
     }
-  }, [stylePaneSection, selectedItemId, selectedSwimlaneId]);
+  }, [stylePaneSection, selectedItemId, selectedSwimlaneId, selectedDepKey]);
 
 
 
   const item = items.find((i) => i.id === selectedItemId);
 
   // Determine which sub-tab to show based on selection
-  const autoSubTab: ItemSubTab = selectedSwimlaneId
-    ? 'swimlane'
-    : item?.type === 'milestone'
-      ? 'milestone'
-      : 'task';
+  const autoSubTab: ItemSubTab = selectedDepKey
+    ? 'dependency'
+    : selectedSwimlaneId
+      ? 'swimlane'
+      : item?.type === 'milestone'
+        ? 'milestone'
+        : 'task';
   const [forcedSubTab, setForcedSubTab] = useState<ItemSubTab | null>(null);
   const activeSubTab = forcedSubTab ?? autoSubTab;
 
   // When selection changes, reset forced sub-tab
   useEffect(() => {
     setForcedSubTab(null);
-  }, [selectedItemId, selectedSwimlaneId]);
+  }, [selectedItemId, selectedSwimlaneId, selectedDepKey]);
 
   const handleSubTabClick = (tab: ItemSubTab) => {
     setForcedSubTab(tab === autoSubTab ? null : tab);
@@ -438,12 +467,52 @@ function ItemsTabContent({
 type DepSubTab = 'link' | 'critical-path';
 
 function DependencyLinkControls() {
-  const showDependencies = useProjectStore((s) => s.showDependencies);
-  const setShowDependencies = useProjectStore((s) => s.setShowDependencies);
+  const selectedDepKey = useProjectStore((s) => s.selectedDepKey);
+  const dependencies = useProjectStore((s) => s.dependencies);
+  const updateDependency = useProjectStore((s) => s.updateDependency);
+  const applyDependencyStyleToAll = useProjectStore((s) => s.applyDependencyStyleToAll);
   const dependencySettings = useProjectStore((s) => s.dependencySettings);
 
   const [depSubTab, setDepSubTab] = useState<DepSubTab>('link');
   const [showSchedulingModal, setShowSchedulingModal] = useState(false);
+
+  const selectedDep = selectedDepKey
+    ? dependencies.find((dep) => `${dep.fromId}-${dep.toId}` === selectedDepKey)
+    : null;
+  const isVisible = selectedDep?.visible !== false;
+  const depColor = selectedDep?.color ?? '#475569';
+  const depTransparency = selectedDep?.transparency ?? 0;
+  const depLineDash = selectedDep?.lineDash ?? 'solid';
+  const depArrowType = selectedDep?.arrowType ?? 'standard';
+  const depArrowSize = selectedDep?.arrowSize ?? 4;
+  const [applied, setApplied] = useState(false);
+  const [applyProps, setApplyProps] = useState({
+    visible: true,
+    color: true,
+    transparency: true,
+    lineDash: true,
+    lineWidth: true,
+    arrowType: true,
+    arrowSize: true,
+    connectionPoints: true,
+  });
+
+  const handleApplyToAll = () => {
+    if (!selectedDep) return;
+    const keys: (keyof Pick<typeof selectedDep, 'visible' | 'fromPoint' | 'toPoint' | 'color' | 'transparency' | 'lineDash' | 'lineWidth' | 'arrowType' | 'arrowSize'>)[] = [];
+    if (applyProps.visible) keys.push('visible');
+    if (applyProps.color) keys.push('color');
+    if (applyProps.transparency) keys.push('transparency');
+    if (applyProps.lineDash) keys.push('lineDash');
+    if (applyProps.lineWidth) keys.push('lineWidth');
+    if (applyProps.arrowType) keys.push('arrowType');
+    if (applyProps.arrowSize) keys.push('arrowSize');
+    if (applyProps.connectionPoints) keys.push('fromPoint', 'toPoint');
+    if (keys.length === 0) return;
+    applyDependencyStyleToAll(selectedDep.fromId, selectedDep.toId, keys);
+    setApplied(true);
+    setTimeout(() => setApplied(false), 1200);
+  };
 
   return (
     <div className="space-y-4">
@@ -477,60 +546,144 @@ function DependencyLinkControls() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-[var(--color-text)]">Visible</span>
             <button
-              onClick={() => setShowDependencies(!showDependencies)}
+              disabled={!selectedDep}
+              onClick={() => {
+                if (!selectedDep) return;
+                updateDependency(selectedDep.fromId, selectedDep.toId, { visible: !isVisible });
+              }}
               className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
             >
-              {showDependencies ? <Eye size={14} /> : <EyeOff size={14} />}
-              {showDependencies ? 'On' : 'Off'}
+              {isVisible ? <Eye size={14} /> : <EyeOff size={14} />}
+              {isVisible ? 'On' : 'Off'}
             </button>
           </div>
 
           {/* Scaffolded styling controls (non-functional placeholders) */}
           <div
-            className={`space-y-3 transition-opacity ${showDependencies ? '' : 'opacity-40 pointer-events-none'}`}
+            className={`space-y-3 transition-opacity ${isVisible ? '' : 'opacity-40 pointer-events-none'}`}
           >
             {/* Color */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--color-text-muted)]">Color</span>
-              <div className="w-6 h-6 rounded border border-[var(--color-border)] bg-[#334155] cursor-not-allowed" title="Coming soon" />
+              <AdvancedColorPicker
+                value={depColor}
+                onChange={(color) => {
+                  if (!selectedDep) return;
+                  updateDependency(selectedDep.fromId, selectedDep.toId, { color });
+                }}
+              />
             </div>
 
             {/* Transparency */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--color-text-muted)]">Transparency</span>
-              <span className="text-xs text-[var(--color-text-muted)]">0%</span>
+              <div className="flex items-center gap-2 w-[180px]">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={depTransparency}
+                  onChange={(e) => {
+                    if (!selectedDep) return;
+                    updateDependency(selectedDep.fromId, selectedDep.toId, { transparency: Number(e.target.value) });
+                  }}
+                  className="flex-1 h-1.5 accent-slate-700 cursor-pointer"
+                />
+                <span className="text-xs text-[var(--color-text-secondary)] w-8 text-right tabular-nums">{depTransparency}%</span>
+              </div>
             </div>
 
             {/* Line dash */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--color-text-muted)]">Line Dash</span>
-              <span className="text-xs text-[var(--color-text-muted)]">Solid</span>
+              <DependencyLineDashDropdown
+                value={depLineDash}
+                onChange={(lineDash) => {
+                  if (!selectedDep) return;
+                  updateDependency(selectedDep.fromId, selectedDep.toId, { lineDash });
+                }}
+              />
             </div>
 
             {/* Line width */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--color-text-muted)]">Line Width</span>
-              <span className="text-xs text-[var(--color-text-muted)]">1.5px</span>
+              <DependencyLineWidthControl
+                value={selectedDep?.lineWidth ?? 1.5}
+                onChange={(lineWidth) => {
+                  if (!selectedDep) return;
+                  updateDependency(selectedDep.fromId, selectedDep.toId, { lineWidth });
+                }}
+              />
             </div>
 
             {/* Arrow type */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--color-text-muted)]">Arrow Type</span>
-              <span className="text-xs text-[var(--color-text-muted)]">Standard</span>
+              <DependencyArrowTypeDropdown
+                value={depArrowType}
+                onChange={(arrowType) => {
+                  if (!selectedDep) return;
+                  updateDependency(selectedDep.fromId, selectedDep.toId, { arrowType });
+                }}
+              />
             </div>
 
             {/* Arrow size */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--color-text-muted)]">Arrow Size</span>
-              <span className="text-xs text-[var(--color-text-muted)]">Medium</span>
+              <DependencyArrowSizeDropdown
+                value={depArrowSize}
+                onChange={(arrowSize) => {
+                  if (!selectedDep) return;
+                  updateDependency(selectedDep.fromId, selectedDep.toId, { arrowSize });
+                }}
+              />
             </div>
 
             {/* Connection points */}
             <div className="flex items-center justify-between">
               <span className="text-xs text-[var(--color-text-muted)]">Connection Points</span>
-              <span className="text-xs text-[var(--color-text-muted)]">Auto</span>
+              <ConnectionPointButton
+                fromPoint={selectedDep?.fromPoint ?? 'auto'}
+                toPoint={selectedDep?.toPoint ?? 'auto'}
+                disabled={!selectedDep}
+                onChange={(fromPoint, toPoint) => {
+                  if (!selectedDep) return;
+                  updateDependency(selectedDep.fromId, selectedDep.toId, { fromPoint, toPoint });
+                }}
+              />
             </div>
           </div>
+
+          {selectedDep && (
+            <ApplyToAllBox onApply={handleApplyToAll} applied={applied} label="Apply to all dependencies">
+              <PropertyCard label="Visible" checked={applyProps.visible} onChange={(v) => setApplyProps((p) => ({ ...p, visible: v }))}>
+                <ShowIcon />
+              </PropertyCard>
+              <PropertyCard label="Color" checked={applyProps.color} onChange={(v) => setApplyProps((p) => ({ ...p, color: v }))}>
+                <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: depColor }} />
+              </PropertyCard>
+              <PropertyCard label="Transparency" checked={applyProps.transparency} onChange={(v) => setApplyProps((p) => ({ ...p, transparency: v }))}>
+                <span className="text-[11px] text-[var(--color-text-secondary)] tabular-nums">{depTransparency}%</span>
+              </PropertyCard>
+              <PropertyCard label="Line Dash" checked={applyProps.lineDash} onChange={(v) => setApplyProps((p) => ({ ...p, lineDash: v }))}>
+                <DependencyDashPreview dasharray={DEP_LINE_DASH_OPTIONS.find((option) => option.id === depLineDash)?.dasharray} />
+              </PropertyCard>
+              <PropertyCard label="Line Width" checked={applyProps.lineWidth} onChange={(v) => setApplyProps((p) => ({ ...p, lineWidth: v }))}>
+                <ThicknessIcon />
+              </PropertyCard>
+              <PropertyCard label="Arrow Type" checked={applyProps.arrowType} onChange={(v) => setApplyProps((p) => ({ ...p, arrowType: v }))}>
+                <DependencyArrowTypePreview type={depArrowType} />
+              </PropertyCard>
+              <PropertyCard label="Arrow Size" checked={applyProps.arrowSize} onChange={(v) => setApplyProps((p) => ({ ...p, arrowSize: v }))}>
+                <DependencyArrowPreview size={depArrowSize} />
+              </PropertyCard>
+              <PropertyCard label="Connection" checked={applyProps.connectionPoints} onChange={(v) => setApplyProps((p) => ({ ...p, connectionPoints: v }))}>
+                <PositionIcon5Dot />
+              </PropertyCard>
+            </ApplyToAllBox>
+          )}
 
           {/* Scheduling Settings button */}
           <div className="pt-2 border-t border-[var(--color-border)]">
@@ -567,6 +720,385 @@ function DependencyLinkControls() {
         <SchedulingSettingsModal onClose={() => setShowSchedulingModal(false)} />
       )}
     </div>
+  );
+}
+
+function DependencyLineDashDropdown({
+  value,
+  onChange,
+}: {
+  value: DependencyDashOptionId;
+  onChange: (value: DependencyDashOptionId) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  const selected = DEP_LINE_DASH_OPTIONS.find((option) => option.id === value) ?? DEP_LINE_DASH_OPTIONS[0];
+
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const width = 180;
+    const margin = 8;
+    const left = Math.min(Math.max(margin, rect.left), window.innerWidth - width - margin);
+    setPos({ top: rect.bottom + 6, left });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const handleViewport = () => updatePos();
+    window.addEventListener('resize', handleViewport);
+    window.addEventListener('scroll', handleViewport, true);
+    return () => {
+      window.removeEventListener('resize', handleViewport);
+      window.removeEventListener('scroll', handleViewport, true);
+    };
+  }, [open, updatePos]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        onClick={() => {
+          if (!open) updatePos();
+          setOpen(!open);
+        }}
+        className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] hover:border-[var(--color-border-light)] transition-colors min-w-[120px]"
+      >
+        <DependencyDashPreview dasharray={selected.dasharray} />
+        <ChevronDown size={12} className="text-[var(--color-text-muted)] shrink-0 ml-auto" />
+      </button>
+
+      {open && pos && createPortal(
+        <div
+          ref={popoverRef}
+          className="fixed z-[9999] w-[180px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          {DEP_LINE_DASH_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => {
+                onChange(option.id);
+                setOpen(false);
+              }}
+              className={`flex items-center w-full px-3 py-2 text-sm transition-colors ${
+                option.id === value
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+              title={option.label}
+            >
+              <DependencyDashPreview dasharray={option.dasharray} />
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+function DependencyDashPreview({ dasharray }: { dasharray?: string }) {
+  return (
+    <svg width="88" height="12" viewBox="0 0 88 12" fill="none" className="shrink-0">
+      <line
+        x1="2"
+        y1="6"
+        x2="86"
+        y2="6"
+        stroke="#334155"
+        strokeWidth="2"
+        strokeDasharray={dasharray}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function DependencyLineWidthControl({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const clamped = Math.max(0.5, Math.min(8, value));
+  const step = 0.25;
+  const formatValue = (num: number) => {
+    const rounded = Math.round(num * 100) / 100;
+    return Number.isInteger(rounded) ? `${rounded.toFixed(0)} px` : `${rounded.toFixed(2).replace(/0$/, '')} px`;
+  };
+
+  return (
+    <div className="flex items-center border border-[var(--color-border)] rounded-lg overflow-hidden bg-white">
+      <div className="px-3 min-w-[78px] h-9 flex items-center justify-center text-xs text-[var(--color-text)] tabular-nums">
+        {formatValue(clamped)}
+      </div>
+      <div className="flex flex-col border-l border-[var(--color-border)]">
+        <button
+          onClick={() => onChange(Math.min(8, Math.round((clamped + step) * 100) / 100))}
+          className="px-1.5 h-[18px] hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center"
+          title="Increase line width"
+        >
+          <ChevronRight size={10} className="-rotate-90" />
+        </button>
+        <button
+          onClick={() => onChange(Math.max(0.5, Math.round((clamped - step) * 100) / 100))}
+          className="px-1.5 h-[18px] hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center border-t border-[var(--color-border)]"
+          title="Decrease line width"
+        >
+          <ChevronRight size={10} className="rotate-90" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DependencyArrowSizeDropdown({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const width = 180;
+    const margin = 8;
+    const left = Math.min(Math.max(margin, rect.left), window.innerWidth - width - margin);
+    setPos({ top: rect.bottom + 6, left });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const handleViewport = () => updatePos();
+    window.addEventListener('resize', handleViewport);
+    window.addEventListener('scroll', handleViewport, true);
+    return () => {
+      window.removeEventListener('resize', handleViewport);
+      window.removeEventListener('scroll', handleViewport, true);
+    };
+  }, [open, updatePos]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        onClick={() => {
+          if (!open) updatePos();
+          setOpen(!open);
+        }}
+        className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] hover:border-[var(--color-border-light)] transition-colors min-w-[120px]"
+      >
+        <span className="text-xs text-[var(--color-text)] tabular-nums">Size {value}</span>
+        <DependencyArrowPreview size={value} />
+        <ChevronDown size={12} className="text-[var(--color-text-muted)] shrink-0 ml-auto" />
+      </button>
+
+      {open && pos && createPortal(
+        <div
+          ref={popoverRef}
+          className="fixed z-[9999] w-[180px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1 max-h-[320px] overflow-y-auto"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          {DEP_ARROW_SIZE_OPTIONS.map((size) => (
+            <button
+              key={size}
+              onClick={() => {
+                onChange(size);
+                setOpen(false);
+              }}
+              className={`flex items-center w-full px-3 py-2 text-sm transition-colors ${
+                size === value
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+            >
+              <span className="w-12 text-left text-xs">Size {size}</span>
+              <DependencyArrowPreview size={size} />
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+function DependencyArrowTypeDropdown({
+  value,
+  onChange,
+}: {
+  value: (typeof DEP_ARROW_TYPE_OPTIONS)[number]['id'];
+  onChange: (value: (typeof DEP_ARROW_TYPE_OPTIONS)[number]['id']) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  const selected = DEP_ARROW_TYPE_OPTIONS.find((option) => option.id === value) ?? DEP_ARROW_TYPE_OPTIONS[0];
+
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const width = 160;
+    const margin = 8;
+    const left = Math.min(Math.max(margin, rect.left), window.innerWidth - width - margin);
+    setPos({ top: rect.bottom + 6, left });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const handleViewport = () => updatePos();
+    window.addEventListener('resize', handleViewport);
+    window.addEventListener('scroll', handleViewport, true);
+    return () => {
+      window.removeEventListener('resize', handleViewport);
+      window.removeEventListener('scroll', handleViewport, true);
+    };
+  }, [open, updatePos]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        onClick={() => {
+          if (!open) updatePos();
+          setOpen(!open);
+        }}
+        className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] hover:border-[var(--color-border-light)] transition-colors min-w-[120px]"
+      >
+        <DependencyArrowTypePreview type={selected.id} />
+        <span className="text-xs text-[var(--color-text)]">{selected.label}</span>
+        <ChevronDown size={12} className="text-[var(--color-text-muted)] shrink-0 ml-auto" />
+      </button>
+
+      {open && pos && createPortal(
+        <div
+          ref={popoverRef}
+          className="fixed z-[9999] w-[160px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1"
+          style={{ top: pos.top, left: pos.left }}
+        >
+          {DEP_ARROW_TYPE_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => {
+                onChange(option.id);
+                setOpen(false);
+              }}
+              className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${
+                option.id === value
+                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+              }`}
+            >
+              <DependencyArrowTypePreview type={option.id} />
+              <span className="text-xs">{option.label}</span>
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+function DependencyArrowTypePreview({ type }: { type: (typeof DEP_ARROW_TYPE_OPTIONS)[number]['id'] }) {
+  return (
+    <svg width="26" height="12" viewBox="0 0 26 12" fill="none" className="shrink-0">
+      <line x1="2" y1="6" x2={type === 'none' ? 22 : 16} y2="6" stroke="#111827" strokeWidth="1.8" strokeLinecap="round" />
+      {type === 'standard' && (
+        <path d="M 16 2.8 L 22 6 L 16 9.2" stroke="#111827" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      )}
+      {type === 'open' && (
+        <path d="M 16 2.8 L 22 6 L 16 9.2" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      )}
+      {type === 'diamond' && (
+        <path d="M 15 6 L 18.5 2.8 L 22 6 L 18.5 9.2 Z" fill="none" stroke="#111827" strokeWidth="1.5" strokeLinejoin="round" />
+      )}
+      {type === 'circle' && (
+        <circle cx="19.5" cy="6" r="2.8" fill="none" stroke="#111827" strokeWidth="1.5" />
+      )}
+    </svg>
+  );
+}
+
+function DependencyArrowPreview({ size }: { size: number }) {
+  const length = 18 + size * 2.5;
+  const shaftEnd = 6 + Math.max(8, length - (6 + size));
+  const arrowX = 6 + length;
+  const strokeWidth = Math.max(1.5, 0.9 + size * 0.22);
+  const headHalf = Math.max(3, 2 + size * 0.45);
+
+  return (
+    <svg width="58" height="14" viewBox="0 0 58 14" fill="none" className="shrink-0">
+      <line
+        x1="6"
+        y1="7"
+        x2={shaftEnd}
+        y2="7"
+        stroke="#111827"
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+      <path
+        d={`M ${shaftEnd - headHalf} ${7 - headHalf} L ${arrowX} 7 L ${shaftEnd - headHalf} ${7 + headHalf}`}
+        fill="none"
+        stroke="#111827"
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -4317,4 +4849,3 @@ function DesignTabContent({
     </div>
   );
 }
-

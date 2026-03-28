@@ -7,6 +7,7 @@ import { StylePane } from '@/components/StylePane/StylePane';
 import { ProjectManagerModal } from '@/components/common/ProjectManagerModal';
 import { SettingsModal } from '@/components/common/SettingsModal';
 import { ConflictResolutionDialog } from '@/components/common/ConflictResolutionDialog';
+import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 import { toPng } from 'html-to-image';
 import { exportNativePptx } from '@/utils/exportPptx';
 import {
@@ -28,7 +29,7 @@ import {
   EyeOff,
   Trash2,
 } from 'lucide-react';
-import type { ActiveView, ConnectionPoint } from '@/types';
+import type { ActiveView } from '@/types';
 
 function App() {
   const activeView = useProjectStore((s) => s.activeView);
@@ -645,167 +646,6 @@ function ConnectionPointIllustration({ fromPoint, toPoint }: { fromPoint: Connec
       </defs>
       <path d={path} fill="none" stroke="#3b82f6" strokeWidth={1.5} markerEnd="url(#cp-arrow)" />
     </svg>
-  );
-}
-
-// ─── Connection Point Button (single popup with From + To + Auto) ────────────
-
-const CP_OPTIONS: { value: ConnectionPoint; label: string }[] = [
-  { value: 'side', label: 'Side' },
-  { value: 'top', label: 'Top' },
-  { value: 'bottom', label: 'Bottom' },
-];
-
-function getPointLabel(p: ConnectionPoint): string {
-  if (p === 'auto') return 'Auto';
-  return p.charAt(0).toUpperCase() + p.slice(1);
-}
-
-function ConnectionPointButton({
-  fromPoint,
-  toPoint,
-  disabled,
-  onChange,
-}: {
-  fromPoint: ConnectionPoint;
-  toPoint: ConnectionPoint;
-  disabled: boolean;
-  onChange: (fp: ConnectionPoint, tp: ConnectionPoint) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const isAuto = fromPoint === 'auto' && toPoint === 'auto';
-  const buttonLabel = isAuto ? 'Auto' : `${getPointLabel(fromPoint)}-${getPointLabel(toPoint)}`;
-
-  // When Auto is checked, both are 'auto'. When unchecked, default to 'side'/'side'.
-  const handleAutoToggle = () => {
-    if (isAuto) {
-      onChange('side', 'side');
-    } else {
-      onChange('auto', 'auto');
-    }
-  };
-
-  return (
-    <div style={{ position: 'relative' }} ref={ref}>
-      <button
-        disabled={disabled}
-        onClick={() => !disabled && setOpen(!open)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 5,
-          padding: '4px 10px',
-          borderRadius: 6,
-          fontSize: 13,
-          fontWeight: 500,
-          border: '1px solid var(--color-border)',
-          background: 'transparent',
-          color: disabled ? 'var(--color-text-muted)' : 'var(--color-text)',
-          cursor: disabled ? 'default' : 'pointer',
-          transition: 'all 0.15s',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        <svg width={14} height={14} viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
-          <rect x={1} y={1} width={5} height={4} rx={1} fill={disabled ? '#94a3b8' : '#475569'} />
-          <rect x={8} y={9} width={5} height={4} rx={1} fill={disabled ? '#94a3b8' : '#475569'} />
-          <path d="M 6 3 L 8 3 L 8 11 L 8 11" fill="none" stroke={disabled ? '#94a3b8' : '#475569'} strokeWidth={1} />
-        </svg>
-        {buttonLabel}
-        <ChevronDown size={12} />
-      </button>
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: '100%',
-            marginTop: 4,
-            background: 'white',
-            border: '1px solid #e2e8f0',
-            borderRadius: 8,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            padding: '10px 10px',
-            zIndex: 30,
-            width: 280,
-          }}
-        >
-          {/* Top row: From select + To select + Auto checkbox */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            {/* From */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>From</span>
-              <select
-                value={isAuto ? 'side' : fromPoint}
-                disabled={isAuto}
-                onChange={(e) => onChange(e.target.value as ConnectionPoint, toPoint)}
-                style={{
-                  fontSize: 11,
-                  padding: '2px 4px',
-                  borderRadius: 4,
-                  border: '1px solid #d1d5db',
-                  background: isAuto ? '#f1f5f9' : 'white',
-                  color: isAuto ? '#94a3b8' : '#334155',
-                  cursor: isAuto ? 'default' : 'pointer',
-                  outline: 'none',
-                }}
-              >
-                {CP_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-            {/* To */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>To</span>
-              <select
-                value={isAuto ? 'side' : toPoint}
-                disabled={isAuto}
-                onChange={(e) => onChange(fromPoint, e.target.value as ConnectionPoint)}
-                style={{
-                  fontSize: 11,
-                  padding: '2px 4px',
-                  borderRadius: 4,
-                  border: '1px solid #d1d5db',
-                  background: isAuto ? '#f1f5f9' : 'white',
-                  color: isAuto ? '#94a3b8' : '#334155',
-                  cursor: isAuto ? 'default' : 'pointer',
-                  outline: 'none',
-                }}
-              >
-                {CP_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-            {/* Auto checkbox */}
-            <label style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer', marginLeft: 'auto' }}>
-              <input
-                type="checkbox"
-                checked={isAuto}
-                onChange={handleAutoToggle}
-                style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#334155' }}
-              />
-              <span style={{ fontSize: 11, color: '#475569', fontWeight: 500 }}>Auto</span>
-            </label>
-          </div>
-          {/* Illustration */}
-          <div style={{ borderRadius: 6, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
-            <ConnectionPointIllustration fromPoint={fromPoint} toPoint={toPoint} />
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 

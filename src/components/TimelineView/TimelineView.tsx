@@ -5,7 +5,7 @@ import { MilestoneIconComponent } from '@/components/common/MilestoneIconCompone
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { DatePickerPopover } from './DatePickerPopover';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig, DependencyType, ConnectionPoint } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig, DependencyType, ConnectionPoint, DependencyArrowType } from '@/types';
 
 // ─── Types for inline editing ────────────────────────────────────────────────
 
@@ -101,6 +101,186 @@ interface ObstacleRect { leftX: number; rightX: number; topY: number; bottomY: n
 
 type AnchorDir = 'right' | 'left' | 'top' | 'bottom';
 
+const DEFAULT_DEPENDENCY_COLOR = '#475569';
+const DEPENDENCY_DASH_MAP: Record<string, string | undefined> = {
+  solid: undefined,
+  dashed: '6 4',
+  dotted: '2 4',
+  'long-dashed': '10 6',
+  'dash-dot': '8 4 2 4',
+  'long-dot': '10 4 2 4',
+};
+
+function arrowMarkerSpec(type: DependencyArrowType, size: number) {
+  const clamped = Math.max(1, Math.min(9, Math.round(size)));
+  const markerWidth = 4.5 + clamped * 0.95;
+  const markerHeight = 3 + clamped * 0.58;
+  const refY = markerHeight / 2;
+  const tailX = markerWidth * 0.12;
+  const tipX = type === 'diamond' ? markerWidth * 0.96 : type === 'circle' ? markerWidth * 0.84 : markerWidth;
+  const openPath = `M ${tailX} ${markerHeight * 0.16} L ${tipX} ${refY} L ${tailX} ${markerHeight * 0.84}`;
+  const diamondPoints = `${markerWidth * 0.14} ${refY}, ${markerWidth * 0.48} 0, ${tipX} ${refY}, ${markerWidth * 0.48} ${markerHeight}`;
+  const circleRadius = Math.max(1.8, markerHeight * 0.34);
+  const refX = type === 'circle'
+    ? tipX - circleRadius
+    : type === 'diamond'
+      ? markerWidth * 0.5
+      : markerWidth * 0.44;
+  const minX = type === 'diamond'
+    ? markerWidth * 0.16
+    : type === 'circle'
+      ? tipX - circleRadius * 2
+      : tailX;
+  return {
+    type,
+    markerWidth,
+    markerHeight,
+    refX,
+    refY,
+    tipX,
+    minX,
+    points: `${tailX} 0, ${markerWidth} ${refY}, ${tailX} ${markerHeight}`,
+    openPath,
+    diamondPoints,
+    circleRadius,
+  };
+}
+
+function dependencyVisualClearance(lineWidth: number | undefined, arrowSize: number | undefined): number {
+  const strokeWidth = Math.max(0.5, lineWidth ?? 1.5);
+  const effectiveArrowSize = Math.max(1, Math.min(9, Math.round(arrowSize ?? 4)));
+  const extraStroke = Math.max(0, strokeWidth - 1.5);
+  const extraArrow = Math.max(0, effectiveArrowSize - 4);
+  return Math.ceil(extraStroke * 0.75 + extraArrow * 0.6);
+}
+
+function dependencyArrowEndInset(
+  arrowType: DependencyArrowType | undefined,
+  arrowSize: number | undefined,
+  lineWidth: number | undefined,
+  dir?: AnchorDir,
+): number {
+  if (!arrowType || arrowType === 'none') return 0;
+  const size = Math.max(1, Math.min(9, Math.round(arrowSize ?? 4)));
+  const stroke = Math.max(0.5, lineWidth ?? 1.5);
+  const directionalBonus = dir === 'top' || dir === 'bottom' ? Math.max(2, stroke) : 0;
+  if (arrowType === 'circle') {
+    const radius = 2 + size * 0.38;
+    return Math.ceil(radius * 2 + Math.max(1.5, 1 + stroke * 0.35) + directionalBonus);
+  }
+  const depth = 7.5 + size * 1.15 + stroke * 0.2;
+  const lineGap = Math.max(1.5, 1 + stroke * 0.35);
+  return Math.ceil(depth + lineGap + directionalBonus);
+}
+
+type RoutePoint = { x: number; y: number };
+
+function parseRoutePoints(path: string): RoutePoint[] {
+  return path
+    .split(/(?=[ML])/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const [, xs, ys] = part.split(/\s+/);
+      return { x: Number(xs), y: Number(ys) };
+    });
+}
+
+function stringifyRoutePoints(points: RoutePoint[]): string {
+  return points
+    .map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${Math.round(point.x * 1000) / 1000} ${Math.round(point.y * 1000) / 1000}`)
+    .join(' ');
+}
+
+function buildDependencyRenderGeometry(
+  path: string,
+  arrowType: DependencyArrowType | undefined,
+  arrowSize: number | undefined,
+  lineWidth: number | undefined,
+): {
+  linePath: string;
+  head:
+    | { kind: 'polygon'; points: string; fill: boolean }
+    | { kind: 'path'; d: string }
+    | { kind: 'circle'; cx: number; cy: number; r: number }
+    | null;
+} {
+  const type = arrowType ?? 'standard';
+  if (type === 'none') return { linePath: path, head: null };
+
+  const points = parseRoutePoints(path);
+  if (points.length < 2) return { linePath: path, head: null };
+
+  const tip = points[points.length - 1];
+  const prev = points[points.length - 2];
+  const dx = tip.x - prev.x;
+  const dy = tip.y - prev.y;
+  const segLen = Math.abs(dx) + Math.abs(dy);
+  if (segLen <= 1) return { linePath: path, head: null };
+
+  const dirX = dx === 0 ? 0 : Math.sign(dx);
+  const dirY = dy === 0 ? 0 : Math.sign(dy);
+  const normalX = -dirY;
+  const normalY = dirX;
+  const size = Math.max(1, Math.min(9, Math.round(arrowSize ?? 4)));
+  const stroke = Math.max(0.5, lineWidth ?? 1.5);
+
+  if (type === 'circle') {
+    const radius = 2 + size * 0.38;
+    const trim = Math.min(radius * 2 + Math.max(1.5, stroke * 0.5), segLen - 1);
+    const centerX = tip.x - dirX * radius;
+    const centerY = tip.y - dirY * radius;
+    points[points.length - 1] = { x: tip.x - dirX * trim, y: tip.y - dirY * trim };
+    return { linePath: stringifyRoutePoints(points), head: { kind: 'circle', cx: centerX, cy: centerY, r: radius } };
+  }
+
+  const isStandard = type === 'standard';
+  const depth = Math.min(
+    isStandard ? 5 + size * 0.55 : dependencyArrowEndInset(type, size, stroke),
+    segLen - 1,
+  );
+  const half = isStandard
+    ? 2.2 + size * 0.22 + stroke * 0.04
+    : 3.4 + size * 0.48 + stroke * 0.1;
+  const baseX = tip.x - dirX * depth;
+  const baseY = tip.y - dirY * depth;
+  const lineGap = isStandard ? Math.max(1.25, 0.85 + stroke * 0.2) : 0;
+  points[points.length - 1] = {
+    x: tip.x - dirX * Math.min(segLen - 1, depth + lineGap),
+    y: tip.y - dirY * Math.min(segLen - 1, depth + lineGap),
+  };
+
+  if (type === 'standard') {
+    const p1 = `${tip.x},${tip.y}`;
+    const p2 = `${baseX + normalX * half},${baseY + normalY * half}`;
+    const p3 = `${baseX - normalX * half},${baseY - normalY * half}`;
+    return { linePath: stringifyRoutePoints(points), head: { kind: 'polygon', points: `${p1} ${p2} ${p3}`, fill: true } };
+  } else if (type === 'open') {
+    const leftX = baseX + normalX * half;
+    const leftY = baseY + normalY * half;
+    const rightX = baseX - normalX * half;
+    const rightY = baseY - normalY * half;
+    return { linePath: stringifyRoutePoints(points), head: { kind: 'path', d: `M ${leftX} ${leftY} L ${tip.x} ${tip.y} L ${rightX} ${rightY}` } };
+  } else if (type === 'diamond') {
+    const midX = tip.x - dirX * (depth * 0.45);
+    const midY = tip.y - dirY * (depth * 0.45);
+    const backX = baseX;
+    const backY = baseY;
+    const p1 = `${tip.x},${tip.y}`;
+    const p2 = `${midX + normalX * half},${midY + normalY * half}`;
+    const p3 = `${backX},${backY}`;
+    const p4 = `${midX - normalX * half},${midY - normalY * half}`;
+    return { linePath: stringifyRoutePoints(points), head: { kind: 'polygon', points: `${p1} ${p2} ${p3} ${p4}`, fill: false } };
+  }
+
+  return { linePath: path, head: null };
+}
+
+function dependencyStrokeOpacity(transparency: number | undefined): number {
+  const clamped = Math.max(0, Math.min(100, transparency ?? 0));
+  return (100 - clamped) / 100;
+}
+
 function routeDepLink(
   fromX: number, fromY: number,
   toX: number, toY: number,
@@ -109,6 +289,8 @@ function routeDepLink(
   endObj: ObstacleRect,
   fromDir: AnchorDir = 'right',
   toDir: AnchorDir = 'left',
+  visualClearance: number = 0,
+  endInset: number = 0,
 ): string {
   type NodeKey = string;
   type EdgeDir = 'H' | 'V' | 'S';
@@ -116,14 +298,14 @@ function routeDepLink(
   type StateKey = string;
 
   const GEOM_EPS = 0.5;
-  const HARD_PAD = 1;
+  const HARD_PAD = 1 + visualClearance;
   const MIN_PORT_OFFSET = 3;
-  const MAX_PORT_OFFSET = 16;
-  const SOFT_ZONE = 28;
+  const MAX_PORT_OFFSET = 16 + visualClearance;
+  const SOFT_ZONE = 28 + visualClearance;
   const PROXIMITY_WEIGHT = 1.25;
   const BEND_PENALTY = 18;
-  const OUTER_MARGIN = 48;
-  const ANCHOR_DEVIATION_WEIGHT = 4;
+  const OUTER_MARGIN = 48 + visualClearance;
+  const ANCHOR_DEVIATION_WEIGHT = 24;
 
   const round3 = (n: number) => Math.round(n * 1000) / 1000;
   const approxEq = (a: number, b: number) => Math.abs(a - b) <= GEOM_EPS;
@@ -273,9 +455,7 @@ function routeDepLink(
 
       addPoint(clamp(preferredX, minX, maxX), y);
       addPoint(clamp(oppositeX, minX, maxX), y);
-      addPoint(minX, y);
       addPoint(midX, y);
-      addPoint(maxX, y);
 
       for (const rect of objects) {
         addPoint(clamp(rect.leftX - HARD_PAD - GEOM_EPS, minX, maxX), y);
@@ -283,21 +463,8 @@ function routeDepLink(
       }
     } else {
       const x = dir === 'left' ? obj.leftX : obj.rightX;
-      const insetY = anchorInsetForSpan(obj.bottomY - obj.topY);
-      const minY = Math.min((obj.topY + obj.bottomY) / 2, obj.topY + insetY);
-      const maxY = Math.max((obj.topY + obj.bottomY) / 2, obj.bottomY - insetY);
       const midY = (obj.topY + obj.bottomY) / 2;
-
-      addPoint(x, clamp(preferredY, minY, maxY));
-      addPoint(x, clamp(oppositeY, minY, maxY));
-      addPoint(x, minY);
       addPoint(x, midY);
-      addPoint(x, maxY);
-
-      for (const rect of objects) {
-        addPoint(x, clamp(rect.topY - HARD_PAD - GEOM_EPS, minY, maxY));
-        addPoint(x, clamp(rect.bottomY + HARD_PAD + GEOM_EPS, minY, maxY));
-      }
     }
 
     return Array.from(candidates)
@@ -309,7 +476,7 @@ function routeDepLink(
       });
   };
 
-  const buildPorts = (obj: ObstacleRect, gx: number, gy: number, dir: AnchorDir): [number, number][] => {
+  const buildPorts = (obj: ObstacleRect, gx: number, gy: number, dir: AnchorDir, minOffset: number): [number, number][] => {
     const ports: [number, number][] = [];
     const portForOffset = (offset: number): [number, number] => {
       switch (dir) {
@@ -348,15 +515,21 @@ function routeDepLink(
       return best;
     };
 
+    const clampedMinOffset = Math.max(GEOM_EPS * 2, minOffset);
     const maxOffset = Math.max(0, Math.min(MAX_PORT_OFFSET, clearanceInDir() - HARD_PAD));
     const candidateOffsets = new Set<number>();
 
-    for (const offset of [MIN_PORT_OFFSET, 4, 6, 8, 12, MAX_PORT_OFFSET]) {
-      if (offset <= maxOffset + GEOM_EPS) candidateOffsets.add(offset);
+    for (const offset of [clampedMinOffset, 4, 6, 8, 12, MAX_PORT_OFFSET]) {
+      if (offset >= clampedMinOffset - GEOM_EPS && offset <= maxOffset + GEOM_EPS) {
+        candidateOffsets.add(offset);
+      }
     }
-    if (maxOffset > GEOM_EPS) candidateOffsets.add(Math.max(GEOM_EPS * 2, round3(maxOffset)));
+    if (maxOffset >= clampedMinOffset - GEOM_EPS) candidateOffsets.add(Math.max(clampedMinOffset, round3(maxOffset)));
     if (candidateOffsets.size === 0 && maxOffset > GEOM_EPS * 2) {
-      candidateOffsets.add(round3(Math.max(GEOM_EPS * 2, maxOffset / 2)));
+      const fallbackOffset = Math.max(clampedMinOffset, maxOffset / 2);
+      if (fallbackOffset <= maxOffset + GEOM_EPS) {
+        candidateOffsets.add(round3(fallbackOffset));
+      }
     }
 
     for (const offset of candidateOffsets) {
@@ -380,8 +553,11 @@ function routeDepLink(
   const startPorts: [number, number][] = [];
   const endPorts: [number, number][] = [];
 
+  const startMinOffset = MIN_PORT_OFFSET;
+  const endMinOffset = Math.max(MIN_PORT_OFFSET, endInset);
+
   for (const [gx, gy] of startAnchors) {
-    for (const port of buildPorts(startRect, gx, gy, fromDir)) {
+    for (const port of buildPorts(startRect, gx, gy, fromDir, startMinOffset)) {
       const key = nodeKey(port[0], port[1]);
       if (!startPortToAnchor.has(key)) {
         startPorts.push(port);
@@ -391,7 +567,7 @@ function routeDepLink(
   }
 
   for (const [gx, gy] of endAnchors) {
-    for (const port of buildPorts(endRect, gx, gy, toDir)) {
+    for (const port of buildPorts(endRect, gx, gy, toDir, endMinOffset)) {
       const key = nodeKey(port[0], port[1]);
       if (!endPortToAnchor.has(key)) {
         endPorts.push(port);
@@ -678,19 +854,97 @@ function routeDepLink(
 
   if (simplified.length < 2) return '';
 
-  const first = simplified[0];
-  const second = simplified[1];
-  const beforeLast = simplified[simplified.length - 2];
-  const last = simplified[simplified.length - 1];
+  const ensureArrowComfort = (pathPoints: [number, number][]): [number, number][] => {
+    if (pathPoints.length < 3 || endInset <= 0) return pathPoints;
+
+    const comfortTarget = Math.ceil(endInset * 1.25);
+    const lastIdx = pathPoints.length - 1;
+    const finalBendIdx = lastIdx - 1;
+    const finalLen = manhattan(
+      pathPoints[finalBendIdx][0],
+      pathPoints[finalBendIdx][1],
+      pathPoints[lastIdx][0],
+      pathPoints[lastIdx][1],
+    );
+
+    if (finalLen >= comfortTarget) return pathPoints;
+
+    const needed = comfortTarget - finalLen;
+    const isFinalHorizontal = approxEq(pathPoints[finalBendIdx][1], pathPoints[lastIdx][1]);
+    const axisValue = isFinalHorizontal ? pathPoints[finalBendIdx][0] : pathPoints[finalBendIdx][1];
+    let runStart = finalBendIdx;
+
+    while (runStart - 1 >= 0) {
+      const prev = pathPoints[runStart - 1];
+      const matches = isFinalHorizontal ? approxEq(prev[0], axisValue) : approxEq(prev[1], axisValue);
+      if (!matches) break;
+      runStart -= 1;
+    }
+
+    const sign = toDir === 'left' ? -1 : toDir === 'right' ? 1 : toDir === 'top' ? -1 : 1;
+
+    const isComfortCandidateValid = (candidate: [number, number][]): boolean => {
+      const candidateFinalLen = manhattan(
+        candidate[finalBendIdx][0],
+        candidate[finalBendIdx][1],
+        candidate[lastIdx][0],
+        candidate[lastIdx][1],
+      );
+      if (candidateFinalLen < comfortTarget) return false;
+
+      for (let i = 1; i < candidate.length - 1; i += 1) {
+        const [x, y] = candidate[i];
+        if (!pointInFreeSpace(x, y)) return false;
+      }
+
+      for (let i = 0; i < candidate.length - 1; i += 1) {
+        const a = candidate[i];
+        const b = candidate[i + 1];
+        if (!approxEq(a[0], b[0]) && !approxEq(a[1], b[1])) return false;
+
+        if (i === 0) {
+          if (!validGlueExit(startRect, chosenStartAnchor[0], chosenStartAnchor[1], b[0], b[1])) return false;
+        } else if (i === candidate.length - 2) {
+          if (!validGlueExit(endRect, chosenEndAnchor[0], chosenEndAnchor[1], a[0], a[1])) return false;
+        } else if (!segmentClear(a[0], a[1], b[0], b[1])) {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    for (let delta = needed; delta >= 1; delta -= 1) {
+      const candidate = pathPoints.map((point) => [...point] as [number, number]);
+      for (let i = runStart; i <= finalBendIdx; i += 1) {
+        if (isFinalHorizontal) {
+          candidate[i][0] += sign * delta;
+        } else {
+          candidate[i][1] += sign * delta;
+        }
+      }
+
+      if (isComfortCandidateValid(candidate)) return candidate;
+    }
+
+    return pathPoints;
+  };
+
+  const comfortable = ensureArrowComfort(simplified);
+
+  const first = comfortable[0];
+  const second = comfortable[1];
+  const beforeLast = comfortable[comfortable.length - 2];
+  const last = comfortable[comfortable.length - 1];
 
   const firstSegOk = segmentMatchesDir(first, second, fromDir);
   const lastSegOk = segmentMatchesDir(last, beforeLast, toDir);
 
   if (!firstSegOk || !lastSegOk) return '';
 
-  for (let i = 0; i < simplified.length - 1; i++) {
-    const a = simplified[i];
-    const b = simplified[i + 1];
+  for (let i = 0; i < comfortable.length - 1; i++) {
+    const a = comfortable[i];
+    const b = comfortable[i + 1];
     if (!approxEq(a[0], b[0]) && !approxEq(a[1], b[1])) return '';
 
     if (i === 0) {
@@ -702,7 +956,7 @@ function routeDepLink(
     }
   }
 
-  return simplified.map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${round3(point[0])} ${round3(point[1])}`).join(' ');
+  return comfortable.map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${round3(point[0])} ${round3(point[1])}`).join(' ');
 }
 
 function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSProperties {
@@ -1220,6 +1474,10 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           fromY = fromRowTop + ROW_BASE / 2;
         }
 
+        const arrowType = dep.arrowType ?? 'standard';
+        const arrowSize = dep.arrowSize ?? 4;
+        const lineWidth = dep.lineWidth ?? 1.5;
+
         // Compute to anchor
         let toX: number;
         let toY: number;
@@ -1244,7 +1502,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         // Determine anchor directions for routing
         const fromDir: AnchorDir = (fp === 'top') ? 'top' : (fp === 'bottom') ? 'bottom' : 'right';
         const toDir: AnchorDir = (tp === 'top') ? 'top' : (tp === 'bottom') ? 'bottom' : 'left';
-
         const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
 
         // Pass all obstacles + source/target object rects to the router
@@ -1256,10 +1513,26 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const allObjRects: ObstacleRect[] = allObstacles.map(({ leftX, rightX, topY, bottomY }) => ({ leftX, rightX, topY, bottomY }));
         const startObjRect = allObjRects[startObsIdx];
         const endObjRect = allObjRects[endObsIdx];
+        const visualClearance = dependencyVisualClearance(lineWidth, arrowSize);
+        const endInset = dependencyArrowEndInset(arrowType, arrowSize, lineWidth, toDir);
+        const path = routeDepLink(fromX, fromY, toX, toY, allObjRects, startObjRect, endObjRect, fromDir, toDir, visualClearance, endInset);
 
-        const path = routeDepLink(fromX, fromY, toX, toY, allObjRects, startObjRect, endObjRect, fromDir, toDir);
-
-        return { path, isCritical, isHidden, key: `${dep.fromId}-${dep.toId}`, fromId: dep.fromId, toId: dep.toId };
+        return {
+          path,
+          isCritical,
+          isHidden,
+          key: `${dep.fromId}-${dep.toId}`,
+          fromId: dep.fromId,
+          toId: dep.toId,
+          color: dep.color,
+          transparency: dep.transparency,
+          arrowType,
+          arrowSize,
+          lineDash: dep.lineDash,
+          lineWidth,
+          targetX: toX,
+          targetY: toY,
+        };
       })
       .filter(Boolean);
   }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, getRowH, zoom]);
@@ -1955,48 +2228,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
               width={totalWidth}
               height={canvasHeight}
             >
-              <defs>
-                <marker
-                  id="arrowhead"
-                  markerWidth="10"
-                  markerHeight="8"
-                  refX="9"
-                  refY="4"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 10 4, 0 8" fill="#475569" />
-                </marker>
-                <marker
-                  id="arrowhead-critical"
-                  markerWidth="10"
-                  markerHeight="8"
-                  refX="9"
-                  refY="4"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 10 4, 0 8" fill="#ef4444" />
-                </marker>
-                <marker
-                  id="arrowhead-selected"
-                  markerWidth="10"
-                  markerHeight="8"
-                  refX="9"
-                  refY="4"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 10 4, 0 8" fill="#3b82f6" />
-                </marker>
-                <marker
-                  id="arrowhead-hidden"
-                  markerWidth="10"
-                  markerHeight="8"
-                  refX="9"
-                  refY="4"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 10 4, 0 8" fill="#94a3b8" />
-                </marker>
-              </defs>
+              <defs />
               {/* Vertical connector lines */}
               {verticalConnectors.map((c) => (
                 <line
@@ -2015,13 +2247,24 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 (dep) => {
                   if (!dep) return null;
                   const isDepSelected = selectedDepKey === dep.key;
-                  const stroke = isDepSelected ? '#3b82f6' : dep.isHidden ? '#94a3b8' : dep.isCritical ? '#ef4444' : '#475569';
-                  const markerEnd = isDepSelected ? 'url(#arrowhead-selected)' : dep.isHidden ? 'url(#arrowhead-hidden)' : dep.isCritical ? 'url(#arrowhead-critical)' : 'url(#arrowhead)';
+                  const baseColor = dep.color ?? DEFAULT_DEPENDENCY_COLOR;
+                  const alpha = dependencyStrokeOpacity(dep.transparency);
+                  const stroke = dep.isHidden
+                    ? '#94a3b8'
+                    : dep.isCritical
+                      ? '#ef4444'
+                      : baseColor;
+                  const arrowType = dep.arrowType ?? 'standard';
+                  const strokeOpacity = alpha;
+                  const strokeWidth = dep.lineWidth ?? (dep.isCritical ? 2 : 1.5);
+                  const dasharray = dep.isHidden ? '4 3' : DEPENDENCY_DASH_MAP[dep.lineDash ?? 'solid'];
+                  const renderGeometry = buildDependencyRenderGeometry(dep.path, arrowType, dep.arrowSize, strokeWidth);
+                  const linePath = renderGeometry.linePath;
                   return (
                     <g key={dep.key} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
                       {/* Invisible fat hit area for clicking */}
                       <path
-                        d={dep.path}
+                        d={linePath}
                         fill="none"
                         stroke="transparent"
                         strokeWidth={12}
@@ -2031,14 +2274,27 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                           setSelectedDepKey(dep.key);
                         }}
                       />
+                      {isDepSelected && (
+                        <path
+                          d={linePath}
+                          fill="none"
+                          stroke="#3b82f6"
+                          strokeOpacity={0.28}
+                          strokeWidth={strokeWidth + 4}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      )}
                       {/* Visible path */}
                       <path
-                        d={dep.path}
+                        d={linePath}
                         fill="none"
                         stroke={stroke}
-                        strokeWidth={isDepSelected ? 2.5 : dep.isCritical ? 2 : 1.5}
-                        strokeDasharray={dep.isHidden ? '4 3' : undefined}
-                        markerEnd={markerEnd}
+                        strokeOpacity={strokeOpacity}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray={dasharray}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       />
                     </g>
                   );
@@ -2083,7 +2339,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     .map((p) => ({ leftX: p.leftX, rightX: p.rightX, topY: p.centerY - p.barHeight / 2, bottomY: p.centerY + p.barHeight / 2 }));
                   const sourceObjRect = allObjRects[sourceIdx >= 0 ? sourceIdx : 0];
                   const targetObjRect = allObjRects[targetIdx >= 0 ? targetIdx : 0];
-                  path = routeDepLink(fromX, fromY, endX, endY, allObjRects, sourceObjRect, targetObjRect, 'right', 'left');
+                  path = routeDepLink(fromX, fromY, endX, endY, allObjRects, sourceObjRect, targetObjRect, 'right', 'left', dependencyVisualClearance(1.5, 4), dependencyArrowEndInset('standard', 4, 1.5, 'left'));
                 } else {
                   // Free-dragging — simple orthogonal routing
                   const gap = endX - fromX;
@@ -2114,6 +2370,67 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                   />
                 );
               })()}
+            </svg>
+
+            {/* Dependency arrowheads above items */}
+            <svg
+              className="absolute top-0 left-0 pointer-events-none z-[45]"
+              width={totalWidth}
+              height={canvasHeight}
+            >
+              {depPaths.map((dep) => {
+                if (!dep) return null;
+                const isDepSelected = selectedDepKey === dep.key;
+                const baseColor = dep.color ?? DEFAULT_DEPENDENCY_COLOR;
+                const alpha = dependencyStrokeOpacity(dep.transparency);
+                const stroke = dep.isHidden
+                  ? '#94a3b8'
+                  : dep.isCritical
+                    ? '#ef4444'
+                    : baseColor;
+                const arrowType = dep.arrowType ?? 'standard';
+                const strokeOpacity = alpha;
+                const strokeWidth = dep.lineWidth ?? (dep.isCritical ? 2 : 1.5);
+                const renderGeometry = buildDependencyRenderGeometry(dep.path, arrowType, dep.arrowSize, strokeWidth);
+                if (!renderGeometry.head) return null;
+                return (
+                  <g key={`${dep.key}-head`} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
+                    {renderGeometry.head.kind === 'polygon' && (
+                      <polygon
+                        points={renderGeometry.head.points}
+                        fill={renderGeometry.head.fill ? stroke : 'none'}
+                        fillOpacity={renderGeometry.head.fill ? strokeOpacity : undefined}
+                        stroke={renderGeometry.head.fill ? 'none' : stroke}
+                        strokeOpacity={renderGeometry.head.fill ? undefined : strokeOpacity}
+                        strokeWidth={renderGeometry.head.fill ? undefined : strokeWidth}
+                        strokeLinejoin="round"
+                      />
+                    )}
+                    {renderGeometry.head.kind === 'path' && (
+                      <path
+                        d={renderGeometry.head.d}
+                        fill="none"
+                        stroke={stroke}
+                        strokeOpacity={strokeOpacity}
+                        strokeWidth={strokeWidth}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    )}
+                    {renderGeometry.head.kind === 'circle' && (
+                      <circle
+                        cx={renderGeometry.head.cx}
+                        cy={renderGeometry.head.cy}
+                        r={renderGeometry.head.r}
+                        fill="none"
+                        stroke={stroke}
+                        strokeOpacity={strokeOpacity}
+                        strokeWidth={strokeWidth}
+                      />
+                    )}
+                  </g>
+                );
+              })}
             </svg>
 
             {/* ─── Render independent items (below timescale only) ─── */}

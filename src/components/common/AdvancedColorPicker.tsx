@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 
 // ─── Color Conversion Utilities ──────────────────────────────────────────────
@@ -117,6 +118,20 @@ export function AdvancedColorPicker({ value, onChange }: AdvancedColorPickerProp
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const popoverWidth = 280;
+    const margin = 8;
+    const left = Math.min(
+      Math.max(margin, rect.left),
+      window.innerWidth - popoverWidth - margin,
+    );
+    const top = rect.bottom + 8;
+    setPos({ top, left });
+  }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -133,20 +148,36 @@ export function AdvancedColorPicker({ value, onChange }: AdvancedColorPickerProp
     return () => document.removeEventListener('mousedown', handleClick);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePos();
+    const handleViewportChange = () => updatePos();
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('scroll', handleViewportChange, true);
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('scroll', handleViewportChange, true);
+    };
+  }, [isOpen, updatePos]);
+
   return (
     <div className="relative">
       <button
         ref={triggerRef}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen) updatePos();
+          setIsOpen(!isOpen);
+        }}
         className="w-7 h-7 rounded-md border-2 border-[var(--color-border)] hover:border-[var(--color-border-light)] transition-colors cursor-pointer shadow-sm"
         style={{ backgroundColor: value }}
         title={value}
       />
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div
           ref={popoverRef}
-          className="absolute left-0 top-9 z-50 w-[280px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl"
+          className="fixed z-[9999] w-[280px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl"
+          style={{ top: pos.top, left: pos.left }}
         >
           <PopoverContent
             value={value}
@@ -155,7 +186,8 @@ export function AdvancedColorPicker({ value, onChange }: AdvancedColorPickerProp
             }}
             onClose={() => setIsOpen(false)}
           />
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

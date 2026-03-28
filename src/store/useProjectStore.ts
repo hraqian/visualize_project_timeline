@@ -136,7 +136,18 @@ function createSampleData(): Pick<ProjectState, 'items' | 'swimlanes' | 'depende
   ];
 
   const makeDep = (fromId: string, toId: string): Dependency => ({
-    fromId, toId, type: 'finish-to-start', lag: 0, lagUnit: 'd', visible: true,
+    fromId,
+    toId,
+    type: 'finish-to-start',
+    lag: 0,
+    lagUnit: 'd',
+    visible: true,
+    color: '#475569',
+    transparency: 0,
+    lineDash: 'solid',
+    lineWidth: 1.5,
+    arrowType: 'standard',
+    arrowSize: 4,
   });
 
   const dependencies: Dependency[] = [
@@ -206,9 +217,10 @@ interface ProjectActions {
   reorderSwimlane: (id: string, newOrder: number) => void;
 
   // Dependencies
-  addDependency: (fromId: string, toId: string, options?: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible' | 'fromPoint' | 'toPoint'>> & { forceSchedule?: boolean }) => void;
+  addDependency: (fromId: string, toId: string, options?: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible' | 'fromPoint' | 'toPoint' | 'color' | 'transparency' | 'lineDash' | 'lineWidth' | 'arrowType' | 'arrowSize'>> & { forceSchedule?: boolean }) => void;
   removeDependency: (fromId: string, toId: string) => void;
-  updateDependency: (fromId: string, toId: string, updates: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible' | 'fromPoint' | 'toPoint'>> & { forceSchedule?: boolean }) => void;
+  updateDependency: (fromId: string, toId: string, updates: Partial<Pick<Dependency, 'type' | 'lag' | 'lagUnit' | 'visible' | 'fromPoint' | 'toPoint' | 'color' | 'transparency' | 'lineDash' | 'lineWidth' | 'arrowType' | 'arrowSize'>> & { forceSchedule?: boolean }) => void;
+  applyDependencyStyleToAll: (fromId: string, toId: string, keys: (keyof Pick<Dependency, 'visible' | 'fromPoint' | 'toPoint' | 'color' | 'transparency' | 'lineDash' | 'lineWidth' | 'arrowType' | 'arrowSize'>)[]) => void;
   toggleDependencyVisibility: (fromId: string, toId: string) => void;
   setItemDependencies: (itemId: string, deps: Dependency[]) => void;
 
@@ -827,6 +839,12 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       visible: options?.visible ?? true,
       fromPoint: options?.fromPoint,
       toPoint: options?.toPoint,
+      color: options?.color ?? '#475569',
+      transparency: options?.transparency ?? 0,
+      lineDash: options?.lineDash ?? 'solid',
+      lineWidth: options?.lineWidth ?? 1.5,
+      arrowType: options?.arrowType ?? 'standard',
+      arrowSize: options?.arrowSize ?? 4,
     }];
     let newItems = state.items;
     if (options?.forceSchedule || state.dependencySettings.schedulingMode !== 'manual') {
@@ -874,6 +892,23 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       }
     }
     set({ dependencies: newDeps, items: newItems });
+  },
+
+  applyDependencyStyleToAll: (fromId, toId, keys) => {
+    const state = get();
+    const source = state.dependencies.find((d) => d.fromId === fromId && d.toId === toId);
+    if (!source || keys.length === 0) return;
+
+    const partial: Partial<Dependency> = {};
+    for (const key of keys) {
+      partial[key] = source[key];
+    }
+
+    set((st) => ({
+      dependencies: st.dependencies.map((dep) =>
+        dep.fromId === fromId && dep.toId === toId ? dep : { ...dep, ...partial }
+      ),
+    }));
   },
 
   toggleDependencyVisibility: (fromId, toId) =>

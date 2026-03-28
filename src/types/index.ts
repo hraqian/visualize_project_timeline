@@ -232,6 +232,10 @@ export type LagUnit = 'd' | 'w' | 'm';
 
 export type ConnectionPoint = 'auto' | 'side' | 'top' | 'bottom';
 
+export type DependencyLineDash = 'solid' | 'dashed' | 'dotted' | 'long-dashed' | 'dash-dot' | 'long-dot';
+export type DependencyArrowSize = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export type DependencyArrowType = 'standard' | 'open' | 'diamond' | 'circle' | 'none';
+
 export interface Dependency {
   fromId: string;
   toId: string;
@@ -241,6 +245,12 @@ export interface Dependency {
   visible: boolean;  // whether the link is shown on the timeline
   fromPoint?: ConnectionPoint;  // where the link exits the predecessor ('auto' = system picks)
   toPoint?: ConnectionPoint;    // where the link enters the successor ('auto' = system picks)
+  color?: string;
+  transparency?: number;
+  lineDash?: DependencyLineDash;
+  lineWidth?: number;
+  arrowType?: DependencyArrowType;
+  arrowSize?: DependencyArrowSize;
 }
 
 // ─── Timescale Types ─────────────────────────────────────────────────────────
