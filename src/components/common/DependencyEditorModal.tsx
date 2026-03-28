@@ -228,7 +228,7 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
 
           {/* Search to add new predecessor */}
           <div className="relative">
-            <div className="flex items-center gap-2 px-3 py-2 border border-dashed border-slate-300 rounded-lg bg-slate-50/50">
+            <div className="flex items-center gap-2 px-3 py-2 border border-dashed rounded-xl" style={{ borderColor: '#cdd9e6', background: 'linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%)' }}>
               <Search size={14} className="text-slate-400 shrink-0" />
               <input
                 ref={searchRef}
@@ -248,7 +248,8 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
             {showSearchResults && (searchQuery || availableItems.length > 0) && (
               <div
                 ref={dropdownRef}
-                className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto z-10"
+                className="absolute left-0 right-0 top-full mt-1 rounded-xl max-h-40 overflow-y-auto z-10"
+                style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}
               >
                 {availableItems.length === 0 ? (
                   <div className="px-3 py-2 text-xs text-slate-400 italic">No matching items</div>
@@ -277,14 +278,15 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-200">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
+            className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 rounded-lg transition-all"
+            style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', border: '1px solid #d9e3ef', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
           >
             Cancel
           </button>
           <button
             onClick={handleApply}
             className="px-4 py-1.5 text-xs font-medium text-white rounded-lg transition-all"
-            style={{ backgroundColor: '#334155' }}
+            style={{ background: 'linear-gradient(180deg, #3c6fd9 0%, #2f5fc7 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }}
           >
             Apply
           </button>
@@ -312,7 +314,8 @@ function LagInput({ value, onChange }: { value: string; onChange: (val: string) 
     return (
       <input
         type="text"
-        className="w-14 text-xs px-1.5 py-1 border border-slate-300 rounded bg-white outline-none focus:ring-1 focus:ring-slate-400 text-slate-600 font-mono text-center"
+        className="w-14 text-xs px-1.5 py-1 border rounded-lg bg-white outline-none focus:ring-1 focus:ring-slate-400 text-slate-600 font-mono text-center"
+        style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
         onBlur={commit}
@@ -327,7 +330,8 @@ function LagInput({ value, onChange }: { value: string; onChange: (val: string) 
 
   return (
     <button
-      className="w-14 text-xs px-1.5 py-1 border border-slate-200 rounded bg-white text-slate-500 font-mono text-center hover:border-slate-300 transition-colors"
+      className="w-14 text-xs px-1.5 py-1 border rounded-lg text-slate-500 font-mono text-center transition-colors"
+      style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}
       onClick={() => { setLocalValue(value); setEditing(true); }}
     >
       {value}

@@ -170,12 +170,18 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
       <button
         ref={triggerRef}
         onClick={handleToggle}
-        className="flex items-center gap-1.5 px-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-text-muted)] transition-colors text-[var(--color-text)] w-full"
-        style={{ height: 28, fontSize: 14 }}
+        className="flex items-center gap-2 px-3 rounded-lg border transition-all text-[var(--color-text)] w-full"
+        style={{
+          height: 32,
+          fontSize: 13,
+          borderColor: '#c8d3df',
+          background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+        }}
       >
         <ShapePreview shape={value} color={ICON_COLOR} width={14} height={8} />
         <span className="flex-1 text-left font-medium">{currentLabel}</span>
-        <ChevronDown size={10} className="text-[var(--color-text-muted)] shrink-0" />
+        <ChevronDown size={11} className="text-[#607086] shrink-0" />
       </button>
 
       {/* Dropdown — portal to body so it escapes overflow clipping */}
@@ -187,14 +193,14 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
             top: pos.top,
             left: pos.left,
             zIndex: 9999,
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: 8,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-            padding: 8,
+            background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
+            border: '1px solid #d9e3ef',
+            borderRadius: 12,
+            boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)',
+            padding: 10,
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
             {BAR_SHAPE_OPTIONS.map((shape) => (
               <button
                 key={shape.id}
@@ -206,15 +212,15 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 29,
-                  height: 29,
-                  borderRadius: 6,
-                  border: 'none',
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  border: value === shape.id ? '1px solid #c7d8f8' : '1px solid transparent',
                   cursor: 'pointer',
-                  background: value === shape.id ? '#e2e8f0' : 'transparent',
+                  background: value === shape.id ? 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' : 'transparent',
                 }}
                 title={shape.label}
-                onMouseEnter={(e) => { if (value !== shape.id) e.currentTarget.style.background = '#f1f5f9'; }}
+                onMouseEnter={(e) => { if (value !== shape.id) e.currentTarget.style.background = '#f7fafc'; }}
                 onMouseLeave={(e) => { if (value !== shape.id) e.currentTarget.style.background = 'transparent'; }}
               >
                 <ShapePreview shape={shape.id} color={value === shape.id ? '#1e293b' : ICON_COLOR} width={19} height={10} />

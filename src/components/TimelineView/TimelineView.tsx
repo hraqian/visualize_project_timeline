@@ -5,7 +5,7 @@ import { MilestoneIconComponent } from '@/components/common/MilestoneIconCompone
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { DatePickerPopover } from './DatePickerPopover';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, EndCapConfig, DependencyType, ConnectionPoint, DependencyArrowType } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyArrowType } from '@/types';
 
 // ─── Types for inline editing ────────────────────────────────────────────────
 
@@ -111,41 +111,6 @@ const DEPENDENCY_DASH_MAP: Record<string, string | undefined> = {
   'long-dot': '10 4 2 4',
 };
 
-function arrowMarkerSpec(type: DependencyArrowType, size: number) {
-  const clamped = Math.max(1, Math.min(9, Math.round(size)));
-  const markerWidth = 4.5 + clamped * 0.95;
-  const markerHeight = 3 + clamped * 0.58;
-  const refY = markerHeight / 2;
-  const tailX = markerWidth * 0.12;
-  const tipX = type === 'diamond' ? markerWidth * 0.96 : type === 'circle' ? markerWidth * 0.84 : markerWidth;
-  const openPath = `M ${tailX} ${markerHeight * 0.16} L ${tipX} ${refY} L ${tailX} ${markerHeight * 0.84}`;
-  const diamondPoints = `${markerWidth * 0.14} ${refY}, ${markerWidth * 0.48} 0, ${tipX} ${refY}, ${markerWidth * 0.48} ${markerHeight}`;
-  const circleRadius = Math.max(1.8, markerHeight * 0.34);
-  const refX = type === 'circle'
-    ? tipX - circleRadius
-    : type === 'diamond'
-      ? markerWidth * 0.5
-      : markerWidth * 0.44;
-  const minX = type === 'diamond'
-    ? markerWidth * 0.16
-    : type === 'circle'
-      ? tipX - circleRadius * 2
-      : tailX;
-  return {
-    type,
-    markerWidth,
-    markerHeight,
-    refX,
-    refY,
-    tipX,
-    minX,
-    points: `${tailX} 0, ${markerWidth} ${refY}, ${tailX} ${markerHeight}`,
-    openPath,
-    diamondPoints,
-    circleRadius,
-  };
-}
-
 function dependencyVisualClearance(lineWidth: number | undefined, arrowSize: number | undefined): number {
   const strokeWidth = Math.max(0.5, lineWidth ?? 1.5);
   const effectiveArrowSize = Math.max(1, Math.min(9, Math.round(arrowSize ?? 4)));
@@ -220,6 +185,7 @@ function buildDependencyRenderGeometry(
 
   const dirX = dx === 0 ? 0 : Math.sign(dx);
   const dirY = dy === 0 ? 0 : Math.sign(dy);
+  const isVertical = dirY !== 0;
   const normalX = -dirY;
   const normalY = dirX;
   const size = Math.max(1, Math.min(9, Math.round(arrowSize ?? 4)));
@@ -236,12 +202,12 @@ function buildDependencyRenderGeometry(
 
   const isStandard = type === 'standard';
   const depth = Math.min(
-    isStandard ? 5 + size * 0.55 : dependencyArrowEndInset(type, size, stroke),
+    (isStandard ? 5 + size * 0.55 : dependencyArrowEndInset(type, size, stroke)) * (isVertical ? 0.92 : 1),
     segLen - 1,
   );
   const half = isStandard
-    ? 2.2 + size * 0.22 + stroke * 0.04
-    : 3.4 + size * 0.48 + stroke * 0.1;
+    ? (2.2 + size * 0.22 + stroke * 0.04) * (isVertical ? 0.88 : 1)
+    : (3.4 + size * 0.48 + stroke * 0.1) * (isVertical ? 0.9 : 1);
   const baseX = tip.x - dirX * depth;
   const baseY = tip.y - dirY * depth;
   const lineGap = isStandard ? Math.max(1.25, 0.85 + stroke * 0.2) : 0;
@@ -279,6 +245,122 @@ function buildDependencyRenderGeometry(
 function dependencyStrokeOpacity(transparency: number | undefined): number {
   const clamped = Math.max(0, Math.min(100, transparency ?? 0));
   return (100 - clamped) / 100;
+}
+
+function renderDependencyHead(
+  head: NonNullable<ReturnType<typeof buildDependencyRenderGeometry>['head']>,
+  stroke: string,
+  strokeOpacity: number,
+  strokeWidth: number,
+  isSelected: boolean,
+): React.ReactNode {
+  const haloStroke = strokeWidth + 4;
+
+  if (head.kind === 'polygon') {
+    return (
+      <>
+        {isSelected && (
+          <polygon
+            points={head.points}
+            fill="none"
+            stroke="#3b82f6"
+            strokeOpacity={0.28}
+            strokeWidth={haloStroke}
+            strokeLinejoin="round"
+          />
+        )}
+        {!head.fill && (
+          <polygon
+            points={head.points}
+            fill="#ffffff"
+            fillOpacity={0.96}
+            stroke="#ffffff"
+            strokeWidth={strokeWidth + 1.5}
+            strokeLinejoin="round"
+          />
+        )}
+        <polygon
+          points={head.points}
+          fill={head.fill ? stroke : 'none'}
+          fillOpacity={head.fill ? strokeOpacity : undefined}
+          stroke={head.fill ? 'none' : stroke}
+          strokeOpacity={head.fill ? undefined : strokeOpacity}
+          strokeWidth={head.fill ? undefined : strokeWidth}
+          strokeLinejoin="round"
+        />
+      </>
+    );
+  }
+
+  if (head.kind === 'path') {
+    return (
+      <>
+        {isSelected && (
+          <path
+            d={head.d}
+            fill="none"
+            stroke="#3b82f6"
+            strokeOpacity={0.28}
+            strokeWidth={haloStroke}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+        <path
+          d={head.d}
+          fill="none"
+          stroke="#ffffff"
+          strokeOpacity={0.96}
+          strokeWidth={strokeWidth + 2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d={head.d}
+          fill="none"
+          stroke={stroke}
+          strokeOpacity={strokeOpacity}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      {isSelected && (
+        <circle
+          cx={head.cx}
+          cy={head.cy}
+          r={head.r}
+          fill="none"
+          stroke="#3b82f6"
+          strokeOpacity={0.28}
+          strokeWidth={haloStroke}
+        />
+      )}
+      <circle
+        cx={head.cx}
+        cy={head.cy}
+        r={head.r}
+        fill="#ffffff"
+        fillOpacity={0.96}
+        stroke="#ffffff"
+        strokeWidth={strokeWidth + 1.5}
+      />
+      <circle
+        cx={head.cx}
+        cy={head.cy}
+        r={head.r}
+        fill="none"
+        stroke={stroke}
+        strokeOpacity={strokeOpacity}
+        strokeWidth={strokeWidth}
+      />
+    </>
+  );
 }
 
 function routeDepLink(
@@ -439,7 +521,7 @@ function routeDepLink(
     preferredY: number,
     dir: AnchorDir,
     oppositeX: number,
-    oppositeY: number,
+    _oppositeY: number,
   ): [number, number][] => {
     const candidates = new Set<string>();
     const addPoint = (x: number, y: number) => {
@@ -2395,39 +2477,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 if (!renderGeometry.head) return null;
                 return (
                   <g key={`${dep.key}-head`} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
-                    {renderGeometry.head.kind === 'polygon' && (
-                      <polygon
-                        points={renderGeometry.head.points}
-                        fill={renderGeometry.head.fill ? stroke : 'none'}
-                        fillOpacity={renderGeometry.head.fill ? strokeOpacity : undefined}
-                        stroke={renderGeometry.head.fill ? 'none' : stroke}
-                        strokeOpacity={renderGeometry.head.fill ? undefined : strokeOpacity}
-                        strokeWidth={renderGeometry.head.fill ? undefined : strokeWidth}
-                        strokeLinejoin="round"
-                      />
-                    )}
-                    {renderGeometry.head.kind === 'path' && (
-                      <path
-                        d={renderGeometry.head.d}
-                        fill="none"
-                        stroke={stroke}
-                        strokeOpacity={strokeOpacity}
-                        strokeWidth={strokeWidth}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    )}
-                    {renderGeometry.head.kind === 'circle' && (
-                      <circle
-                        cx={renderGeometry.head.cx}
-                        cy={renderGeometry.head.cy}
-                        r={renderGeometry.head.r}
-                        fill="none"
-                        stroke={stroke}
-                        strokeOpacity={strokeOpacity}
-                        strokeWidth={strokeWidth}
-                      />
-                    )}
+                    {renderDependencyHead(renderGeometry.head, stroke, strokeOpacity, strokeWidth, isDepSelected)}
                   </g>
                 );
               })}

@@ -28,14 +28,15 @@ export function FontFamilyDropdown({ value, onChange, fonts }: FontFamilyDropdow
     <div className="relative flex-1" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 w-full px-2.5 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-sm text-[var(--color-text)] hover:border-[var(--color-border-light)] transition-colors"
+        className="flex items-center gap-1.5 w-full px-3 py-1.5 rounded-lg border text-sm text-[var(--color-text)] transition-all"
+        style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       >
         <span className="flex-1 text-left truncate" style={{ fontFamily: value }}>{value}</span>
-        <ChevronDown size={13} className="text-[var(--color-text-muted)] shrink-0" />
+        <ChevronDown size={13} className="text-[#607086] shrink-0" />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-[200px] max-h-[240px] overflow-y-auto bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1">
+        <div className="absolute left-0 top-full mt-1 z-50 w-[200px] max-h-[240px] overflow-y-auto rounded-xl py-1.5" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
           {fonts.map((font) => (
             <button
               key={font}
@@ -43,12 +44,12 @@ export function FontFamilyDropdown({ value, onChange, fonts }: FontFamilyDropdow
                 onChange(font);
                 setIsOpen(false);
               }}
-              className="flex items-center w-full px-3 py-2.5 text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-colors"
-              style={{ fontFamily: font }}
+              className="flex items-center w-full px-3 py-2.5 text-sm text-[var(--color-text)] hover:bg-[#f7fafc] transition-colors"
+              style={value === font ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)', fontFamily: font } : { fontFamily: font }}
             >
               <span className="flex-1 text-left">{font}</span>
               {value === font && (
-                <Check size={14} className="text-[var(--color-text-muted)] shrink-0" />
+                <Check size={14} className="text-[#4b83e6] shrink-0" />
               )}
             </button>
           ))}
@@ -87,14 +88,15 @@ export function FontSizeDropdown({ value, onChange, sizes = DEFAULT_FONT_SIZES }
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-sm text-[var(--color-text)] hover:border-[var(--color-border-light)] transition-colors min-w-[52px]"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-sm text-[var(--color-text)] transition-all min-w-[56px]"
+        style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       >
         <span className="flex-1 text-center">{value}</span>
-        <ChevronDown size={12} className="text-[var(--color-text-muted)] shrink-0" />
+        <ChevronDown size={12} className="text-[#607086] shrink-0" />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-[80px] max-h-[200px] overflow-y-auto bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1">
+        <div className="absolute right-0 top-full mt-1 z-50 w-[80px] max-h-[200px] overflow-y-auto rounded-xl py-1.5" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
           {sizes.map((size) => (
             <button
               key={size}
@@ -102,11 +104,12 @@ export function FontSizeDropdown({ value, onChange, sizes = DEFAULT_FONT_SIZES }
                 onChange(size);
                 setIsOpen(false);
               }}
-              className="flex items-center w-full px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-colors"
+              className="flex items-center w-full px-3 py-2 text-sm text-[var(--color-text)] hover:bg-[#f7fafc] transition-colors"
+              style={value === size ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' } : undefined}
             >
               <span className="flex-1 text-left">{size}</span>
               {value === size && (
-                <Check size={13} className="text-[var(--color-text-muted)] shrink-0" />
+                <Check size={13} className="text-[#4b83e6] shrink-0" />
               )}
             </button>
           ))}

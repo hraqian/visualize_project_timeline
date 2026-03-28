@@ -30,16 +30,20 @@ export function SizeControl({
   return (
     <div className="flex items-center gap-2">
       {/* Preset buttons */}
-      <div className="flex rounded-md overflow-hidden border border-[var(--color-border)]">
+      <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
         {presets.map((preset) => (
           <button
             key={preset.label}
             onClick={() => onChange(preset.value)}
             className={`px-2.5 py-1 text-xs font-medium transition-colors ${
               activePreset?.label === preset.label
-                ? 'bg-slate-700/15 text-slate-800'
-                : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]'
-            } ${preset !== presets[0] ? 'border-l border-[var(--color-border)]' : ''}`}
+                ? 'text-slate-800'
+                : 'text-[var(--color-text-secondary)] hover:bg-[#f7fafc] hover:text-[var(--color-text)]'
+            } ${preset !== presets[0] ? 'border-l' : ''}`}
+            style={{
+              borderColor: preset !== presets[0] ? '#d7e0ea' : undefined,
+              background: activePreset?.label === preset.label ? 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' : 'transparent',
+            }}
           >
             {preset.label}
           </button>
@@ -47,7 +51,7 @@ export function SizeControl({
       </div>
 
       {/* Numeric stepper */}
-      <div className="flex items-center border border-[var(--color-border)] rounded-md overflow-hidden bg-[var(--color-bg-secondary)]">
+      <div className="flex items-center rounded-lg overflow-hidden border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
         <input
           type="number"
           min={min}
@@ -60,16 +64,17 @@ export function SizeControl({
           }}
           className="w-10 px-1.5 py-1 text-xs text-center text-[var(--color-text)] bg-transparent outline-none font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
-        <div className="flex flex-col border-l border-[var(--color-border)]">
+        <div className="flex flex-col border-l" style={{ borderColor: '#d7e0ea' }}>
           <button
             onClick={() => onChange(Math.min(max, value + step))}
-            className="px-1 py-0 hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
+            className="px-1 py-0 hover:bg-[#f7fafc] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
           >
             <ChevronUp size={10} />
           </button>
           <button
             onClick={() => onChange(Math.max(min, value - step))}
-            className="px-1 py-0 hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors border-t border-[var(--color-border)]"
+            className="px-1 py-0 hover:bg-[#f7fafc] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors border-t"
+            style={{ borderColor: '#d7e0ea' }}
           >
             <ChevronDown size={10} />
           </button>

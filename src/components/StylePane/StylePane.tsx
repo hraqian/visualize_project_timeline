@@ -778,17 +778,18 @@ function DependencyLineDashDropdown({
           if (!open) updatePos();
           setOpen(!open);
         }}
-        className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] hover:border-[var(--color-border-light)] transition-colors min-w-[120px]"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all min-w-[124px]"
+        style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       >
         <DependencyDashPreview dasharray={selected.dasharray} />
-        <ChevronDown size={12} className="text-[var(--color-text-muted)] shrink-0 ml-auto" />
+        <ChevronDown size={12} className="text-[#607086] shrink-0 ml-auto" />
       </button>
 
       {open && pos && createPortal(
         <div
           ref={popoverRef}
-          className="fixed z-[9999] w-[180px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1"
-          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-[9999] w-[180px] rounded-xl py-1.5"
+          style={{ top: pos.top, left: pos.left, background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}
         >
           {DEP_LINE_DASH_OPTIONS.map((option) => (
             <button
@@ -799,9 +800,10 @@ function DependencyLineDashDropdown({
               }}
               className={`flex items-center w-full px-3 py-2 text-sm transition-colors ${
                 option.id === value
-                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
-                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  ? 'text-[var(--color-text)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[#f7fafc]'
               }`}
+              style={option.id === value ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' } : undefined}
               title={option.label}
             >
               <DependencyDashPreview dasharray={option.dasharray} />
@@ -846,21 +848,22 @@ function DependencyLineWidthControl({
   };
 
   return (
-    <div className="flex items-center border border-[var(--color-border)] rounded-lg overflow-hidden bg-white">
-      <div className="px-3 min-w-[78px] h-9 flex items-center justify-center text-xs text-[var(--color-text)] tabular-nums">
+    <div className="flex items-center rounded-lg overflow-hidden border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
+      <div className="px-3 min-w-[82px] h-9 flex items-center justify-center text-xs text-[var(--color-text)] tabular-nums">
         {formatValue(clamped)}
       </div>
-      <div className="flex flex-col border-l border-[var(--color-border)]">
+      <div className="flex flex-col border-l" style={{ borderColor: '#d7e0ea' }}>
         <button
           onClick={() => onChange(Math.min(8, Math.round((clamped + step) * 100) / 100))}
-          className="px-1.5 h-[18px] hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center"
+          className="px-1.5 h-[18px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center"
           title="Increase line width"
         >
           <ChevronRight size={10} className="-rotate-90" />
         </button>
         <button
           onClick={() => onChange(Math.max(0.5, Math.round((clamped - step) * 100) / 100))}
-          className="px-1.5 h-[18px] hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center border-t border-[var(--color-border)]"
+          className="px-1.5 h-[18px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center border-t"
+          style={{ borderColor: '#d7e0ea' }}
           title="Decrease line width"
         >
           <ChevronRight size={10} className="rotate-90" />
@@ -923,18 +926,19 @@ function DependencyArrowSizeDropdown({
           if (!open) updatePos();
           setOpen(!open);
         }}
-        className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] hover:border-[var(--color-border-light)] transition-colors min-w-[120px]"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all min-w-[124px]"
+        style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       >
         <span className="text-xs text-[var(--color-text)] tabular-nums">Size {value}</span>
         <DependencyArrowPreview size={value} />
-        <ChevronDown size={12} className="text-[var(--color-text-muted)] shrink-0 ml-auto" />
+        <ChevronDown size={12} className="text-[#607086] shrink-0 ml-auto" />
       </button>
 
       {open && pos && createPortal(
         <div
           ref={popoverRef}
-          className="fixed z-[9999] w-[180px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1 max-h-[320px] overflow-y-auto"
-          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-[9999] w-[180px] rounded-xl py-1.5 max-h-[320px] overflow-y-auto"
+          style={{ top: pos.top, left: pos.left, background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}
         >
           {DEP_ARROW_SIZE_OPTIONS.map((size) => (
             <button
@@ -945,9 +949,10 @@ function DependencyArrowSizeDropdown({
               }}
               className={`flex items-center w-full px-3 py-2 text-sm transition-colors ${
                 size === value
-                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
-                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  ? 'text-[var(--color-text)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[#f7fafc]'
               }`}
+              style={size === value ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' } : undefined}
             >
               <span className="w-12 text-left text-xs">Size {size}</span>
               <DependencyArrowPreview size={size} />
@@ -1015,18 +1020,19 @@ function DependencyArrowTypeDropdown({
           if (!open) updatePos();
           setOpen(!open);
         }}
-        className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] hover:border-[var(--color-border-light)] transition-colors min-w-[120px]"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all min-w-[124px]"
+        style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       >
         <DependencyArrowTypePreview type={selected.id} />
         <span className="text-xs text-[var(--color-text)]">{selected.label}</span>
-        <ChevronDown size={12} className="text-[var(--color-text-muted)] shrink-0 ml-auto" />
+        <ChevronDown size={12} className="text-[#607086] shrink-0 ml-auto" />
       </button>
 
       {open && pos && createPortal(
         <div
           ref={popoverRef}
-          className="fixed z-[9999] w-[160px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1"
-          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-[9999] w-[160px] rounded-xl py-1.5"
+          style={{ top: pos.top, left: pos.left, background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}
         >
           {DEP_ARROW_TYPE_OPTIONS.map((option) => (
             <button
@@ -1037,9 +1043,10 @@ function DependencyArrowTypeDropdown({
               }}
               className={`flex items-center gap-2 w-full px-3 py-2 text-sm transition-colors ${
                 option.id === value
-                  ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)]'
-                  : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'
+                  ? 'text-[var(--color-text)]'
+                  : 'text-[var(--color-text-secondary)] hover:bg-[#f7fafc]'
               }`}
+              style={option.id === value ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' } : undefined}
             >
               <DependencyArrowTypePreview type={option.id} />
               <span className="text-xs">{option.label}</span>
@@ -1921,11 +1928,18 @@ function PropertyCard({
 }) {
   return (
     <div
-      className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border cursor-pointer transition-all flex-1 ${
-        checked
-          ? 'border-[var(--color-border)] bg-[var(--color-bg-secondary)]'
-          : 'border-[var(--color-border)] bg-[var(--color-bg-secondary)]'
-      }`}
+      className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border cursor-pointer transition-all flex-1"
+      style={checked
+        ? {
+            borderColor: '#c7d8f8',
+            background: 'linear-gradient(180deg, #eff5ff 0%, #e8f0ff 100%)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.82)',
+          }
+        : {
+            borderColor: '#d9e3ef',
+            background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)',
+          }}
       onClick={() => onChange(!checked)}
     >
       <span className="text-[11px] font-medium text-[var(--color-text)]">{label}</span>
@@ -1981,11 +1995,12 @@ function MilestoneShapeDropdown({
       <button
         ref={triggerRef}
         onClick={() => { if (!open) updatePos(); setOpen(!open); }}
-        className="w-full flex items-center gap-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-[var(--color-text)] hover:border-[var(--color-text-muted)] transition-colors"
+        className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--color-text)] transition-all border"
+        style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       >
         <MilestoneIconComponent icon={value} size={16} color={color} />
         <span className="flex-1 text-left font-medium">{selectedIcon?.label ?? value}</span>
-        <ChevronDown size={12} className={`text-[var(--color-text-muted)]`} />
+        <ChevronDown size={12} className="text-[#607086]" />
       </button>
 
       {open && createPortal(
@@ -1997,14 +2012,14 @@ function MilestoneShapeDropdown({
             left: pos.left,
             transform: 'translateX(-100%)',
             zIndex: 9999,
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: 8,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-            padding: 8,
+            background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
+            border: '1px solid #d9e3ef',
+            borderRadius: 12,
+            boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)',
+            padding: 10,
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
             {MILESTONE_ICONS.map((ic) => (
               <button
                 key={ic.id}
@@ -2015,13 +2030,13 @@ function MilestoneShapeDropdown({
                   justifyContent: 'center',
                   width: 36,
                   height: 36,
-                  borderRadius: 6,
-                  border: 'none',
+                  borderRadius: 8,
+                  border: value === ic.id ? '1px solid #c7d8f8' : '1px solid transparent',
                   cursor: 'pointer',
-                  background: value === ic.id ? '#e2e8f0' : 'transparent',
+                  background: value === ic.id ? 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' : 'transparent',
                 }}
                 title={ic.label}
-                onMouseEnter={(e) => { if (value !== ic.id) e.currentTarget.style.background = '#f1f5f9'; }}
+                onMouseEnter={(e) => { if (value !== ic.id) e.currentTarget.style.background = '#f7fafc'; }}
                 onMouseLeave={(e) => { if (value !== ic.id) e.currentTarget.style.background = 'transparent'; }}
               >
                 <MilestoneIconComponent icon={ic.id} size={18} color={value === ic.id ? '#1e293b' : '#475569'} />
@@ -2104,32 +2119,36 @@ function MilestoneStyleControls({
                   onClick={() => updateMilestoneStyle(item.id, { size: p.value })}
                   className={`w-9 h-9 rounded-lg text-xs font-medium transition-all border ${
                     style.size === p.value
-                      ? 'bg-[var(--color-bg-secondary)] border-[var(--color-text-muted)] text-[var(--color-text)]'
-                      : 'bg-white border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-muted)]'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-              <div className="flex items-center border border-[var(--color-border)] rounded-lg overflow-hidden ml-1">
+                      ? 'text-[var(--color-text)]'
+                      : 'text-[var(--color-text-secondary)] hover:border-[var(--color-text-muted)]'
+                   }`}
+                   style={style.size === p.value
+                     ? { borderColor: '#c7d8f8', background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)' }
+                     : { borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)' }}
+                 >
+                   {p.label}
+                 </button>
+               ))}
+              <div className="flex items-center rounded-lg overflow-hidden ml-1 border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
                 <input
                   type="number"
                   min={8}
                   max={48}
                   value={style.size}
                   onChange={(e) => updateMilestoneStyle(item.id, { size: Math.max(8, Math.min(48, parseInt(e.target.value) || 8)) })}
-                  className="w-12 h-9 text-center text-sm text-[var(--color-text)] bg-white outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-12 h-9 text-center text-sm text-[var(--color-text)] bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
-                <div className="flex flex-col border-l border-[var(--color-border)]">
+                <div className="flex flex-col border-l" style={{ borderColor: '#d7e0ea' }}>
                   <button
                     onClick={() => updateMilestoneStyle(item.id, { size: Math.min(48, style.size + 1) })}
-                    className="px-1.5 h-[18px] hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center"
+                    className="px-1.5 h-[18px] hover:bg-[#f7fafc] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center"
                   >
                     <ChevronRight size={10} className="-rotate-90" />
                   </button>
                   <button
                     onClick={() => updateMilestoneStyle(item.id, { size: Math.max(8, style.size - 1) })}
-                    className="px-1.5 h-[18px] hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center border-t border-[var(--color-border)]"
+                    className="px-1.5 h-[18px] hover:bg-[#f7fafc] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center border-t"
+                    style={{ borderColor: '#d7e0ea' }}
                   >
                     <ChevronRight size={10} className="rotate-90" />
                   </button>
@@ -2151,9 +2170,12 @@ function MilestoneStyleControls({
                     onClick={() => updateMilestoneStyle(item.id, { position: pos })}
                     className={`p-2 rounded-lg border transition-all ${
                       style.position === pos
-                        ? 'bg-[var(--color-bg-secondary)] border-[var(--color-text-muted)]'
-                        : 'bg-white border-[var(--color-border)] hover:border-[var(--color-text-muted)]'
+                        ? ''
+                        : ''
                     }`}
+                    style={style.position === pos
+                      ? { borderColor: '#c7d8f8', background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)' }
+                      : { borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)' }}
                     title={pos === 'above' ? 'Above timeline' : 'Below timeline'}
                   >
                     <svg width={28} height={24} viewBox="0 0 28 24" fill="none">
@@ -3054,12 +3076,12 @@ function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarSha
       <button
         ref={triggerRef}
         onClick={handleToggle}
-        className="flex items-center gap-1.5 px-2 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-[var(--color-text-muted)] transition-colors text-[var(--color-text)] w-full"
-        style={{ height: 28, fontSize: 14 }}
+        className="flex items-center gap-2 px-3 rounded-lg border transition-all text-[var(--color-text)] w-full"
+        style={{ height: 32, fontSize: 13, borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       >
         <ShapePreview shape={TIMESCALE_TO_BAR_SHAPE[value]} color={TIMESCALE_ICON_COLOR} width={14} height={8} />
         <span className="flex-1 text-left font-medium">{selected.label}</span>
-        <ChevronDown size={10} className="text-[var(--color-text-muted)] shrink-0" />
+        <ChevronDown size={11} className="text-[#607086] shrink-0" />
       </button>
       {open && createPortal(
         <div
@@ -3069,14 +3091,14 @@ function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarSha
             top: pos.top,
             left: pos.left,
             zIndex: 9999,
-            background: '#ffffff',
-            border: '1px solid #cbd5e1',
-            borderRadius: 8,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-            padding: 8,
+            background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
+            border: '1px solid #d9e3ef',
+            borderRadius: 12,
+            boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)',
+            padding: 10,
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
             {TIMESCALE_BAR_SHAPES.map((s) => (
               <button
                 key={s.id}
@@ -3085,15 +3107,15 @@ function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarSha
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 29,
-                  height: 29,
-                  borderRadius: 6,
-                  border: 'none',
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  border: value === s.id ? '1px solid #c7d8f8' : '1px solid transparent',
                   cursor: 'pointer',
-                  background: value === s.id ? '#e2e8f0' : 'transparent',
+                  background: value === s.id ? 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' : 'transparent',
                 }}
                 title={s.label}
-                onMouseEnter={(e) => { if (value !== s.id) e.currentTarget.style.background = '#f1f5f9'; }}
+                onMouseEnter={(e) => { if (value !== s.id) e.currentTarget.style.background = '#f7fafc'; }}
                 onMouseLeave={(e) => { if (value !== s.id) e.currentTarget.style.background = 'transparent'; }}
               >
                 <ShapePreview shape={TIMESCALE_TO_BAR_SHAPE[s.id]} color={value === s.id ? '#1e293b' : TIMESCALE_ICON_COLOR} width={19} height={10} />
@@ -3154,7 +3176,7 @@ function ScaleSection() {
     <div className="space-y-4">
       {/* Multi-tier indicator */}
       {visibleCount > 1 && (
-        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md text-xs text-[var(--color-text-secondary)]">
+        <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-[var(--color-text-secondary)] border" style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)' }}>
           <Info className="w-3.5 h-3.5 shrink-0" />
           <span>
             Editing <span className="font-semibold text-[var(--color-text)]">{activeTierName}</span> — click a tier row on the timeline to switch
@@ -3171,7 +3193,8 @@ function ScaleSection() {
               Unit type
             </label>
             <select
-              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors"
+              className="w-full border rounded-lg px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors"
+              style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
               value={tier.unit}
               onChange={(e) => handleUnitChange(e.target.value)}
             >
@@ -3188,7 +3211,8 @@ function ScaleSection() {
               Format
             </label>
             <select
-              className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors"
+              className="w-full border rounded-lg px-3 py-1.5 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors"
+              style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
               value={tier.format}
               onChange={(e) => updateTier(activeTierStoreIndex, { format: e.target.value as TierFormat })}
             >
@@ -3645,7 +3669,8 @@ function TierColumn({
           <label className="text-xs font-medium text-[var(--color-text)] block mb-1.5">Units</label>
           <div className="flex gap-1.5">
             <select
-              className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-2 py-1.5 text-sm text-[var(--color-text)] outline-none"
+              className="flex-1 border rounded-lg px-2.5 py-1.5 text-sm text-[var(--color-text)] outline-none"
+              style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
               value={tier.unit}
               onChange={(e) => {
                 const newUnit = e.target.value as TimescaleTierConfig['unit'];
@@ -3660,7 +3685,8 @@ function TierColumn({
               <option value="year">Years</option>
             </select>
             <select
-              className="flex-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-2 py-1.5 text-sm text-[var(--color-text)] outline-none"
+              className="flex-1 border rounded-lg px-2.5 py-1.5 text-sm text-[var(--color-text)] outline-none"
+              style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
               value={tier.format}
               onChange={(e) => updateTier({ format: e.target.value as TierFormat })}
             >
@@ -4041,7 +4067,7 @@ function ApplyToAllBox({
   }, [expanded]);
 
   return (
-    <div className="border border-[var(--color-border)] rounded-lg p-3">
+    <div className="rounded-xl border p-3" style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
       <button
         ref={triggerRef}
         onClick={() => setExpanded(!expanded)}
@@ -4058,11 +4084,14 @@ function ApplyToAllBox({
       {expanded && popoverPos && createPortal(
         <div
           ref={popoverRef}
-          className="fixed z-[9999] bg-white border border-[var(--color-border)] rounded-lg shadow-lg p-3 space-y-3"
+          className="fixed z-[9999] rounded-xl p-3 space-y-3"
           style={{
             right: popoverPos.right,
             bottom: window.innerHeight - popoverPos.top,
             minWidth: 'max-content',
+            background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
+            border: '1px solid #d9e3ef',
+            boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)',
           }}
         >
           <div className="flex gap-2">
@@ -4105,8 +4134,9 @@ function ApplyToAllBox({
               className={`px-6 py-1.5 rounded-lg text-sm font-medium transition-all border whitespace-nowrap ${
                 applied
                   ? 'bg-green-500/10 text-green-600 border-green-500/30'
-                  : 'bg-white text-[var(--color-text)] border-[var(--color-border)] hover:border-[var(--color-text-muted)]'
+                  : 'text-[var(--color-text)] hover:border-[var(--color-text-muted)]'
               }`}
+              style={applied ? undefined : { background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', borderColor: '#c8d3df', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
             >
               {applied ? 'Applied!' : 'Apply'}
             </button>
@@ -4383,7 +4413,8 @@ function ConnectorThicknessDropdown({
 }) {
   return (
     <select
-      className="w-full h-9 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors cursor-pointer"
+      className="w-full h-9 border rounded-lg px-3 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors cursor-pointer"
+      style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       value={value}
       onChange={(e) => onChange(e.target.value as ConnectorThickness)}
     >
@@ -4414,7 +4445,8 @@ function OutlineThicknessDropdown({
 }) {
   return (
     <select
-      className="w-full h-9 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-md px-3 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors cursor-pointer"
+      className="w-full h-9 border rounded-lg px-3 text-sm text-[var(--color-text)] outline-none focus:border-slate-700 transition-colors cursor-pointer"
+      style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       value={value}
       onChange={(e) => onChange(e.target.value as OutlineThickness)}
     >
@@ -4744,23 +4776,27 @@ function SwimlaneSpacingSection() {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex rounded-md overflow-hidden border border-[var(--color-border)]">
+      <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
         {SWIMLANE_SPACING_PRESETS.map((preset, idx) => (
           <button
             key={preset.value}
             onClick={() => setSwimlaneSpacing(preset.value)}
             className={`flex items-center justify-center w-10 h-9 transition-colors ${
               swimlaneSpacing === preset.value
-                ? 'bg-[var(--color-bg-tertiary)] text-[var(--color-text)] border border-[var(--color-border)]'
-                : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]'
-            } ${idx !== 0 ? 'border-l border-[var(--color-border)]' : ''}`}
+                ? 'text-[var(--color-text)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[#f7fafc] hover:text-[var(--color-text)]'
+            } ${idx !== 0 ? 'border-l' : ''}`}
+            style={{
+              borderColor: idx !== 0 ? '#d7e0ea' : undefined,
+              background: swimlaneSpacing === preset.value ? 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' : 'transparent',
+            }}
             title={preset.label}
           >
             <SwimlaneSpacingIcon gap={preset.gap} active={swimlaneSpacing === preset.value} />
           </button>
         ))}
       </div>
-      <div className="flex items-center border border-[var(--color-border)] rounded-md overflow-hidden">
+      <div className="flex items-center rounded-lg overflow-hidden border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
         <input
           type="text"
           value={swimlaneSpacing}
@@ -4768,18 +4804,19 @@ function SwimlaneSpacingSection() {
             const n = parseInt(e.target.value, 10);
             if (!isNaN(n) && n >= 0 && n <= 40) setSwimlaneSpacing(n);
           }}
-          className="w-10 h-9 text-center text-sm bg-[var(--color-bg-secondary)] text-[var(--color-text)] outline-none"
+          className="w-10 h-9 text-center text-sm bg-transparent text-[var(--color-text)] outline-none"
         />
-        <div className="flex flex-col border-l border-[var(--color-border)]">
+        <div className="flex flex-col border-l" style={{ borderColor: '#d7e0ea' }}>
           <button
             onClick={() => setSwimlaneSpacing(Math.min(40, swimlaneSpacing + 1))}
-            className="px-1.5 h-[18px] flex items-center justify-center bg-[var(--color-bg-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors text-[var(--color-text-muted)]"
+            className="px-1.5 h-[18px] flex items-center justify-center hover:bg-[#f7fafc] transition-colors text-[var(--color-text-muted)]"
           >
             <ChevronUp size={10} />
           </button>
           <button
             onClick={() => setSwimlaneSpacing(Math.max(0, swimlaneSpacing - 1))}
-            className="px-1.5 h-[18px] flex items-center justify-center bg-[var(--color-bg-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors border-t border-[var(--color-border)] text-[var(--color-text-muted)]"
+            className="px-1.5 h-[18px] flex items-center justify-center hover:bg-[#f7fafc] transition-colors border-t text-[var(--color-text-muted)]"
+            style={{ borderColor: '#d7e0ea' }}
           >
             <ChevronDown size={10} />
           </button>

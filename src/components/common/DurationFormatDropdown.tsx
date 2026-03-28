@@ -41,14 +41,15 @@ export function DurationFormatDropdown({ value, onChange }: DurationFormatDropdo
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-sm text-[var(--color-text)] hover:border-[var(--color-border-light)] transition-colors min-w-[120px]"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm text-[var(--color-text)] transition-all min-w-[124px]"
+        style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       >
         <span className="flex-1 text-left truncate">{value}</span>
-        <ChevronDown size={13} className="text-[var(--color-text-muted)] shrink-0" />
+        <ChevronDown size={13} className="text-[#607086] shrink-0" />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-[180px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1">
+        <div className="absolute left-0 top-full mt-1 z-50 w-[180px] rounded-xl py-1.5" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
           {DURATION_CATEGORIES.map((cat) => (
             <div
               key={cat.label}
@@ -58,16 +59,16 @@ export function DurationFormatDropdown({ value, onChange }: DurationFormatDropdo
             >
               <button
                 className={`flex items-center w-full px-3 py-2.5 text-sm text-[var(--color-text)] transition-colors ${
-                  hoveredCategory === cat.label ? 'bg-[var(--color-surface-hover)]' : ''
+                  hoveredCategory === cat.label ? 'bg-[#f7fafc]' : ''
                 }`}
               >
                 <span className="flex-1 text-left">{cat.label}</span>
-                <ChevronRight size={13} className="text-[var(--color-text-muted)] shrink-0" />
+                <ChevronRight size={13} className="text-[#607086] shrink-0" />
               </button>
 
               {/* Submenu */}
               {hoveredCategory === cat.label && (
-                <div className="absolute left-full top-0 ml-0 z-50 w-[140px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl py-1">
+                <div className="absolute left-full top-0 ml-1 z-50 w-[140px] rounded-xl py-1.5" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
                   {cat.formats.map((fmt) => (
                     <button
                       key={fmt}
@@ -76,11 +77,12 @@ export function DurationFormatDropdown({ value, onChange }: DurationFormatDropdo
                         setIsOpen(false);
                         setHoveredCategory(null);
                       }}
-                      className="flex items-center w-full px-3 py-2.5 text-sm text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                      className="flex items-center w-full px-3 py-2.5 text-sm text-[var(--color-text)] hover:bg-[#f7fafc] transition-colors"
+                      style={value === fmt ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' } : undefined}
                     >
                       <span className="flex-1 text-left">{fmt}</span>
                       {value === fmt && (
-                        <Check size={14} className="text-[var(--color-text-muted)] shrink-0" />
+                        <Check size={14} className="text-[#4b83e6] shrink-0" />
                       )}
                     </button>
                   ))}

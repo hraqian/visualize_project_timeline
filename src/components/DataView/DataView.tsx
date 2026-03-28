@@ -840,7 +840,8 @@ function ColorPickerButton({ onSetColor }: { onSetColor: (color: string) => void
       <Tooltip label="Set color">
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-100 hover:border-slate-300 transition-colors text-xs font-medium"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-slate-600 transition-all text-xs font-medium"
+          style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
         >
           <Paintbrush size={15} />
           Color
@@ -849,13 +850,13 @@ function ColorPickerButton({ onSetColor }: { onSetColor: (color: string) => void
       </Tooltip>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-2.5 z-40">
+        <div className="absolute left-0 top-full mt-1 rounded-xl p-2.5 z-40" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
           <div className="flex items-center gap-1.5">
             {/* Paint bucket icon placeholder */}
-            <div className="w-7 h-7 rounded-md border border-slate-200 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg border flex items-center justify-center" style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}>
               <Paintbrush size={14} className="text-slate-700" />
             </div>
-            <div className="w-px h-6 bg-slate-200 mx-0.5" />
+            <div className="w-px h-6 mx-0.5" style={{ background: '#d9e3ef' }} />
             {COLOR_SWATCHES.map((swatch, i) => {
               const isLight = ['#f8fafc', '#ffffff', '#fff'].includes(swatch.toLowerCase());
               return (
@@ -904,14 +905,15 @@ function ColumnConfigButton({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 px-2 py-1 rounded border border-slate-200 text-xs font-medium text-slate-400 hover:text-slate-800 hover:border-slate-300 transition-colors whitespace-nowrap"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium text-slate-500 transition-all whitespace-nowrap"
+        style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
       >
         <Plus size={12} />
         Add column
         <ChevronDown size={10} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-2 z-30 min-w-[180px]">
+        <div className="absolute right-0 top-full mt-1 rounded-xl py-2 z-30 min-w-[180px]" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
           <div className="px-3 pb-1.5 text-xs font-semibold text-slate-700">Columns</div>
           {columns.map((col) => (
             <button
@@ -973,20 +975,22 @@ export function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlan
       <div className="flex">
         <button
           onClick={() => onAdd(defaultAction)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-md text-xs font-medium bg-slate-50 text-slate-800 hover:bg-slate-100 transition-all border border-slate-200"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-l-lg text-xs font-medium text-slate-800 transition-all border"
+          style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
         >
           <Plus size={14} />
           {labels[defaultAction]}
         </button>
         <button
           onClick={() => setOpen(!open)}
-          className="px-1.5 py-1.5 rounded-r-md text-xs bg-slate-50 text-slate-800 hover:bg-slate-100 transition-all border border-l-0 border-slate-200"
+          className="px-1.5 py-1.5 rounded-r-lg text-xs text-slate-800 transition-all border border-l-0"
+          style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
         >
           <ChevronDown size={12} />
         </button>
       </div>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 min-w-[160px]">
+        <div className="absolute right-0 top-full mt-1 rounded-xl py-1.5 z-30 min-w-[160px]" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
           {(['swimlane', 'task', 'milestone'] as const).map((type) => (
             <button
               key={type}
@@ -998,6 +1002,7 @@ export function AddDropdownButton({ onAdd }: { onAdd: (type: ItemType | 'swimlan
               className={`w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 transition-colors ${
                 defaultAction === type ? 'text-slate-800 font-medium' : 'text-slate-500'
               }`}
+              style={defaultAction === type ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' } : undefined}
             >
               {labels[type]}
             </button>
@@ -2288,7 +2293,7 @@ function RowMoreMenu({
       </Tooltip>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-40 min-w-[200px]">
+        <div className="absolute right-0 top-full mt-1 rounded-xl py-1.5 z-40 min-w-[200px]" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
           {menuItems.map((mi, idx) => (
             <button
               key={idx}
@@ -2300,8 +2305,8 @@ function RowMoreMenu({
               className={`w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors ${
                 mi.danger
                   ? 'text-slate-600 hover:text-red-600 hover:bg-red-50'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
+                  : 'text-slate-600 hover:bg-[#f7fafc]'
+                }`}
             >
               <span className="text-slate-400 shrink-0">{mi.icon}</span>
               {mi.label}
@@ -2370,7 +2375,7 @@ function SwimlaneMoreMenu({
       </button>
 
       {open && (
-        <div className={`absolute left-0 ${flipUp ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-40 min-w-[220px]`}>
+        <div className={`absolute left-0 ${flipUp ? 'bottom-full mb-1' : 'top-full mt-1'} rounded-xl py-1.5 z-40 min-w-[220px]`} style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
           {menuItems.map((mi, idx) => (
             <button
               key={idx}
@@ -2382,8 +2387,8 @@ function SwimlaneMoreMenu({
               className={`w-full text-left px-3 py-2 text-[13px] flex items-center gap-2.5 transition-colors ${
                 mi.danger
                   ? 'text-slate-600 hover:text-red-600 hover:bg-red-50'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
+                  : 'text-slate-600 hover:bg-[#f7fafc]'
+                }`}
             >
               <span className="text-slate-400 shrink-0">{mi.icon}</span>
               {mi.label}
@@ -2450,15 +2455,16 @@ function SwimlaneColorPicker({
 
       {open && (
         <div
-          className={`absolute left-0 ${flipUp ? 'bottom-full mb-1' : 'top-full mt-1'} bg-white border border-slate-200 rounded-lg shadow-lg z-40 p-2.5`}
+          className={`absolute left-0 ${flipUp ? 'bottom-full mb-1' : 'top-full mt-1'} rounded-xl z-40 p-2.5`}
+          style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-1.5">
             {/* Paint bucket icon */}
-            <div className="w-7 h-7 rounded-md border border-slate-200 flex items-center justify-center shrink-0">
+            <div className="w-7 h-7 rounded-lg border flex items-center justify-center shrink-0" style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}>
               <Paintbrush size={14} className="text-slate-700" />
             </div>
-            <div className="w-px h-6 bg-slate-200 mx-0.5 shrink-0" />
+            <div className="w-px h-6 mx-0.5 shrink-0" style={{ background: '#d9e3ef' }} />
             {COLOR_SWATCHES.map((swatch, i) => {
               const isLight = ['#f8fafc', '#ffffff', '#fff'].includes(swatch.toLowerCase());
               const isSelected = swatch === currentColor;
@@ -2470,7 +2476,7 @@ function SwimlaneColorPicker({
                     onChange(swatch);
                   }}
                   className={`w-7 h-7 rounded-md shrink-0 hover:scale-110 transition-all ${
-                    isSelected ? 'ring-2 ring-slate-400 ring-offset-1' : ''
+                    isSelected ? 'ring-2 ring-[#4b83e6] ring-offset-1' : ''
                   } ${isLight ? 'border border-slate-200' : ''}`}
                   style={{ backgroundColor: swatch }}
                   title={swatch}
@@ -2554,7 +2560,7 @@ function StatusCell({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-30 min-w-[180px] overflow-hidden">
+        <div className="absolute left-0 top-full mt-1 rounded-xl z-30 min-w-[180px] overflow-hidden" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
           {/* Status list */}
           <div className="py-1 max-h-[200px] overflow-y-auto">
             {currentLabel && (
@@ -2564,7 +2570,7 @@ function StatusCell({
                   onChange(null);
                   setOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:bg-slate-50 transition-colors"
+                className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:bg-[#f7fafc] transition-colors"
               >
                 Clear status
               </button>
@@ -2578,7 +2584,8 @@ function StatusCell({
                   onChange(s.id);
                   setOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 transition-colors flex items-center gap-2.5"
+                className="w-full text-left px-3 py-2 text-xs hover:bg-[#f7fafc] transition-colors flex items-center gap-2.5"
+                style={s.id === statusId ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' } : undefined}
               >
                 <span
                   className="w-4 h-4 rounded shrink-0"
@@ -2598,7 +2605,7 @@ function StatusCell({
                 e.stopPropagation();
                 handleCreate();
               }}
-              className="w-full text-left px-3 py-2.5 text-xs text-slate-500 hover:bg-slate-50 transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-2.5 text-xs text-slate-500 hover:bg-[#f7fafc] transition-colors flex items-center gap-2"
             >
               <Plus size={13} className="text-slate-400" />
               Create new status

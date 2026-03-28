@@ -9,6 +9,8 @@ const CP_OPTIONS: { value: Exclude<ConnectionPoint, 'auto'>; label: string }[] =
   { value: 'bottom', label: 'Bottom' },
 ];
 
+const CONNECTION_POPOVER_WIDTH = 372;
+
 function getPointLabel(point: ConnectionPoint): string {
   switch (point) {
     case 'top':
@@ -33,31 +35,84 @@ function ConnectionPointIllustration({
   const isAuto = fromPoint === 'auto' && toPoint === 'auto';
   const resolvedFrom = isAuto ? 'side' : fromPoint;
   const resolvedTo = isAuto ? 'side' : toPoint;
+  const W = 250;
+  const H = 88;
+  const barH = 16;
+  const barW = 66;
+  const bar1X = 26;
+  const bar1Y = 50;
+  const bar2X = W - 26 - barW;
+  const bar2Y = 50;
+  const stub = 10;
 
-  const fromPos = resolvedFrom === 'top'
-    ? { x: 22, y: 12 }
-    : resolvedFrom === 'bottom'
-      ? { x: 22, y: 38 }
-      : { x: 34, y: 25 };
-  const toPos = resolvedTo === 'top'
-    ? { x: 86, y: 12 }
-    : resolvedTo === 'bottom'
-      ? { x: 86, y: 38 }
-      : { x: 74, y: 25 };
+  const anchorFor = (side: ConnectionPoint, isTarget: boolean): [number, number] => {
+    const x = isTarget ? bar2X : bar1X;
+    const y = isTarget ? bar2Y : bar1Y;
+    if (side === 'top') return [x + barW / 2, y];
+    if (side === 'bottom') return [x + barW / 2, y + barH];
+    return isTarget ? [x, y + barH / 2] : [x + barW, y + barH / 2];
+  };
+
+  const extendOutward = (point: [number, number], side: ConnectionPoint, isTarget: boolean): [number, number] => {
+    if (side === 'top') return [point[0], point[1] - stub];
+    if (side === 'bottom') return [point[0], point[1] + stub];
+    return [point[0] + (isTarget ? -stub : stub), point[1]];
+  };
+
+  const fromAnchor = anchorFor(resolvedFrom, false);
+  const toAnchor = anchorFor(resolvedTo, true);
+  const fromExit = extendOutward(fromAnchor, resolvedFrom, false);
+  const toEntry = extendOutward(toAnchor, resolvedTo, true);
+  const midX = Math.round((fromExit[0] + toEntry[0]) / 2);
+  const rawPoints: [number, number][] = [
+    fromAnchor,
+    fromExit,
+    [midX, fromExit[1]],
+    [midX, toEntry[1]],
+    toEntry,
+    toAnchor,
+  ];
+
+  const points = rawPoints.filter((point, idx) => {
+    const prev = rawPoints[idx - 1];
+    return !prev || prev[0] !== point[0] || prev[1] !== point[1];
+  }).filter((point, idx, arr) => {
+    if (idx === 0 || idx === arr.length - 1) return true;
+    const prev = arr[idx - 1];
+    const next = arr[idx + 1];
+    const sameX = prev[0] === point[0] && point[0] === next[0];
+    const sameY = prev[1] === point[1] && point[1] === next[1];
+    return !sameX && !sameY;
+  });
+
+  const path = points.map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${point[0]} ${point[1]}`).join(' ');
+  const tip = points[points.length - 1];
+  const prev = points[points.length - 2] ?? tip;
+  const dx = tip[0] - prev[0];
+  const dy = tip[1] - prev[1];
+  const dirX = dx === 0 ? 0 : Math.sign(dx);
+  const dirY = dy === 0 ? 0 : Math.sign(dy);
+  const normalX = -dirY;
+  const normalY = dirX;
+  const arrowDepth = 6;
+  const arrowHalf = 3.5;
+  const arrowBaseX = tip[0] - dirX * arrowDepth;
+  const arrowBaseY = tip[1] - dirY * arrowDepth;
+  const arrowPoints = `${tip[0]},${tip[1]} ${arrowBaseX + normalX * arrowHalf},${arrowBaseY + normalY * arrowHalf} ${arrowBaseX - normalX * arrowHalf},${arrowBaseY - normalY * arrowHalf}`;
 
   return (
-    <svg width={110} height={50} viewBox="0 0 110 50" fill="none">
-      <rect x={10} y={15} width={24} height={20} rx={4} fill="#ffffff" stroke="#cbd5e1" />
-      <rect x={74} y={15} width={24} height={20} rx={4} fill="#ffffff" stroke="#cbd5e1" />
-      <circle cx={fromPos.x} cy={fromPos.y} r={2.75} fill="#334155" />
-      <circle cx={toPos.x} cy={toPos.y} r={2.75} fill="#334155" />
+    <svg width={250} height={88} viewBox="0 0 250 88" fill="none" style={{ display: 'block' }}>
+      <rect x={bar1X} y={bar1Y} width={barW} height={barH} rx={4} fill="#cfdae8" fillOpacity={0.92} />
+      <rect x={bar2X} y={bar2Y} width={barW} height={barH} rx={4} fill="#cfdae8" fillOpacity={0.92} />
       <path
-        d={`M ${fromPos.x} ${fromPos.y} C ${fromPos.x + 14} ${fromPos.y}, ${toPos.x - 14} ${toPos.y}, ${toPos.x} ${toPos.y}`}
-        stroke="#64748b"
-        strokeWidth={1.75}
+        d={path}
+        fill="none"
+        stroke="#4b83e6"
+        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      <polygon points={arrowPoints} fill="#4b83e6" />
     </svg>
   );
 }
@@ -82,9 +137,8 @@ export function ConnectionPointButton({
   const updatePos = useCallback(() => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    const width = 280;
     const margin = 8;
-    const left = Math.min(Math.max(margin, rect.left), window.innerWidth - width - margin);
+    const left = Math.min(Math.max(margin, rect.left), window.innerWidth - CONNECTION_POPOVER_WIDTH - margin);
     setPos({ top: rect.bottom + 6, left });
   }, []);
 
@@ -137,26 +191,29 @@ export function ConnectionPointButton({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 5,
-          padding: '4px 10px',
-          borderRadius: 6,
+          gap: 7,
+          padding: '5px 12px',
+          borderRadius: 8,
           fontSize: 13,
-          fontWeight: 500,
-          border: '1px solid var(--color-border)',
-          background: 'transparent',
-          color: disabled ? 'var(--color-text-muted)' : 'var(--color-text)',
+          fontWeight: 600,
+          border: disabled ? '1px solid #d7dee8' : '1px solid #c8d3df',
+          background: disabled
+            ? 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)'
+            : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+          color: disabled ? '#94a3b8' : '#334155',
           cursor: disabled ? 'default' : 'pointer',
           transition: 'all 0.15s',
           whiteSpace: 'nowrap',
+          boxShadow: disabled ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.9)',
         }}
       >
-        <svg width={14} height={14} viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
-          <rect x={1} y={1} width={5} height={4} rx={1} fill={disabled ? '#94a3b8' : '#475569'} />
-          <rect x={8} y={9} width={5} height={4} rx={1} fill={disabled ? '#94a3b8' : '#475569'} />
-          <path d="M 6 3 L 8 3 L 8 11 L 8 11" fill="none" stroke={disabled ? '#94a3b8' : '#475569'} strokeWidth={1} />
+        <svg width={16} height={16} viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+          <rect x={1.5} y={2} width={5.5} height={4.5} rx={1.25} fill={disabled ? '#cbd5e1' : '#94a3b8'} />
+          <rect x={9} y={9.5} width={5.5} height={4.5} rx={1.25} fill={disabled ? '#cbd5e1' : '#94a3b8'} />
+          <path d="M 7 4.25 H 10 V 11.75" fill="none" stroke={disabled ? '#94a3b8' : '#4b83e6'} strokeWidth={1.35} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         {buttonLabel}
-        <ChevronDown size={12} />
+        <ChevronDown size={13} color={disabled ? '#94a3b8' : '#607086'} />
       </button>
       {open && pos && createPortal(
         <div
@@ -165,31 +222,43 @@ export function ConnectionPointButton({
             position: 'fixed',
             left: pos.left,
             top: pos.top,
-            background: 'white',
-            border: '1px solid #e2e8f0',
-            borderRadius: 8,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            padding: '10px 10px',
+            background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
+            border: '1px solid #d9e3ef',
+            borderRadius: 12,
+            boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)',
+            padding: '12px',
             zIndex: 30,
-            width: 280,
+            width: CONNECTION_POPOVER_WIDTH,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>From</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <span style={{ fontSize: 11, color: '#607086', fontWeight: 600, letterSpacing: 0.1 }}>From</span>
               <select
                 value={isAuto ? 'side' : fromPoint}
                 disabled={isAuto}
                 onChange={(e) => onChange(e.target.value as ConnectionPoint, toPoint)}
                 style={{
-                  fontSize: 11,
-                  padding: '2px 4px',
-                  borderRadius: 4,
-                  border: '1px solid #d1d5db',
-                  background: isAuto ? '#f1f5f9' : 'white',
-                  color: isAuto ? '#94a3b8' : '#334155',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  padding: '6px 26px 6px 10px',
+                  width: 96,
+                  minWidth: 96,
+                  borderRadius: 8,
+                  border: '1px solid #c7d2df',
+                  background: isAuto
+                    ? 'linear-gradient(180deg, #f7f9fc 0%, #f1f5f9 100%)'
+                    : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+                  color: isAuto ? '#94a3b8' : '#314155',
                   cursor: isAuto ? 'default' : 'pointer',
                   outline: 'none',
+                  boxShadow: isAuto ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.9)',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23607086' d='M1 1l4 4 4-4'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 10px center',
                 }}
               >
                 {CP_OPTIONS.map((o) => (
@@ -197,21 +266,33 @@ export function ConnectionPointButton({
                 ))}
               </select>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>To</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <span style={{ fontSize: 11, color: '#607086', fontWeight: 600, letterSpacing: 0.1 }}>To</span>
               <select
                 value={isAuto ? 'side' : toPoint}
                 disabled={isAuto}
                 onChange={(e) => onChange(fromPoint, e.target.value as ConnectionPoint)}
                 style={{
-                  fontSize: 11,
-                  padding: '2px 4px',
-                  borderRadius: 4,
-                  border: '1px solid #d1d5db',
-                  background: isAuto ? '#f1f5f9' : 'white',
-                  color: isAuto ? '#94a3b8' : '#334155',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  padding: '6px 26px 6px 10px',
+                  width: 96,
+                  minWidth: 96,
+                  borderRadius: 8,
+                  border: '1px solid #c7d2df',
+                  background: isAuto
+                    ? 'linear-gradient(180deg, #f7f9fc 0%, #f1f5f9 100%)'
+                    : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+                  color: isAuto ? '#94a3b8' : '#314155',
                   cursor: isAuto ? 'default' : 'pointer',
                   outline: 'none',
+                  boxShadow: isAuto ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.9)',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23607086' d='M1 1l4 4 4-4'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 10px center',
                 }}
               >
                 {CP_OPTIONS.map((o) => (
@@ -219,17 +300,17 @@ export function ConnectionPointButton({
                 ))}
               </select>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer', marginLeft: 'auto' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flexShrink: 0, padding: '6px 8px', borderRadius: 8, border: '1px solid #e2e8f0', background: isAuto ? '#f8fbff' : '#ffffff' }}>
               <input
                 type="checkbox"
                 checked={isAuto}
                 onChange={handleAutoToggle}
-                style={{ width: 13, height: 13, cursor: 'pointer', accentColor: '#334155' }}
+                style={{ width: 15, height: 15, cursor: 'pointer', accentColor: '#4b83e6' }}
               />
-              <span style={{ fontSize: 11, color: '#475569', fontWeight: 500 }}>Auto</span>
+              <span style={{ fontSize: 12, color: '#4b5b70', fontWeight: 600 }}>Auto</span>
             </label>
           </div>
-          <div style={{ borderRadius: 6, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
+          <div style={{ borderRadius: 8, background: 'linear-gradient(180deg, #fdfefe 0%, #f5f8fc 100%)', border: '1px solid #dde6f0', display: 'flex', justifyContent: 'center', padding: '12px 0 10px', overflow: 'hidden', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
             <ConnectionPointIllustration fromPoint={fromPoint} toPoint={toPoint} />
           </div>
         </div>,

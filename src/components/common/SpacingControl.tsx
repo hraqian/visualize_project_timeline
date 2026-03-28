@@ -19,16 +19,20 @@ export function SpacingControl({
 }: SpacingControlProps) {
   return (
     <div className="flex items-center gap-2">
-      <div className="flex rounded-md overflow-hidden border border-[var(--color-border)]">
+      <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
         {presets.map((preset, idx) => (
           <button
             key={preset.label}
             onClick={() => onChange(preset.value)}
             className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-colors ${
               value === preset.value
-                ? 'bg-slate-700/15 text-slate-800'
-                : 'bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]'
-            } ${idx !== 0 ? 'border-l border-[var(--color-border)]' : ''}`}
+                ? 'text-slate-800'
+                : 'text-[var(--color-text-secondary)] hover:bg-[#f7fafc] hover:text-[var(--color-text)]'
+            } ${idx !== 0 ? 'border-l' : ''}`}
+            style={{
+              borderColor: idx !== 0 ? '#d7e0ea' : undefined,
+              background: value === preset.value ? 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' : 'transparent',
+            }}
             title={`${preset.label} (${preset.value}px)`}
           >
             <SpacingIcon gap={preset.gap} active={value === preset.value} />

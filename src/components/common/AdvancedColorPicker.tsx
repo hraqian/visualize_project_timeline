@@ -168,23 +168,32 @@ export function AdvancedColorPicker({ value, onChange }: AdvancedColorPickerProp
           if (!isOpen) updatePos();
           setIsOpen(!isOpen);
         }}
-        className="w-7 h-7 rounded-md border-2 border-[var(--color-border)] hover:border-[var(--color-border-light)] transition-colors cursor-pointer shadow-sm"
-        style={{ backgroundColor: value }}
+        className="w-8 h-8 rounded-[10px] border cursor-pointer transition-all"
+        style={{
+          backgroundColor: value,
+          borderColor: '#c8d3df',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55)',
+        }}
         title={value}
       />
 
       {isOpen && createPortal(
         <div
           ref={popoverRef}
-          className="fixed z-[9999] w-[280px] bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg shadow-xl"
-          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-[9999] w-[280px] rounded-xl border"
+          style={{
+            top: pos.top,
+            left: pos.left,
+            background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
+            borderColor: '#d9e3ef',
+            boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)',
+          }}
         >
           <PopoverContent
             value={value}
             onChange={(c) => {
               onChange(c);
             }}
-            onClose={() => setIsOpen(false)}
           />
         </div>,
         document.body,
@@ -198,11 +207,9 @@ export function AdvancedColorPicker({ value, onChange }: AdvancedColorPickerProp
 function PopoverContent({
   value,
   onChange,
-  onClose,
 }: {
   value: string;
   onChange: (color: string) => void;
-  onClose: () => void;
 }) {
   const [paletteOpen, setPaletteOpen] = useState(true);
   const [customOpen, setCustomOpen] = useState(false);
@@ -404,7 +411,8 @@ function PopoverContent({
                   onChange={(e) => setHexInput(e.target.value)}
                   onBlur={() => handleHexSubmit(hexInput)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleHexSubmit(hexInput); }}
-                  className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-2 py-1 text-[11px] text-[var(--color-text)] font-mono outline-none focus:border-slate-700"
+                  className="w-full border rounded-lg px-2 py-1 text-[11px] text-[var(--color-text)] font-mono outline-none focus:border-slate-700"
+                  style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}
                 />
               </div>
               <RgbInput label="R" value={rgb[0]} onChange={(v) => handleRgbChange(v, rgb[1], rgb[2])} />
@@ -441,7 +449,8 @@ function RgbInput({
           const v = Math.max(0, Math.min(255, parseInt(e.target.value) || 0));
           onChange(v);
         }}
-        className="w-full bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded px-1.5 py-1 text-[11px] text-[var(--color-text)] font-mono outline-none focus:border-slate-700 text-center"
+        className="w-full border rounded-lg px-1.5 py-1 text-[11px] text-[var(--color-text)] font-mono outline-none focus:border-slate-700 text-center"
+        style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}
       />
     </div>
   );

@@ -92,7 +92,12 @@ export function ProjectManagerModal({ onClose }: Props) {
 
       {/* Modal */}
       <div
-        className="relative bg-white rounded-lg shadow-xl w-[520px] max-h-[70vh] flex flex-col"
+        className="relative w-[520px] max-h-[70vh] flex flex-col rounded-2xl border"
+        style={{
+          background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
+          borderColor: '#d9e3ef',
+          boxShadow: '0 24px 60px rgba(15, 23, 42, 0.18), 0 8px 24px rgba(15, 23, 42, 0.08)',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -110,7 +115,8 @@ export function ProjectManagerModal({ onClose }: Props) {
         <div className="px-5 py-3 border-b border-[var(--color-border)] flex items-center gap-2">
           <button
             onClick={handleNew}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-white bg-[#1e293b] hover:bg-[#0f172a] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors"
+            style={{ background: 'linear-gradient(180deg, #3c6fd9 0%, #2f5fc7 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }}
           >
             <Plus size={14} />
             New Project
@@ -136,16 +142,15 @@ export function ProjectManagerModal({ onClose }: Props) {
                   return (
                     <div
                       key={p.id}
-                      className={`flex items-center gap-3 px-5 py-3 hover:bg-[var(--color-surface-hover)] transition-colors ${
-                        isCurrent ? 'bg-[var(--color-bg-secondary)]' : ''
-                      }`}
+                      className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--color-surface-hover)] transition-colors"
+                      style={isCurrent ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e8f0ff 100%)' } : undefined}
                     >
                       <FolderOpen size={16} className="shrink-0 text-[var(--color-text-muted)]" />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-[var(--color-text)] truncate">
                           {p.name}
                           {isCurrent && (
-                            <span className="ml-2 text-[10px] font-normal text-[#1e293b] bg-[#1e293b]/10 px-1.5 py-0.5 rounded">
+                            <span className="ml-2 text-[10px] font-normal text-[#31549a] px-1.5 py-0.5 rounded" style={{ background: 'rgba(75, 131, 230, 0.12)', border: '1px solid rgba(75, 131, 230, 0.18)' }}>
                               Current
                             </span>
                           )}
