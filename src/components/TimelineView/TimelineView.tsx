@@ -2,10 +2,11 @@ import { useRef, useState, useCallback, useMemo, useEffect, forwardRef, useImper
 import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, addDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
+import { buildDependencyRenderGeometry, dependencyArrowEndInset, dependencyArrowVisualClearance } from '@/components/common/dependencyArrowGeometry';
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { DatePickerPopover } from './DatePickerPopover';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyArrowType } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape } from '@/types';
 
 // ─── Types for inline editing ────────────────────────────────────────────────
 
@@ -110,137 +111,6 @@ const DEPENDENCY_DASH_MAP: Record<string, string | undefined> = {
   'dash-dot': '8 4 2 4',
   'long-dot': '10 4 2 4',
 };
-
-function dependencyVisualClearance(lineWidth: number | undefined, arrowSize: number | undefined): number {
-  const strokeWidth = Math.max(0.5, lineWidth ?? 1.5);
-  const effectiveArrowSize = Math.max(1, Math.min(9, Math.round(arrowSize ?? 4)));
-  const extraStroke = Math.max(0, strokeWidth - 1.5);
-  const extraArrow = Math.max(0, effectiveArrowSize - 4);
-  return Math.ceil(extraStroke * 0.75 + extraArrow * 0.6);
-}
-
-function dependencyArrowEndInset(
-  arrowType: DependencyArrowType | undefined,
-  arrowSize: number | undefined,
-  lineWidth: number | undefined,
-  dir?: AnchorDir,
-): number {
-  if (!arrowType || arrowType === 'none') return 0;
-  const size = Math.max(1, Math.min(9, Math.round(arrowSize ?? 4)));
-  const stroke = Math.max(0.5, lineWidth ?? 1.5);
-  const directionalBonus = dir === 'top' || dir === 'bottom' ? Math.max(2, stroke) : 0;
-  if (arrowType === 'circle') {
-    const radius = 2 + size * 0.38;
-    return Math.ceil(radius * 2 + Math.max(1.5, 1 + stroke * 0.35) + directionalBonus);
-  }
-  const depth = 7.5 + size * 1.15 + stroke * 0.2;
-  const lineGap = Math.max(1.5, 1 + stroke * 0.35);
-  return Math.ceil(depth + lineGap + directionalBonus);
-}
-
-type RoutePoint = { x: number; y: number };
-
-function parseRoutePoints(path: string): RoutePoint[] {
-  return path
-    .split(/(?=[ML])/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => {
-      const [, xs, ys] = part.split(/\s+/);
-      return { x: Number(xs), y: Number(ys) };
-    });
-}
-
-function stringifyRoutePoints(points: RoutePoint[]): string {
-  return points
-    .map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${Math.round(point.x * 1000) / 1000} ${Math.round(point.y * 1000) / 1000}`)
-    .join(' ');
-}
-
-function buildDependencyRenderGeometry(
-  path: string,
-  arrowType: DependencyArrowType | undefined,
-  arrowSize: number | undefined,
-  lineWidth: number | undefined,
-): {
-  linePath: string;
-  head:
-    | { kind: 'polygon'; points: string; fill: boolean }
-    | { kind: 'path'; d: string }
-    | { kind: 'circle'; cx: number; cy: number; r: number }
-    | null;
-} {
-  const type = arrowType ?? 'standard';
-  if (type === 'none') return { linePath: path, head: null };
-
-  const points = parseRoutePoints(path);
-  if (points.length < 2) return { linePath: path, head: null };
-
-  const tip = points[points.length - 1];
-  const prev = points[points.length - 2];
-  const dx = tip.x - prev.x;
-  const dy = tip.y - prev.y;
-  const segLen = Math.abs(dx) + Math.abs(dy);
-  if (segLen <= 1) return { linePath: path, head: null };
-
-  const dirX = dx === 0 ? 0 : Math.sign(dx);
-  const dirY = dy === 0 ? 0 : Math.sign(dy);
-  const isVertical = dirY !== 0;
-  const normalX = -dirY;
-  const normalY = dirX;
-  const size = Math.max(1, Math.min(9, Math.round(arrowSize ?? 4)));
-  const stroke = Math.max(0.5, lineWidth ?? 1.5);
-
-  if (type === 'circle') {
-    const radius = 2 + size * 0.38;
-    const trim = Math.min(radius * 2 + Math.max(1.5, stroke * 0.5), segLen - 1);
-    const centerX = tip.x - dirX * radius;
-    const centerY = tip.y - dirY * radius;
-    points[points.length - 1] = { x: tip.x - dirX * trim, y: tip.y - dirY * trim };
-    return { linePath: stringifyRoutePoints(points), head: { kind: 'circle', cx: centerX, cy: centerY, r: radius } };
-  }
-
-  const isStandard = type === 'standard';
-  const depth = Math.min(
-    (isStandard ? 5 + size * 0.55 : dependencyArrowEndInset(type, size, stroke)) * (isVertical ? 0.92 : 1),
-    segLen - 1,
-  );
-  const half = isStandard
-    ? (2.2 + size * 0.22 + stroke * 0.04) * (isVertical ? 0.88 : 1)
-    : (3.4 + size * 0.48 + stroke * 0.1) * (isVertical ? 0.9 : 1);
-  const baseX = tip.x - dirX * depth;
-  const baseY = tip.y - dirY * depth;
-  const lineGap = isStandard ? Math.max(1.25, 0.85 + stroke * 0.2) : 0;
-  points[points.length - 1] = {
-    x: tip.x - dirX * Math.min(segLen - 1, depth + lineGap),
-    y: tip.y - dirY * Math.min(segLen - 1, depth + lineGap),
-  };
-
-  if (type === 'standard') {
-    const p1 = `${tip.x},${tip.y}`;
-    const p2 = `${baseX + normalX * half},${baseY + normalY * half}`;
-    const p3 = `${baseX - normalX * half},${baseY - normalY * half}`;
-    return { linePath: stringifyRoutePoints(points), head: { kind: 'polygon', points: `${p1} ${p2} ${p3}`, fill: true } };
-  } else if (type === 'open') {
-    const leftX = baseX + normalX * half;
-    const leftY = baseY + normalY * half;
-    const rightX = baseX - normalX * half;
-    const rightY = baseY - normalY * half;
-    return { linePath: stringifyRoutePoints(points), head: { kind: 'path', d: `M ${leftX} ${leftY} L ${tip.x} ${tip.y} L ${rightX} ${rightY}` } };
-  } else if (type === 'diamond') {
-    const midX = tip.x - dirX * (depth * 0.45);
-    const midY = tip.y - dirY * (depth * 0.45);
-    const backX = baseX;
-    const backY = baseY;
-    const p1 = `${tip.x},${tip.y}`;
-    const p2 = `${midX + normalX * half},${midY + normalY * half}`;
-    const p3 = `${backX},${backY}`;
-    const p4 = `${midX - normalX * half},${midY - normalY * half}`;
-    return { linePath: stringifyRoutePoints(points), head: { kind: 'polygon', points: `${p1} ${p2} ${p3} ${p4}`, fill: false } };
-  }
-
-  return { linePath: path, head: null };
-}
 
 function dependencyStrokeOpacity(transparency: number | undefined): number {
   const clamped = Math.max(0, Math.min(100, transparency ?? 0));
@@ -1595,7 +1465,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const allObjRects: ObstacleRect[] = allObstacles.map(({ leftX, rightX, topY, bottomY }) => ({ leftX, rightX, topY, bottomY }));
         const startObjRect = allObjRects[startObsIdx];
         const endObjRect = allObjRects[endObsIdx];
-        const visualClearance = dependencyVisualClearance(lineWidth, arrowSize);
+        const visualClearance = dependencyArrowVisualClearance(lineWidth, arrowSize);
         const endInset = dependencyArrowEndInset(arrowType, arrowSize, lineWidth, toDir);
         const path = routeDepLink(fromX, fromY, toX, toY, allObjRects, startObjRect, endObjRect, fromDir, toDir, visualClearance, endInset);
 
@@ -2421,7 +2291,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     .map((p) => ({ leftX: p.leftX, rightX: p.rightX, topY: p.centerY - p.barHeight / 2, bottomY: p.centerY + p.barHeight / 2 }));
                   const sourceObjRect = allObjRects[sourceIdx >= 0 ? sourceIdx : 0];
                   const targetObjRect = allObjRects[targetIdx >= 0 ? targetIdx : 0];
-                  path = routeDepLink(fromX, fromY, endX, endY, allObjRects, sourceObjRect, targetObjRect, 'right', 'left', dependencyVisualClearance(1.5, 4), dependencyArrowEndInset('standard', 4, 1.5, 'left'));
+                  path = routeDepLink(fromX, fromY, endX, endY, allObjRects, sourceObjRect, targetObjRect, 'right', 'left', dependencyArrowVisualClearance(1.5, 4), dependencyArrowEndInset('standard', 4, 1.5, 'left'));
                 } else {
                   // Free-dragging — simple orthogonal routing
                   const gap = endX - fromX;

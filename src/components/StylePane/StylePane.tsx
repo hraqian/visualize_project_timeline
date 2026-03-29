@@ -50,6 +50,7 @@ import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 import { DialogButton, ModalCloseButton, ModalSurface } from '@/components/common/ModalPrimitives';
+import { getDependencyArrowPreviewProps } from '@/components/common/dependencyArrowGeometry';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1019,50 +1020,74 @@ function DependencyArrowTypeDropdown({
 }
 
 function DependencyArrowTypePreview({ type }: { type: (typeof DEP_ARROW_TYPE_OPTIONS)[number]['id'] }) {
+  const preview = getDependencyArrowPreviewProps(type, 4);
+
   return (
     <svg width="26" height="12" viewBox="0 0 26 12" fill="none" className="shrink-0">
-      <line x1="2" y1="6" x2={type === 'none' ? 22 : 16} y2="6" stroke="#111827" strokeWidth="1.8" strokeLinecap="round" />
+      <line
+        x1={preview.shaftStart}
+        y1={preview.centerY}
+        x2={preview.shaftEnd}
+        y2={preview.centerY}
+        stroke="#111827"
+        strokeWidth={preview.strokeWidth}
+        strokeLinecap="round"
+      />
       {type === 'standard' && (
-        <path d="M 16 2.8 L 22 6 L 16 9.2" stroke="#111827" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <polygon
+          points={`${preview.tipX},${preview.centerY} ${preview.tipX - preview.depth},${preview.centerY - preview.half} ${preview.tipX - preview.depth},${preview.centerY + preview.half}`}
+          fill="#111827"
+        />
       )}
       {type === 'open' && (
-        <path d="M 16 2.8 L 22 6 L 16 9.2" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d={`M ${preview.tipX - preview.depth} ${preview.centerY - preview.half} L ${preview.tipX} ${preview.centerY} L ${preview.tipX - preview.depth} ${preview.centerY + preview.half}`}
+          stroke="#111827"
+          strokeWidth={preview.strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       )}
       {type === 'diamond' && (
-        <path d="M 15 6 L 18.5 2.8 L 22 6 L 18.5 9.2 Z" fill="none" stroke="#111827" strokeWidth="1.5" strokeLinejoin="round" />
+        <polygon
+          points={`${preview.tipX},${preview.centerY} ${preview.tipX - preview.depth * 0.5},${preview.centerY - preview.half} ${preview.tipX - preview.depth},${preview.centerY} ${preview.tipX - preview.depth * 0.5},${preview.centerY + preview.half}`}
+          fill="none"
+          stroke="#111827"
+          strokeWidth={preview.strokeWidth}
+          strokeLinejoin="round"
+        />
       )}
       {type === 'circle' && (
-        <circle cx="19.5" cy="6" r="2.8" fill="none" stroke="#111827" strokeWidth="1.5" />
+        <circle
+          cx={preview.tipX - preview.circleRadius}
+          cy={preview.centerY}
+          r={preview.circleRadius}
+          fill="none"
+          stroke="#111827"
+          strokeWidth={preview.strokeWidth}
+        />
       )}
     </svg>
   );
 }
 
 function DependencyArrowPreview({ size }: { size: number }) {
-  const length = 18 + size * 2.5;
-  const shaftEnd = 6 + Math.max(8, length - (6 + size));
-  const arrowX = 6 + length;
-  const strokeWidth = Math.max(1.5, 0.9 + size * 0.22);
-  const headHalf = Math.max(3, 2 + size * 0.45);
+  const preview = getDependencyArrowPreviewProps('standard', size);
 
   return (
     <svg width="58" height="14" viewBox="0 0 58 14" fill="none" className="shrink-0">
       <line
         x1="6"
-        y1="7"
-        x2={shaftEnd}
-        y2="7"
+        y1={preview.centerY + 1}
+        x2={6 + (preview.shaftEnd - preview.shaftStart) + size * 2.4}
+        y2={preview.centerY + 1}
         stroke="#111827"
-        strokeWidth={strokeWidth}
+        strokeWidth={preview.strokeWidth}
         strokeLinecap="round"
       />
-      <path
-        d={`M ${shaftEnd - headHalf} ${7 - headHalf} L ${arrowX} 7 L ${shaftEnd - headHalf} ${7 + headHalf}`}
-        fill="none"
-        stroke="#111827"
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeLinejoin="round"
+      <polygon
+        points={`${24 + size * 2.4},${preview.centerY + 1} ${24 + size * 2.4 - preview.depth},${preview.centerY + 1 - preview.half} ${24 + size * 2.4 - preview.depth},${preview.centerY + 1 + preview.half}`}
+        fill="#111827"
       />
     </svg>
   );

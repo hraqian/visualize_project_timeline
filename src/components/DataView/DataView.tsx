@@ -1144,7 +1144,7 @@ function IndependentItemsGroup({
 // ─── Swimlane Group ──────────────────────────────────────────────────────────
 
 interface SwimlaneGroupProps {
-  swimlane: { id: string; name: string; color: string; order: number };
+  swimlane: { id: string; name: string; bodyColor: string; order: number };
   items: ReturnType<typeof useProjectStore.getState>['items'];
   allItems: ProjectItem[];
   statusLabels: StatusLabel[];
@@ -1320,8 +1320,8 @@ function SwimlaneGroup({
             />
             {/* Pencil for color editing — hover only */}
             <SwimlaneColorPicker
-              currentColor={swimlane.color}
-              onChange={(color) => onUpdateSwimlane(swimlane.id, { color })}
+              currentColor={swimlane.bodyColor}
+              onChange={(bodyColor) => onUpdateSwimlane(swimlane.id, { bodyColor })}
             />
             {editingName ? (
               <input
