@@ -174,8 +174,8 @@ function computeLayout(
   const sortedSwimlanes = [...swimlanes].sort((a, b) => a.order - b.order);
   const visibleItems = items.filter((i) => i.visible);
   const swimlaneIds = new Set(swimlanes.map((s) => s.id));
-  const independentItems = visibleItems.filter((i) => !swimlaneIds.has(i.swimlaneId));
-  const swimlanedItemsList = visibleItems.filter((i) => swimlaneIds.has(i.swimlaneId));
+  const independentItems = visibleItems.filter((i) => i.swimlaneId === null || !swimlaneIds.has(i.swimlaneId));
+  const swimlanedItemsList = visibleItems.filter((i) => i.swimlaneId !== null && swimlaneIds.has(i.swimlaneId));
 
   const aboveMilestones = independentItems.filter(
     (i) => i.type === 'milestone' && i.swimlaneId === null && i.milestoneStyle.position === 'above'
@@ -195,11 +195,11 @@ function computeLayout(
     swimlaneRowLayouts.set(sl.id, buildGroupRowLayout(slItems, getRow));
   }
   const getRowY = (item: ProjectItem) => {
-    if (!swimlaneIds.has(item.swimlaneId)) return indepLayout.getRowY(item);
+    if (item.swimlaneId === null || !swimlaneIds.has(item.swimlaneId)) return indepLayout.getRowY(item);
     return swimlaneRowLayouts.get(item.swimlaneId!)?.getRowY(item) ?? getRow(item) * ROW_HEIGHT;
   };
   const getRowH = (item: ProjectItem) => {
-    if (!swimlaneIds.has(item.swimlaneId)) return indepLayout.getRowH(item);
+    if (item.swimlaneId === null || !swimlaneIds.has(item.swimlaneId)) return indepLayout.getRowH(item);
     return swimlaneRowLayouts.get(item.swimlaneId!)?.getRowH(item) ?? ROW_HEIGHT;
   };
 
@@ -883,10 +883,8 @@ function drawDependencies(
   dependencies: Dependency[],
   items: ProjectItem[],
   belowIndependentItems: ProjectItem[],
-  swimlanedItems: ProjectItem[],
   swimlaneLayout: SwimlaneLayout[],
   getRowY: (item: ProjectItem) => number,
-  getRowH: (item: ProjectItem) => number,
 ) {
   const itemMap = new Map(items.filter(i => i.visible).map(i => [i.id, i]));
 
@@ -906,8 +904,8 @@ function drawDependencies(
     const toX = ctx.offsetX + px2in(toStartXPx, ctx.scale);
 
     // Y positions
-    const fromYPx = getItemCenterYPx(from, belowIndependentItems, swimlanedItems, swimlaneLayout, getRowY, getRowH);
-    const toYPx = getItemCenterYPx(to, belowIndependentItems, swimlanedItems, swimlaneLayout, getRowY, getRowH);
+    const fromYPx = getItemCenterYPx(from, belowIndependentItems, swimlaneLayout, getRowY);
+    const toYPx = getItemCenterYPx(to, belowIndependentItems, swimlaneLayout, getRowY);
     const fromY = canvasY(fromYPx, ctx);
     const toY = canvasY(toYPx, ctx);
 
@@ -935,7 +933,6 @@ function drawDependencies(
 function getItemCenterYPx(
   item: ProjectItem,
   belowIndependentItems: ProjectItem[],
-  swimlanedItems: ProjectItem[],
   swimlaneLayout: SwimlaneLayout[],
   getRowY: (item: ProjectItem) => number,
 ): number {
@@ -971,7 +968,6 @@ export async function exportNativePptx(
     swimlanedItems,
     swimlaneLayout,
     getRowY,
-    getRowH,
     canvasHeight,
     tierLabels,
     rangeEndDate,
@@ -995,9 +991,9 @@ export async function exportNativePptx(
   // Independent "below" items
   for (const item of belowIndependentItems) {
     if (item.type === 'task') {
-      drawTaskBar(slide, ctx, item, INDEPENDENT_SECTION_PADDING, getRowY(item), getRowH(item));
+      drawTaskBar(slide, ctx, item, INDEPENDENT_SECTION_PADDING, getRowY(item));
     } else {
-      drawMilestone(slide, ctx, item, INDEPENDENT_SECTION_PADDING, getRowY(item), getRowH(item), false);
+      drawMilestone(slide, ctx, item, INDEPENDENT_SECTION_PADDING, getRowY(item), false);
     }
   }
 
@@ -1010,7 +1006,7 @@ export async function exportNativePptx(
     if (s.showDate) stackH += Math.ceil(s.dateFontSize * 1.25) + 1;
     const aboveHeightPx = ctx.aboveHeight / ctx.scale;
     const ay = aboveHeightPx - stackH - aboveRowGap;
-    drawMilestone(slide, ctx, item, 0, 0, ROW_HEIGHT, true, ay);
+    drawMilestone(slide, ctx, item, 0, 0, true, ay);
   }
 
   // Swimlaned items
@@ -1018,15 +1014,15 @@ export async function exportNativePptx(
     const slItems = swimlanedItems.filter((it) => it.swimlaneId === sl.swimlane.id);
     for (const item of slItems) {
       if (item.type === 'task') {
-        drawTaskBar(slide, ctx, item, sl.contentY, getRowY(item), getRowH(item));
+        drawTaskBar(slide, ctx, item, sl.contentY, getRowY(item));
       } else {
-        drawMilestone(slide, ctx, item, sl.contentY, getRowY(item), getRowH(item), false);
+        drawMilestone(slide, ctx, item, sl.contentY, getRowY(item), false);
       }
     }
   }
 
   // 5. Dependency lines
-  drawDependencies(slide, ctx, dependencies, items, belowIndependentItems, swimlanedItems, swimlaneLayout, getRowY, getRowH);
+  drawDependencies(slide, ctx, dependencies, items, belowIndependentItems, swimlaneLayout, getRowY);
 
   // Write file
   const fileName = `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx`;

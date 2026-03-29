@@ -549,8 +549,8 @@ function routeDepLink(
       });
   };
 
-  const startAnchors = buildSideAnchors(startRect, fromX, fromY, fromDir, toX, toY);
-  const endAnchors = buildSideAnchors(endRect, toX, toY, toDir, fromX, fromY);
+  const startAnchors = buildSideAnchors(startRect, fromX, fromY, fromDir, toX);
+  const endAnchors = buildSideAnchors(endRect, toX, toY, toDir, fromX);
 
   const startPortToAnchor = new Map<string, [number, number]>();
   const endPortToAnchor = new Map<string, [number, number]>();
@@ -1166,11 +1166,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   // Items NOT in any existing swimlane (independent items)
   const swimlaneIds = useMemo(() => new Set(swimlanes.map((s) => s.id)), [swimlanes]);
   const independentItems = useMemo(
-    () => visibleItems.filter((i) => !swimlaneIds.has(i.swimlaneId)),
+    () => visibleItems.filter((i) => i.swimlaneId === null || !swimlaneIds.has(i.swimlaneId)),
     [visibleItems, swimlaneIds]
   );
   const swimlanedItems = useMemo(
-    () => visibleItems.filter((i) => swimlaneIds.has(i.swimlaneId)),
+    () => visibleItems.filter((i) => i.swimlaneId !== null && swimlaneIds.has(i.swimlaneId)),
     [visibleItems, swimlaneIds]
   );
 
@@ -1403,7 +1403,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       if (item.type === 'milestone' && item.swimlaneId === null && item.milestoneStyle.position === 'above') {
         return 0;
       }
-      if (!swimlaneIds.has(item.swimlaneId)) {
+      if (item.swimlaneId === null || !swimlaneIds.has(item.swimlaneId)) {
         return INDEPENDENT_SECTION_PADDING + getRowY(item);
       }
       const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
@@ -1540,7 +1540,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     const lines: { x: number; y1: number; y2: number; color: string; thickness: number; key: string }[] = [];
 
     const getItemY = (item: ProjectItem) => {
-      if (!swimlaneIds.has(item.swimlaneId)) {
+      if (item.swimlaneId === null || !swimlaneIds.has(item.swimlaneId)) {
         return INDEPENDENT_SECTION_PADDING + getRowY(item);
       }
       const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
@@ -1645,7 +1645,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       if (item.type === 'milestone' && item.swimlaneId === null && item.milestoneStyle.position === 'above') {
         return 0;
       }
-      if (!swimlaneIds.has(item.swimlaneId)) {
+      if (item.swimlaneId === null || !swimlaneIds.has(item.swimlaneId)) {
         return INDEPENDENT_SECTION_PADDING + getRowY(item);
       }
       const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
@@ -1963,6 +1963,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     translateX={txl}
                     isSelected={isSel}
                     isDragging={isDraggingItem}
+                    isHovered={hoveredItemId === item.id}
                     onMouseDown={(e) => handleMouseDown(e, item.id)}
                     onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
                     onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
@@ -1972,6 +1973,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
                     onCancelEdit={cancelEditing}
                     onOpenDatePicker={(el) => openDatePicker(item.id, 'single', el)}
+                    onMouseEnter={() => setHoveredItemId(item.id)}
+                    onMouseLeave={() => setHoveredItemId(null)}
+                    onHandleMouseDown={(side, e) => handleDepHandleMouseDown(item.id, side, e)}
+                    isDepDragTarget={depDrag?.targetId === item.id}
+                    depDragTargetSide={depDrag?.targetId === item.id ? depDrag.targetSide ?? null : null}
                   />
                 );
               })}

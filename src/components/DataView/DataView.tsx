@@ -625,7 +625,6 @@ export function DataView() {
                 <SwimlaneGroup
                   key={swimlane.id}
                   swimlane={swimlane}
-                  swimlaneIndex={idx}
                   items={swimItems}
                   allItems={items}
                   statusLabels={statusLabels}
@@ -984,14 +983,14 @@ interface IndependentItemsGroupProps {
   onToggleChecked: (id: string) => void;
   onUpdateItem: (id: string, updates: Partial<ProjectItem>) => void;
   onDeleteItem: (id: string) => void;
-  onSelectItem: (id: string) => void;
+  onSelectItem: (id: string | null) => void;
   selectedItemId: string | null;
   onDateChange: (id: string, field: 'startDate' | 'endDate', value: string) => void;
   onDurationChange: (id: string, days: number) => void;
   onUpdateTaskStyle: (id: string, style: Partial<TaskStyle>) => void;
   onUpdateMilestoneStyle: (id: string, style: Partial<MilestoneStyle>) => void;
   onAddItem: (type: ItemType) => void;
-  onAddStatusLabel: (name: string) => void;
+  onAddStatusLabel: (label: StatusLabel) => void;
   onAddItemRelative: (referenceId: string, position: 'above' | 'below') => void;
   onDuplicateItem: (id: string) => void;
   onToggleVisibility: (id: string) => void;

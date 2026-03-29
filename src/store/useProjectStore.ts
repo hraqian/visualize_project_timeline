@@ -151,6 +151,9 @@ interface ProjectActions {
 }
 
 type ProjectStore = ProjectState & ProjectActions;
+type UndoableKey = 'projectName' | 'timelineTitle' | 'items' | 'swimlanes' | 'dependencies' | 'statusLabels';
+type Snapshot = Partial<Pick<ProjectStore, UndoableKey>>;
+type DependencyStyleKey = keyof Pick<Dependency, 'visible' | 'fromPoint' | 'toPoint' | 'color' | 'transparency' | 'lineDash' | 'lineWidth' | 'arrowType' | 'arrowSize'>;
 
 // Keys that represent saveable project data (changes to these mark the project dirty)
 // Keys that mark the project dirty (all saveable project data + settings)
@@ -161,21 +164,24 @@ const SAVEABLE_KEYS: Set<string> = new Set([
 ]);
 
 // Keys captured by undo/redo (only data edits, not view/display settings)
-const UNDOABLE_KEYS: Set<string> = new Set([
+const UNDOABLE_KEYS: Set<UndoableKey> = new Set([
   'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies', 'statusLabels',
 ]);
 
 // ─── Undo / Redo stacks (kept outside store to avoid triggering re-renders) ──
-type Snapshot = Record<string, unknown>;
 const MAX_UNDO = 50;
 let undoStack: Snapshot[] = [];
 let redoStack: Snapshot[] = [];
 let isUndoRedoing = false;          // guard to prevent snapshotting during undo/redo
 
+function assignSnapshotValue<K extends UndoableKey>(snap: Snapshot, state: ProjectStore, key: K) {
+  snap[key] = structuredClone(state[key]);
+}
+
 function takeSnapshot(state: ProjectStore): Snapshot {
   const snap: Snapshot = {};
   for (const key of UNDOABLE_KEYS) {
-    snap[key] = structuredClone((state as Record<string, unknown>)[key]);
+    assignSnapshotValue(snap, state, key);
   }
   return snap;
 }
@@ -187,14 +193,14 @@ function applySnapshot(snap: Snapshot): Partial<ProjectStore> {
 export const useProjectStore = create<ProjectStore>((_set, get) => {
   // Wrap set to auto-mark dirty when saveable data changes + push undo snapshots
   const set: typeof _set = (partial, replace) => {
-    _set((prev) => {
+    const computeNext = (prev: ProjectStore): ProjectStore => {
       const next = typeof partial === 'function' ? partial(prev) : partial;
       const keys = Object.keys(next as object);
       // Check if any saveable key is being changed
       const touchesSaveable = keys.some((k) => SAVEABLE_KEYS.has(k));
       if (touchesSaveable && !Object.prototype.hasOwnProperty.call(next as Record<string, unknown>, 'isDirty')) {
         // Push undo snapshot only when undoable keys are touched
-        const touchesUndoable = keys.some((k) => UNDOABLE_KEYS.has(k));
+        const touchesUndoable = keys.some((k) => UNDOABLE_KEYS.has(k as UndoableKey));
         if (!isUndoRedoing && touchesUndoable) {
           undoStack.push(takeSnapshot(prev as unknown as ProjectStore));
           if (undoStack.length > MAX_UNDO) undoStack.shift();
@@ -203,7 +209,14 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
         return { ...next, isDirty: true, canUndo: undoStack.length > 0, canRedo: redoStack.length > 0 } as ProjectStore;
       }
       return next as ProjectStore;
-    }, replace);
+    };
+
+    if (replace === true) {
+      _set(computeNext, true);
+      return;
+    }
+
+    _set(computeNext);
   };
 
   return {
@@ -796,9 +809,12 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     const source = state.dependencies.find((d) => d.fromId === fromId && d.toId === toId);
     if (!source || keys.length === 0) return;
 
-    const partial: Partial<Dependency> = {};
-    for (const key of keys) {
+    const partial: Partial<Pick<Dependency, DependencyStyleKey>> = {};
+    const assignDependencyStyleValue = <K extends DependencyStyleKey>(key: K) => {
       partial[key] = source[key];
+    };
+    for (const key of keys) {
+      assignDependencyStyleValue(key);
     }
 
     set((st) => ({
@@ -888,7 +904,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
             const partial: Record<string, unknown> = {};
             for (const k of keys) {
               if (k in source.taskStyle) {
-                partial[k] = (source.taskStyle as Record<string, unknown>)[k];
+                partial[k] = (source.taskStyle as unknown as Record<string, unknown>)[k];
               }
             }
             return { ...i, taskStyle: { ...i.taskStyle, ...partial } };
@@ -896,7 +912,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
             const partial: Record<string, unknown> = {};
             for (const k of keys) {
               if (k in source.milestoneStyle) {
-                partial[k] = (source.milestoneStyle as Record<string, unknown>)[k];
+                partial[k] = (source.milestoneStyle as unknown as Record<string, unknown>)[k];
               }
             }
             return { ...i, milestoneStyle: { ...i.milestoneStyle, ...partial } };
@@ -921,7 +937,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
     const partial: Record<string, unknown> = {};
     for (const k of keys) {
-      partial[k] = (source.taskStyle as Record<string, unknown>)[k];
+      partial[k] = (source.taskStyle as unknown as Record<string, unknown>)[k];
     }
 
     set((st) => ({

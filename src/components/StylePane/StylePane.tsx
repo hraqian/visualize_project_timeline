@@ -34,6 +34,8 @@ import {
   type ElapsedTimeThickness,
   type EndCapConfig,
   type TaskLayout,
+  type StylePaneSection,
+  type DateFormat,
 } from '@/types';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
@@ -1209,7 +1211,6 @@ function TaskStyleControls({
             right={(
               <ShapeDropdown
                 value={style.barShape}
-                color={style.color}
                 onChange={(barShape) => updateTaskStyle(item.id, { barShape })}
               />
             )}
@@ -2340,7 +2341,7 @@ function MilestoneStyleControls({
               Format
             </label>
             <DateFormatDropdown
-              value={style.dateFormat}
+              value={style.dateFormat as DateFormat}
               onChange={(dateFormat) => updateMilestoneStyle(item.id, { dateFormat })}
             />
           </div>
@@ -2868,6 +2869,7 @@ function EndCapSection({ side }: { side: 'left' | 'right' }) {
               <FontFamilyDropdown
                 value={cap.fontFamily}
                 onChange={(fontFamily) => updateCap({ fontFamily })}
+                fonts={FONT_FAMILIES}
               />
             </div>
             <div className="w-16">

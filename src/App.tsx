@@ -310,7 +310,7 @@ function App() {
                       className="flex items-center rounded-lg border transition-all"
                       style={toolbarContentStyle()}
                       icon={<Trash2 size={14} />}
-                      destructive={selectedDepKey}
+                      destructive={Boolean(selectedDepKey)}
                     >
                       Delete
                     </ToolbarButton>
@@ -491,8 +491,7 @@ function DependenciesDropdown({
         onClick={() => setOpen(!open)}
         icon={<Link2 size={14} />}
         chevron={<ChevronDown size={12} />}
-        active={showDependencies}
-      >
+        >
         Dependencies
       </ToolbarSplitButton>
       {open && (

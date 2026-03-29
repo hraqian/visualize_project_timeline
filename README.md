@@ -1,83 +1,12 @@
-# React + TypeScript + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
 # Project Timeline
+
+Browser-based project timeline editor with Data View, Timeline View, dependency scheduling, and configurable critical path styling.
 
 ## Storage Backends
 
-The app supports two storage modes behind the same save/load/delete UI:
+The app supports two storage modes behind the same save/load/delete UI.
 
-### 1. Local dev file storage
+### Local dev file storage
 
 Default when no Supabase environment variables are configured.
 
@@ -85,46 +14,98 @@ Default when no Supabase environment variables are configured.
 - saves project JSON files under `data/projects/`
 - intended for local development only
 
-### 2. Hosted storage with Supabase
+### Hosted storage with Supabase
 
 Enabled when both of these environment variables are present:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 
-In this mode the app keeps the same project-manager UX, but saves projects in Supabase instead of local files.
+In this mode the app keeps the same Project Manager UX, but saves projects in Supabase instead of local files.
+
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the app locally:
+
+```bash
+npm run dev
+```
+
+Without Supabase env vars, the app will use the local Vite `/api/projects` storage backend.
 
 ## Supabase Setup
 
-Create a table named `projects` with columns:
+This repo includes a ready-to-run SQL file:
+
+- `supabase/projects-schema.sql`
+
+Create a Supabase project, open the SQL editor, and run that file.
+
+It creates:
+
+- `public.projects`
+- index on `last_modified`
+- permissive RLS policies for initial testing
+
+Table shape:
 
 - `id` `text primary key`
 - `name` `text not null`
 - `last_modified` `timestamptz not null`
 - `data` `jsonb not null`
 
-Example SQL:
-
-```sql
-create table if not exists projects (
-  id text primary key,
-  name text not null,
-  last_modified timestamptz not null,
-  data jsonb not null
-);
-```
-
-For a first pass, you can allow public read/write on this table if the app is only for personal testing. For a real public deployment, add auth and proper row-level security.
+For real public use, you should tighten the included policies and add auth.
 
 ## Environment
 
-Copy `.env.example` to `.env.local` for local hosted-storage testing.
+Copy:
 
-If no Supabase variables are set, the app falls back to local file storage.
+```bash
+cp .env.example .env.local
+```
 
-## Deployment Recommendation
+Then fill in:
 
-- local development: keep using the current Vite dev workflow
-- production deployment: use Vercel or Cloudflare Pages for the frontend and Supabase for storage
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
-This keeps the visible save/load/delete behavior similar between local and deployed versions, while allowing the local workflow to continue unchanged.
+With those values present, local development will use Supabase instead of the Vite file-storage backend.
+
+## Deployment
+
+Recommended frontend hosts:
+
+- Vercel
+- Cloudflare Pages
+
+Build settings:
+
+- build command: `npm run build`
+- output directory: `dist`
+
+Environment variables to configure in the host dashboard:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+## Fastest End-to-End Path
+
+1. Create a Supabase project.
+2. Run `supabase/projects-schema.sql` in Supabase SQL editor.
+3. Copy `.env.example` to `.env.local` and add your Supabase values.
+4. Run `npm run dev` and verify save/load/delete works in Project Manager.
+5. Push this repo to GitHub.
+6. Connect the repo to Vercel or Cloudflare Pages.
+7. Add the same two env vars in the deployment dashboard.
+
+## Notes
+
+- no Supabase env vars: local file storage via Vite plugin
+- Supabase env vars present: hosted storage with the same visible save/load/delete UX
+- local and deployed builds can share the same backend if you want, but separate dev/prod Supabase projects are safer

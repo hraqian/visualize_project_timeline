@@ -368,7 +368,7 @@ export function computeAutoFontSize(
   if (availableWidth <= 0) return MIN_SIZE;
 
   // Find the longest label by measuring each at a reference size
-  ctx.font = `${fontWeight} ${MAX_SIZE}px ${fontFamily}`;
+  ctx.font = `${fontStyle} ${fontWeight} ${MAX_SIZE}px ${fontFamily}`;
   let longestLabel = '';
   let longestWidth = 0;
   for (const cell of cells) {
