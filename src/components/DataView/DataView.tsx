@@ -1206,6 +1206,7 @@ interface SwimlaneGroupProps {
 function SwimlaneGroup({
   swimlane,
   items: swimItems,
+  allItems,
   statusLabels,
   columnVisibility,
   totalColumns,
@@ -2178,7 +2179,6 @@ function ItemRow({
             <Trash2 size={14} />
           </button>
           <RowMoreMenu
-            itemId={item.id}
             isVisible={item.visible}
             onAddAbove={() => onAddItemRelative(item.id, 'above')}
             onAddBelow={() => onAddItemRelative(item.id, 'below')}
