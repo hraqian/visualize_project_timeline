@@ -661,7 +661,8 @@ function DependencyLinkControls() {
           <div className="pt-2 border-t border-[var(--color-border)]">
             <button
               onClick={() => setShowSchedulingModal(true)}
-              className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-colors"
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs font-medium text-[var(--color-text-secondary)] transition-colors border"
+              style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)' }}
             >
               <Settings size={14} />
               Scheduling Settings
@@ -2587,7 +2588,8 @@ function TimescaleTabContent({
       <div className="px-4">
         <button
           onClick={() => setTierSettingsOpen(true)}
-          className="flex items-center justify-center gap-2 w-full border border-[var(--color-border)] rounded-lg px-4 py-2.5 text-sm font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-colors"
+          className="flex items-center justify-center gap-2 w-full border rounded-xl px-4 py-2.5 text-sm font-medium text-[var(--color-text)] transition-colors"
+          style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
         >
           <Settings size={14} className="text-[var(--color-text-muted)]" />
           Tier settings
@@ -2773,7 +2775,8 @@ function ElapsedTimeSection() {
             <select
               value={thickness}
               onChange={(e) => updateTimescale({ elapsedTimeThickness: e.target.value as ElapsedTimeThickness })}
-              className="w-full h-9 pl-3 pr-8 rounded border border-[var(--color-border)] bg-white text-sm text-[var(--color-text)] appearance-none cursor-pointer hover:bg-[var(--color-surface-hover)] transition-colors"
+              className="w-full h-9 pl-3 pr-8 rounded-lg border text-sm text-[var(--color-text)] appearance-none cursor-pointer transition-colors"
+              style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
             >
               {ELAPSED_THICKNESS_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>{opt.label}</option>
@@ -3505,13 +3508,15 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-end gap-3 px-8 py-4 border-t border-[var(--color-border)]">
           <button
             onClick={onClose}
-            className="px-6 py-2 rounded-lg text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-colors"
+            className="px-6 py-2 rounded-lg text-sm font-medium text-[var(--color-text)] transition-colors border"
+            style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-2 rounded-lg text-sm font-medium text-white bg-green-500 hover:bg-green-600 transition-colors"
+            className="px-6 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+            style={{ background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }}
           >
             Save
           </button>
