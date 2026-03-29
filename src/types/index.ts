@@ -187,6 +187,31 @@ export interface ProjectItem {
 
 export type OutlineThickness = 'none' | 'thin' | 'medium' | 'thick';
 
+export interface CriticalPathItemStyle {
+  enabled: boolean;
+  color: string;
+}
+
+export interface CriticalPathOutlineStyle {
+  enabled: boolean;
+  color: string;
+  thickness: OutlineThickness;
+}
+
+export interface CriticalPathLinkStyle {
+  enabled: boolean;
+  color: string;
+  dash: DependencyLineDash;
+}
+
+export interface CriticalPathStyle {
+  itemBackground: CriticalPathItemStyle;
+  itemOutline: CriticalPathOutlineStyle;
+  titleColor: CriticalPathItemStyle;
+  dependencyColor: CriticalPathItemStyle;
+  dependencyDash: { enabled: boolean; dash: DependencyLineDash };
+}
+
 export interface Swimlane {
   id: string;
   name: string;
@@ -397,6 +422,7 @@ export interface ProjectState {
   selectedDepKey: string | null; // selected dependency link key ("fromId-toId")
   stylePaneSection: StylePaneSection | null; // which collapsible section is expanded in StylePane
   showCriticalPath: boolean;
+  criticalPathStyle: CriticalPathStyle;
   showDependencies: boolean; // master toggle — controls dep lines on timeline + Predecessors column in DataView
   dependencySettings: DependencySettings; // scheduling mode config (per-project)
   zoom: number; // pixels per day
@@ -481,6 +507,30 @@ export const DEFAULT_TASK_STYLE: TaskStyle = {
   // Vertical connector defaults
   connectorColor: '#9ca3af',
   connectorThickness: 'thin',
+};
+
+export const DEFAULT_CRITICAL_PATH_STYLE: CriticalPathStyle = {
+  itemBackground: {
+    enabled: false,
+    color: '#fee2e2',
+  },
+  itemOutline: {
+    enabled: true,
+    color: '#ef4444',
+    thickness: 'thin',
+  },
+  titleColor: {
+    enabled: false,
+    color: '#b91c1c',
+  },
+  dependencyColor: {
+    enabled: true,
+    color: '#ef4444',
+  },
+  dependencyDash: {
+    enabled: false,
+    dash: 'solid',
+  },
 };
 
 export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {

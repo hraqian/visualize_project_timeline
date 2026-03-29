@@ -1041,6 +1041,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const moveItem = useProjectStore((s) => s.moveItem);
   const moveItemToSwimlane = useProjectStore((s) => s.moveItemToSwimlane);
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
+  const criticalPathStyle = useProjectStore((s) => s.criticalPathStyle);
   const showDependencies = useProjectStore((s) => s.showDependencies);
   const swimlaneSpacing = useProjectStore((s) => s.swimlaneSpacing);
   const taskLayout = useProjectStore((s) => s.taskLayout);
@@ -2243,15 +2244,21 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                   const isDepSelected = selectedDepKey === dep.key;
                   const baseColor = dep.color ?? DEFAULT_DEPENDENCY_COLOR;
                   const alpha = dependencyStrokeOpacity(dep.transparency);
+                  const criticalStroke = criticalPathStyle.dependencyColor.enabled
+                    ? criticalPathStyle.dependencyColor.color
+                    : baseColor;
                   const stroke = dep.isHidden
                     ? '#94a3b8'
                     : dep.isCritical
-                      ? '#ef4444'
+                      ? criticalStroke
                       : baseColor;
                   const arrowType = dep.arrowType ?? 'standard';
                   const strokeOpacity = alpha;
-                  const strokeWidth = dep.lineWidth ?? (dep.isCritical ? 2 : 1.5);
-                  const dasharray = dep.isHidden ? '4 3' : DEPENDENCY_DASH_MAP[dep.lineDash ?? 'solid'];
+                  const strokeWidth = dep.lineWidth ?? 1.5;
+                  const effectiveDash = dep.isCritical && criticalPathStyle.dependencyDash.enabled
+                    ? criticalPathStyle.dependencyDash.dash
+                    : dep.lineDash ?? 'solid';
+                  const dasharray = dep.isHidden ? '4 3' : DEPENDENCY_DASH_MAP[effectiveDash];
                   const renderGeometry = buildDependencyRenderGeometry(dep.path, arrowType, dep.arrowSize, strokeWidth);
                   const linePath = renderGeometry.linePath;
                   return (
@@ -2653,6 +2660,9 @@ interface TaskBarProps {
 function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: TaskBarProps) {
   const isEditing = (field: string) => editingField?.itemId === item.id && editingField?.field === field;
   const style = item.taskStyle;
+  const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
+  const criticalPathStyle = useProjectStore((s) => s.criticalPathStyle);
+  const isCritical = showCriticalPath && item.isCriticalPath;
   const barHeight = style.thickness;
   const barY = y + (ROW_BASE - barHeight) / 2;
   const w = Math.max(width, 8);
@@ -2737,6 +2747,26 @@ function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragg
   const shapeStyle: React.CSSProperties = clipPath
     ? { clipPath }
     : { borderRadius };
+  const backgroundColor = isCritical && criticalPathStyle.itemBackground.enabled
+    ? criticalPathStyle.itemBackground.color
+    : `${style.color}30`;
+  const outlineThickness = criticalPathStyle.itemOutline.thickness === 'thick'
+    ? 3
+    : criticalPathStyle.itemOutline.thickness === 'medium'
+      ? 2
+      : criticalPathStyle.itemOutline.thickness === 'thin'
+        ? 1.5
+        : 0;
+  const outlineBorder = isCritical && criticalPathStyle.itemOutline.enabled && outlineThickness > 0
+    ? `${outlineThickness}px solid ${criticalPathStyle.itemOutline.color}`
+    : clipPath
+      ? 'none'
+      : isSelected
+        ? `2px solid ${style.color}`
+        : `1px solid ${style.color}50`;
+  const titleColor = isCritical && criticalPathStyle.titleColor.enabled
+    ? criticalPathStyle.titleColor.color
+    : style.fontColor;
 
   return (
     <div
@@ -2844,12 +2874,12 @@ function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragg
         className="w-full h-full relative overflow-hidden cursor-pointer hover:outline hover:outline-1 hover:outline-red-400"
         style={{
           ...shapeStyle,
-          backgroundColor: `${style.color}30`,
-          border: clipPath ? 'none' : isSelected ? `2px solid ${style.color}` : `1px solid ${style.color}50`,
+          backgroundColor,
+          border: outlineBorder,
           boxShadow: isSelected
             ? `0 0 0 2px ${style.color}30, 0 2px 8px ${style.color}20`
-            : item.isCriticalPath
-            ? '0 0 0 2px rgba(239,68,68,0.3)'
+            : isCritical && criticalPathStyle.itemOutline.enabled
+            ? `0 0 0 2px ${criticalPathStyle.itemOutline.color}33`
             : 'none',
         }}
         onClick={(e) => { e.stopPropagation(); onClickBar(); }}
@@ -2865,8 +2895,8 @@ function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragg
             opacity: 0.85,
           }}
         />
-        {item.isCriticalPath && !clipPath && (
-          <div className="absolute inset-0 border-2 border-red-500 rounded-inherit" style={{ borderRadius }} />
+        {isCritical && criticalPathStyle.itemOutline.enabled && !clipPath && outlineThickness > 0 && (
+          <div className="absolute inset-0 rounded-inherit pointer-events-none" style={{ border: `${outlineThickness}px solid ${criticalPathStyle.itemOutline.color}`, borderRadius }} />
         )}
       </div>
 
@@ -2880,7 +2910,7 @@ function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragg
             fontWeight: style.fontWeight,
             fontStyle: style.fontStyle ?? 'normal',
             textDecoration: isEditing('title') ? 'none' : (style.textDecoration ?? 'none'),
-            color: style.fontColor,
+            color: titleColor,
             maxWidth: isEditing('title') ? 'none' : 200,
             overflow: isEditing('title') ? 'visible' : 'hidden',
             textOverflow: 'ellipsis',
@@ -2904,7 +2934,7 @@ function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragg
               value={item.name}
               onCommit={(v) => onCommitEdit('title', v)}
               onCancel={onCancelEdit}
-              style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: style.fontColor }}
+                style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: titleColor }}
             />
           ) : (
             <span>{item.name}</span>
@@ -3102,6 +3132,19 @@ interface MilestoneItemProps {
 function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: MilestoneItemProps) {
   const isEditingTitle = editingField?.itemId === item.id && editingField?.field === 'milestoneTitle';
   const style = item.milestoneStyle;
+  const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
+  const criticalPathStyle = useProjectStore((s) => s.criticalPathStyle);
+  const isCritical = showCriticalPath && item.isCriticalPath;
+  const titleColor = isCritical && criticalPathStyle.titleColor.enabled
+    ? criticalPathStyle.titleColor.color
+    : style.fontColor;
+  const outlineThickness = criticalPathStyle.itemOutline.thickness === 'thick'
+    ? 3
+    : criticalPathStyle.itemOutline.thickness === 'medium'
+      ? 2
+      : criticalPathStyle.itemOutline.thickness === 'thin'
+        ? 1.5
+        : 0;
   const isIndependent = item.swimlaneId === null;
 
   // ─── Independent milestones: vertical stack layout ───
@@ -3120,7 +3163,7 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
           fontWeight: style.fontWeight,
           fontStyle: style.fontStyle ?? 'normal',
           textDecoration: isEditingTitle ? 'none' : (style.textDecoration ?? 'none'),
-          color: style.fontColor,
+          color: titleColor,
           maxWidth: isEditingTitle ? 'none' : 200,
           overflow: isEditingTitle ? 'visible' : 'hidden',
           textOverflow: 'ellipsis',
@@ -3133,7 +3176,7 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
             value={item.name}
             onCommit={(v) => onCommitEdit('milestoneTitle', v)}
             onCancel={onCancelEdit}
-            style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: style.fontColor, width: 120 }}
+              style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: titleColor, width: 120 }}
           />
         ) : (
           item.name
@@ -3170,8 +3213,8 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
         onClick={(e) => { e.stopPropagation(); onClickIcon(); }}
       >
         <MilestoneIconComponent icon={style.icon} size={style.size} color={style.color} />
-        {item.isCriticalPath && (
-          <div className="absolute inset-0 rounded-full border-2 border-red-500" />
+        {isCritical && criticalPathStyle.itemOutline.enabled && outlineThickness > 0 && (
+          <div className="absolute inset-0 rounded-full" style={{ border: `${outlineThickness}px solid ${criticalPathStyle.itemOutline.color}` }} />
         )}
       </div>
     );
@@ -3369,8 +3412,8 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
         onClick={(e) => { e.stopPropagation(); onClickIcon(); }}
       >
         <MilestoneIconComponent icon={style.icon} size={style.size} color={style.color} />
-        {item.isCriticalPath && (
-          <div className="absolute inset-0 rounded-full border-2 border-red-500" />
+        {isCritical && criticalPathStyle.itemOutline.enabled && outlineThickness > 0 && (
+          <div className="absolute inset-0 rounded-full" style={{ border: `${outlineThickness}px solid ${criticalPathStyle.itemOutline.color}` }} />
         )}
       </div>
 
@@ -3391,7 +3434,7 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
               fontWeight: style.fontWeight,
               fontStyle: style.fontStyle ?? 'normal',
               textDecoration: isEditingTitle ? 'none' : (style.textDecoration ?? 'none'),
-              color: style.fontColor,
+              color: titleColor,
               maxWidth: isEditingTitle ? 'none' : 200,
               overflow: isEditingTitle ? 'visible' : 'hidden',
               textOverflow: 'ellipsis',
@@ -3404,7 +3447,7 @@ function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isS
                 value={item.name}
                 onCommit={(v) => onCommitEdit('milestoneTitle', v)}
                 onCancel={onCancelEdit}
-                style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: style.fontColor, width: 120 }}
+                style={{ fontSize: style.fontSize, fontFamily: style.fontFamily, fontWeight: style.fontWeight, color: titleColor, width: 120 }}
               />
             ) : (
               item.name

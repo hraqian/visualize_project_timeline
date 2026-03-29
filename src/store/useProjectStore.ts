@@ -17,12 +17,12 @@ import type {
   OptionalColumn,
   StylePaneSection,
   TaskLayout,
-  SchedulingConflict,
   DependencyConflictMode,
   DependencyLagAdjustment,
   RescheduledItemChange,
-} from '@/types';
-import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY, DEFAULT_DEPENDENCY_SETTINGS } from '@/types';
+  CriticalPathStyle,
+ } from '@/types';
+import { DEFAULT_TASK_STYLE, DEFAULT_MILESTONE_STYLE, DEFAULT_SWIMLANE_STYLE, DEFAULT_STATUS_LABELS, DEFAULT_COLUMN_VISIBILITY, DEFAULT_DEPENDENCY_SETTINGS, DEFAULT_CRITICAL_PATH_STYLE } from '@/types';
 import { getDefaultTimescale, computeCriticalPath, scheduleDependents } from '@/utils';
 import { getGlobalSettings } from '@/utils/storage';
 import { saveProjectToFile, loadProjectFromFile } from '@/utils/fileStorage';
@@ -36,136 +36,6 @@ function applyLagAdjustments(deps: Dependency[], adjustments: DependencyLagAdjus
     if (adj) return { ...d, lag: adj.newLag, lagUnit: adj.newLagUnit };
     return d;
   });
-}
-
-// ─── Sample Data ─────────────────────────────────────────────────────────────
-
-function createSampleData(): Pick<ProjectState, 'items' | 'swimlanes' | 'dependencies'> {
-  const swimlanes: Swimlane[] = [
-    { id: 's1', name: 'Planning', color: '#334155', order: 0, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#334155' },
-    { id: 's2', name: 'Design', color: '#8b5cf6', order: 1, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#8b5cf6' },
-    { id: 's3', name: 'Development', color: '#3b82f6', order: 2, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#3b82f6' },
-    { id: 's4', name: 'Testing & Launch', color: '#22c55e', order: 3, collapsed: false, ...DEFAULT_SWIMLANE_STYLE, headerColor: '#22c55e' },
-  ];
-
-  const items: ProjectItem[] = [
-    {
-      id: 'i1', name: 'Project Kickoff', type: 'milestone',
-      startDate: '2026-04-01', endDate: '2026-04-01',
-      percentComplete: 100, statusId: 'on-track', assignedTo: 'Alex Chen', visible: true, swimlaneId: 's1', row: 0,
-      taskStyle: { ...DEFAULT_TASK_STYLE }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE, icon: 'star-filled', color: '#f59e0b' },
-      dependsOn: [], isCriticalPath: false,
-    },
-    {
-      id: 'i2', name: 'Requirements Gathering', type: 'task',
-      startDate: '2026-04-02', endDate: '2026-04-18',
-      percentComplete: 80, statusId: 'on-track', assignedTo: 'Sarah Kim', visible: true, swimlaneId: 's1', row: 0,
-      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#334155' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
-      dependsOn: ['i1'], isCriticalPath: false,
-    },
-    {
-      id: 'i3', name: 'Stakeholder Review', type: 'milestone',
-      startDate: '2026-04-21', endDate: '2026-04-21',
-      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's1', row: 1,
-      taskStyle: { ...DEFAULT_TASK_STYLE }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE, icon: 'flag-filled', color: '#ec4899' },
-      dependsOn: ['i2'], isCriticalPath: false,
-    },
-    {
-      id: 'i4', name: 'UI/UX Wireframes', type: 'task',
-      startDate: '2026-04-22', endDate: '2026-05-09',
-      percentComplete: 45, statusId: 'potential-risk', assignedTo: 'James Lee', visible: true, swimlaneId: 's2', row: 0,
-      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#8b5cf6' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
-      dependsOn: ['i3'], isCriticalPath: false,
-    },
-    {
-      id: 'i5', name: 'Visual Design System', type: 'task',
-      startDate: '2026-05-01', endDate: '2026-05-20',
-      percentComplete: 20, statusId: 'at-risk', assignedTo: 'Emily Park', visible: true, swimlaneId: 's2', row: 1,
-      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#a855f7' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
-      dependsOn: [], isCriticalPath: false,
-    },
-    {
-      id: 'i6', name: 'Design Approval', type: 'milestone',
-      startDate: '2026-05-22', endDate: '2026-05-22',
-      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's2', row: 0,
-      taskStyle: { ...DEFAULT_TASK_STYLE }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE, icon: 'check', color: '#22c55e' },
-      dependsOn: ['i4', 'i5'], isCriticalPath: false,
-    },
-    {
-      id: 'i7', name: 'Frontend Development', type: 'task',
-      startDate: '2026-05-25', endDate: '2026-07-03',
-      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's3', row: 0,
-      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#3b82f6' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
-      dependsOn: ['i6'], isCriticalPath: false,
-    },
-    {
-      id: 'i8', name: 'Backend API', type: 'task',
-      startDate: '2026-05-25', endDate: '2026-06-26',
-      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's3', row: 1,
-      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#06b6d4' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
-      dependsOn: ['i6'], isCriticalPath: false,
-    },
-    {
-      id: 'i9', name: 'Database Setup', type: 'task',
-      startDate: '2026-05-25', endDate: '2026-06-06',
-      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's3', row: 2,
-      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#14b8a6' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
-      dependsOn: ['i6'], isCriticalPath: false,
-    },
-    {
-      id: 'i10', name: 'Integration Testing', type: 'task',
-      startDate: '2026-07-06', endDate: '2026-07-17',
-      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's4', row: 0,
-      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#22c55e' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
-      dependsOn: ['i7', 'i8'], isCriticalPath: false,
-    },
-    {
-      id: 'i11', name: 'UAT & Bug Fixes', type: 'task',
-      startDate: '2026-07-20', endDate: '2026-07-31',
-      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's4', row: 0,
-      taskStyle: { ...DEFAULT_TASK_STYLE, color: '#f97316' }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE },
-      dependsOn: ['i10'], isCriticalPath: false,
-    },
-    {
-      id: 'i12', name: 'Go Live!', type: 'milestone',
-      startDate: '2026-08-03', endDate: '2026-08-03',
-      percentComplete: 0, statusId: null, assignedTo: '', visible: true, swimlaneId: 's4', row: 1,
-      taskStyle: { ...DEFAULT_TASK_STYLE }, milestoneStyle: { ...DEFAULT_MILESTONE_STYLE, icon: 'flag-filled', color: '#ef4444', size: 24 },
-      dependsOn: ['i11'], isCriticalPath: false,
-    },
-  ];
-
-  const makeDep = (fromId: string, toId: string): Dependency => ({
-    fromId,
-    toId,
-    type: 'finish-to-start',
-    lag: 0,
-    lagUnit: 'd',
-    visible: true,
-    color: '#475569',
-    transparency: 0,
-    lineDash: 'solid',
-    lineWidth: 1.5,
-    arrowType: 'standard',
-    arrowSize: 4,
-  });
-
-  const dependencies: Dependency[] = [
-    makeDep('i1', 'i2'),
-    makeDep('i2', 'i3'),
-    makeDep('i3', 'i4'),
-    makeDep('i4', 'i6'),
-    makeDep('i5', 'i6'),
-    makeDep('i6', 'i7'),
-    makeDep('i6', 'i8'),
-    makeDep('i6', 'i9'),
-    makeDep('i7', 'i10'),
-    makeDep('i8', 'i10'),
-    makeDep('i10', 'i11'),
-    makeDep('i11', 'i12'),
-  ];
-
-  return { items, swimlanes, dependencies };
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -250,6 +120,7 @@ interface ProjectActions {
   // Critical Path
   toggleCriticalPath: () => void;
   recalcCriticalPath: () => void;
+  updateCriticalPathStyle: (updates: Partial<CriticalPathStyle>) => void;
 
   // Column Visibility
   toggleColumn: (column: OptionalColumn) => void;
@@ -285,7 +156,7 @@ type ProjectStore = ProjectState & ProjectActions;
 // Keys that mark the project dirty (all saveable project data + settings)
 const SAVEABLE_KEYS: Set<string> = new Set([
   'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies',
-  'statusLabels', 'columnVisibility', 'timescale', 'zoom', 'swimlaneSpacing', 'showCriticalPath', 'taskLayout',
+  'statusLabels', 'columnVisibility', 'timescale', 'zoom', 'swimlaneSpacing', 'showCriticalPath', 'criticalPathStyle', 'taskLayout',
   'showDependencies', 'dependencySettings',
 ]);
 
@@ -321,7 +192,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       const keys = Object.keys(next as object);
       // Check if any saveable key is being changed
       const touchesSaveable = keys.some((k) => SAVEABLE_KEYS.has(k));
-      if (touchesSaveable && !(next as Record<string, unknown>).hasOwnProperty('isDirty')) {
+      if (touchesSaveable && !Object.prototype.hasOwnProperty.call(next as Record<string, unknown>, 'isDirty')) {
         // Push undo snapshot only when undoable keys are touched
         const touchesUndoable = keys.some((k) => UNDOABLE_KEYS.has(k));
         if (!isUndoRedoing && touchesUndoable) {
@@ -357,6 +228,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   selectedDepKey: null,
   stylePaneSection: null,
   showCriticalPath: false,
+  criticalPathStyle: { ...DEFAULT_CRITICAL_PATH_STYLE },
   showDependencies: false,
   dependencySettings: { ...DEFAULT_DEPENDENCY_SETTINGS },
   zoom: 8,
@@ -396,6 +268,30 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     if (data.timescale?.tiers?.length === 1 && data.timescale.tiers[0].unit === 'month' && data.timescale.tiers[0].format === 'MMM') {
       data.timescale.tiers[0].unit = 'auto';
     }
+    data.criticalPathStyle = {
+      ...DEFAULT_CRITICAL_PATH_STYLE,
+      ...(data.criticalPathStyle ?? {}),
+      itemBackground: {
+        ...DEFAULT_CRITICAL_PATH_STYLE.itemBackground,
+        ...(data.criticalPathStyle?.itemBackground ?? {}),
+      },
+      itemOutline: {
+        ...DEFAULT_CRITICAL_PATH_STYLE.itemOutline,
+        ...(data.criticalPathStyle?.itemOutline ?? {}),
+      },
+      titleColor: {
+        ...DEFAULT_CRITICAL_PATH_STYLE.titleColor,
+        ...(data.criticalPathStyle?.titleColor ?? {}),
+      },
+      dependencyColor: {
+        ...DEFAULT_CRITICAL_PATH_STYLE.dependencyColor,
+        ...(data.criticalPathStyle?.dependencyColor ?? {}),
+      },
+      dependencyDash: {
+        ...DEFAULT_CRITICAL_PATH_STYLE.dependencyDash,
+        ...(data.criticalPathStyle?.dependencyDash ?? {}),
+      },
+    };
     set({
       ...data,
       isDirty: false,
@@ -439,6 +335,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       selectedDepKey: null,
       stylePaneSection: null,
       showCriticalPath: false,
+      criticalPathStyle: { ...DEFAULT_CRITICAL_PATH_STYLE },
       showDependencies: depDefaults.enabled,
       dependencySettings: { ...depDefaults },
       zoom: 8,
@@ -1103,6 +1000,14 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       items: state.items.map((i) => ({ ...i, isCriticalPath: critical.has(i.id) })),
     });
   },
+
+  updateCriticalPathStyle: (updates) =>
+    set((state) => ({
+      criticalPathStyle: {
+        ...state.criticalPathStyle,
+        ...updates,
+      },
+    })),
 
   // ─── Column Visibility ──────────────────────────────────────────────
   toggleColumn: (column) =>

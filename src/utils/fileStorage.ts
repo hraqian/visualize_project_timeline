@@ -23,6 +23,7 @@ const SAVEABLE_KEYS: (keyof ProjectState)[] = [
   'taskLayout',
   'swimlaneSpacing',
   'showCriticalPath',
+  'criticalPathStyle',
   'showDependencies',
   'dependencySettings',
 ];

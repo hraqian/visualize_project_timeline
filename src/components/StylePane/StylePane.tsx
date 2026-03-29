@@ -448,6 +448,10 @@ function DependencyLinkControls() {
   const updateDependency = useProjectStore((s) => s.updateDependency);
   const applyDependencyStyleToAll = useProjectStore((s) => s.applyDependencyStyleToAll);
   const dependencySettings = useProjectStore((s) => s.dependencySettings);
+  const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
+  const toggleCriticalPath = useProjectStore((s) => s.toggleCriticalPath);
+  const criticalPathStyle = useProjectStore((s) => s.criticalPathStyle);
+  const updateCriticalPathStyle = useProjectStore((s) => s.updateCriticalPathStyle);
 
   const [depSubTab, setDepSubTab] = useState<DepSubTab>('link');
   const [showSchedulingModal, setShowSchedulingModal] = useState(false);
@@ -662,10 +666,117 @@ function DependencyLinkControls() {
           </div>
         </div>
       ) : (
-        /* Critical Path placeholder */
-        <div className="text-center py-12 px-6">
-          <div className="text-sm font-semibold text-[var(--color-text)] mb-1">Critical Path</div>
-          <div className="text-xs text-[var(--color-text-muted)]">Coming soon. Critical path highlighting and analysis will appear here.</div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-[var(--color-text)]">Visible</span>
+            <button
+              onClick={toggleCriticalPath}
+              className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+            >
+              {showCriticalPath ? <Eye size={14} /> : <EyeOff size={14} />}
+              {showCriticalPath ? 'On' : 'Off'}
+            </button>
+          </div>
+
+          <div className={`space-y-4 transition-opacity ${showCriticalPath ? '' : 'opacity-40 pointer-events-none'}`}>
+            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-3">
+              <div className="text-xs font-semibold text-[var(--color-text)]">Tasks & Milestones</div>
+
+              <PropertyCard
+                label="Background Color"
+                checked={criticalPathStyle.itemBackground.enabled}
+                onChange={(enabled) => updateCriticalPathStyle({ itemBackground: { ...criticalPathStyle.itemBackground, enabled } })}
+              >
+                <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: criticalPathStyle.itemBackground.color }} />
+              </PropertyCard>
+              {criticalPathStyle.itemBackground.enabled && (
+                <PropertyControlRow label="Color">
+                  <AdvancedColorPicker
+                    value={criticalPathStyle.itemBackground.color}
+                    onChange={(color) => updateCriticalPathStyle({ itemBackground: { ...criticalPathStyle.itemBackground, color } })}
+                  />
+                </PropertyControlRow>
+              )}
+
+              <PropertyCard
+                label="Outline"
+                checked={criticalPathStyle.itemOutline.enabled}
+                onChange={(enabled) => updateCriticalPathStyle({ itemOutline: { ...criticalPathStyle.itemOutline, enabled } })}
+              >
+                <ThicknessIcon />
+              </PropertyCard>
+              {criticalPathStyle.itemOutline.enabled && (
+                <LabeledFieldPair
+                  leftLabel="Color"
+                  left={(
+                    <AdvancedColorPicker
+                      value={criticalPathStyle.itemOutline.color}
+                      onChange={(color) => updateCriticalPathStyle({ itemOutline: { ...criticalPathStyle.itemOutline, color } })}
+                    />
+                  )}
+                  rightLabel="Thickness"
+                  right={(
+                    <OutlineThicknessDropdown
+                      value={criticalPathStyle.itemOutline.thickness}
+                      onChange={(thickness) => updateCriticalPathStyle({ itemOutline: { ...criticalPathStyle.itemOutline, thickness } })}
+                    />
+                  )}
+                />
+              )}
+
+              <PropertyCard
+                label="Title Color"
+                checked={criticalPathStyle.titleColor.enabled}
+                onChange={(enabled) => updateCriticalPathStyle({ titleColor: { ...criticalPathStyle.titleColor, enabled } })}
+              >
+                <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: criticalPathStyle.titleColor.color }} />
+              </PropertyCard>
+              {criticalPathStyle.titleColor.enabled && (
+                <PropertyControlRow label="Color">
+                  <AdvancedColorPicker
+                    value={criticalPathStyle.titleColor.color}
+                    onChange={(color) => updateCriticalPathStyle({ titleColor: { ...criticalPathStyle.titleColor, color } })}
+                  />
+                </PropertyControlRow>
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-3">
+              <div className="text-xs font-semibold text-[var(--color-text)]">Dependency Links</div>
+
+              <PropertyCard
+                label="Color"
+                checked={criticalPathStyle.dependencyColor.enabled}
+                onChange={(enabled) => updateCriticalPathStyle({ dependencyColor: { ...criticalPathStyle.dependencyColor, enabled } })}
+              >
+                <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: criticalPathStyle.dependencyColor.color }} />
+              </PropertyCard>
+              {criticalPathStyle.dependencyColor.enabled && (
+                <PropertyControlRow label="Color">
+                  <AdvancedColorPicker
+                    value={criticalPathStyle.dependencyColor.color}
+                    onChange={(color) => updateCriticalPathStyle({ dependencyColor: { ...criticalPathStyle.dependencyColor, color } })}
+                  />
+                </PropertyControlRow>
+              )}
+
+              <PropertyCard
+                label="Dash Type"
+                checked={criticalPathStyle.dependencyDash.enabled}
+                onChange={(enabled) => updateCriticalPathStyle({ dependencyDash: { ...criticalPathStyle.dependencyDash, enabled } })}
+              >
+                <DependencyDashPreview dasharray={DEP_LINE_DASH_OPTIONS.find((option) => option.id === criticalPathStyle.dependencyDash.dash)?.dasharray} />
+              </PropertyCard>
+              {criticalPathStyle.dependencyDash.enabled && (
+                <PropertyControlRow label="Dash">
+                  <DependencyLineDashDropdown
+                    value={criticalPathStyle.dependencyDash.dash}
+                    onChange={(dash) => updateCriticalPathStyle({ dependencyDash: { ...criticalPathStyle.dependencyDash, dash } })}
+                  />
+                </PropertyControlRow>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
