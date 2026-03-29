@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
 import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import type { DependencySchedulingMode, DependencyConflictMode } from '@/types';
+import { DialogButton, ModalCloseButton, ModalSurface } from './ModalPrimitives';
 
 interface Props {
   onClose: () => void;
@@ -41,16 +41,11 @@ export function SettingsModal({ onClose }: Props) {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-[640px] max-h-[80vh] flex flex-col overflow-hidden">
+      <ModalSurface className="relative w-[640px] max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
           <h2 className="text-base font-semibold text-slate-800">Settings</h2>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
-          >
-            <X size={18} />
-          </button>
+          <ModalCloseButton onClick={onClose} />
         </div>
 
         {/* Body: two-panel layout */}
@@ -90,20 +85,10 @@ export function SettingsModal({ onClose }: Props) {
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-200 shrink-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md text-sm font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 rounded-md text-sm font-medium text-white bg-[#1e293b] hover:bg-[#0f172a] transition-all"
-          >
-            Save
-          </button>
+          <DialogButton onClick={onClose}>Cancel</DialogButton>
+          <DialogButton tone="primary" onClick={handleSave}>Save</DialogButton>
         </div>
-      </div>
+      </ModalSurface>
     </div>,
     document.body,
   );

@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useProjectStore } from '@/store/useProjectStore';
+import { DialogButton, ModalCloseButton, ModalSurface } from './ModalPrimitives';
 
 type Action = 'reschedule' | 'keep';
 
@@ -51,7 +52,7 @@ export function ConflictResolutionDialog() {
       <div className="absolute inset-0 bg-black/40" onClick={dismissConflicts} />
 
       {/* Dialog */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-[560px] max-h-[80vh] flex flex-col overflow-hidden">
+      <ModalSurface className="relative w-[560px] max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 shrink-0">
           <div className="flex items-center justify-between">
@@ -61,12 +62,7 @@ export function ConflictResolutionDialog() {
                 Scheduling Conflict{pendingConflicts.length > 1 ? 's' : ''}
               </h2>
             </div>
-            <button
-              onClick={dismissConflicts}
-              className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
-            >
-              <X size={16} />
-            </button>
+            <ModalCloseButton onClick={dismissConflicts} size={16} />
           </div>
           <p className="text-sm text-slate-500 mt-1">
             {pendingConflicts.length === 1
@@ -97,26 +93,20 @@ export function ConflictResolutionDialog() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
+                    <DialogButton
                       onClick={() => setAction(conflict.itemId, 'reschedule')}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                        action === 'reschedule'
-                          ? 'bg-slate-700 text-white'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
+                      tone={action === 'reschedule' ? 'primary' : 'secondary'}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                     >
                       Reschedule
-                    </button>
-                    <button
+                    </DialogButton>
+                    <DialogButton
                       onClick={() => setAction(conflict.itemId, 'keep')}
-                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                        action === 'keep'
-                          ? 'bg-amber-500 text-white'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
+                      tone={action === 'keep' ? 'danger' : 'secondary'}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                     >
                       Keep as-is
-                    </button>
+                    </DialogButton>
                   </div>
                 </div>
               );
@@ -130,40 +120,20 @@ export function ConflictResolutionDialog() {
             {/* Bulk actions */}
             {pendingConflicts.length > 1 && (
               <div className="flex gap-2">
-                <button
-                  onClick={() => setAllActions('reschedule')}
-                  className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors"
-                >
-                  Reschedule All
-                </button>
-                <button
-                  onClick={() => setAllActions('keep')}
-                  className="px-3 py-1.5 rounded-md text-sm font-medium text-amber-600 hover:bg-amber-50 transition-colors"
-                >
-                  Keep All
-                </button>
+                <DialogButton onClick={() => setAllActions('reschedule')} className="px-3 py-1.5 rounded-lg text-sm font-medium">Reschedule All</DialogButton>
+                <DialogButton tone="danger" onClick={() => setAllActions('keep')} className="px-3 py-1.5 rounded-lg text-sm font-medium">Keep All</DialogButton>
               </div>
             )}
             {pendingConflicts.length <= 1 && <div />}
 
             {/* Apply / Cancel */}
             <div className="flex gap-2">
-              <button
-                onClick={dismissConflicts}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleApply}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 transition-colors"
-              >
-                Apply
-              </button>
+              <DialogButton onClick={dismissConflicts}>Cancel</DialogButton>
+              <DialogButton tone="primary" onClick={handleApply}>Apply</DialogButton>
             </div>
           </div>
         </div>
-      </div>
+      </ModalSurface>
     </div>,
     document.body
   );

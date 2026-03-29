@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Eye, EyeOff, Trash2, Search } from 'lucide-react';
 import type { Dependency, DependencyType, LagUnit, ProjectItem } from '@/types';
+import { DialogButton, ModalCloseButton, ModalSurface } from './ModalPrimitives';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -133,7 +134,7 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
+      <ModalSurface className="relative w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
           <div>
@@ -142,12 +143,7 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
               {rowNum}. {item.name}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
-          >
-            <X size={18} />
-          </button>
+          <ModalCloseButton onClick={onClose} />
         </div>
 
         {/* Body */}
@@ -276,22 +272,10 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-200">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 rounded-lg transition-all"
-            style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', border: '1px solid #d9e3ef', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleApply}
-            className="px-4 py-1.5 text-xs font-medium text-white rounded-lg transition-all"
-            style={{ background: 'linear-gradient(180deg, #3c6fd9 0%, #2f5fc7 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }}
-          >
-            Apply
-          </button>
+          <DialogButton onClick={onClose} className="px-3 py-1.5 text-xs font-medium rounded-lg">Cancel</DialogButton>
+          <DialogButton tone="primary" onClick={handleApply} className="px-4 py-1.5 text-xs font-medium rounded-lg">Apply</DialogButton>
         </div>
-      </div>
+      </ModalSurface>
     </div>,
     document.body
   );

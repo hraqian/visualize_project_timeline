@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useProjectStore } from '@/store/useProjectStore';
 import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import type { DependencySchedulingMode, DependencyConflictMode, RescheduledItemChange } from '@/types';
+import { DialogButton, ModalCloseButton, ModalSurface } from './ModalPrimitives';
 
 interface Props {
   onClose: () => void;
@@ -75,7 +76,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
     return createPortal(
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-        <div className="relative bg-white rounded-xl shadow-2xl w-[520px] max-h-[80vh] flex flex-col overflow-hidden">
+        <ModalSurface className="relative w-[520px] max-h-[80vh] flex flex-col overflow-hidden">
           {/* Header */}
           <div className="px-6 py-4 border-b border-slate-200 shrink-0">
             <div className="flex items-center justify-between">
@@ -83,12 +84,7 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                 <CheckCircle2 size={18} className="text-emerald-500" />
                 <h2 className="text-base font-semibold text-slate-800">Rescheduling Complete</h2>
               </div>
-              <button
-                onClick={onClose}
-                className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
-              >
-                <X size={16} />
-              </button>
+              <ModalCloseButton onClick={onClose} size={16} />
             </div>
             <p className="text-sm text-slate-500 mt-1">
               {summaryChanges.length === 0
@@ -131,14 +127,9 @@ export function SchedulingSettingsModal({ onClose }: Props) {
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-slate-200 shrink-0 flex justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 transition-colors"
-            >
-              Done
-            </button>
+            <DialogButton tone="primary" onClick={onClose}>Done</DialogButton>
           </div>
-        </div>
+        </ModalSurface>
       </div>,
       document.body
     );
@@ -151,17 +142,12 @@ export function SchedulingSettingsModal({ onClose }: Props) {
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-[480px] max-h-[80vh] flex flex-col overflow-hidden">
+      <ModalSurface className="relative w-[480px] max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-800">Scheduling Settings</h2>
-            <button
-              onClick={onClose}
-              className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
-            >
-              <X size={16} />
-            </button>
+            <ModalCloseButton onClick={onClose} size={16} />
           </div>
           <p className="text-sm text-slate-500 mt-1">
             Will apply only to your current timeline.
@@ -319,18 +305,8 @@ export function SchedulingSettingsModal({ onClose }: Props) {
                   snapped to their exact required dates.
                 </p>
                 <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={() => setShowStrictWarning(false)}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-amber-100 transition-colors"
-                  >
-                    Go Back
-                  </button>
-                  <button
-                    onClick={doSave}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 transition-colors"
-                  >
-                    Continue
-                  </button>
+                  <DialogButton onClick={() => setShowStrictWarning(false)} className="px-3 py-1.5 rounded-lg text-sm font-medium" style={{ background: 'linear-gradient(180deg, #fffdf7 0%, #fef3c7 100%)', border: '1px solid #fde68a', color: '#92400e', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>Go Back</DialogButton>
+                  <DialogButton tone="primary" onClick={doSave} className="px-3 py-1.5 rounded-lg text-sm font-medium" style={{ background: 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)' }}>Continue</DialogButton>
                 </div>
               </div>
             </div>
@@ -351,21 +327,11 @@ export function SchedulingSettingsModal({ onClose }: Props) {
 
           {/* Buttons */}
           <div className="flex justify-end gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 transition-colors"
-            >
-              Save
-            </button>
+            <DialogButton onClick={onClose}>Cancel</DialogButton>
+            <DialogButton tone="primary" onClick={handleSave}>Save</DialogButton>
           </div>
         </div>
-      </div>
+      </ModalSurface>
     </div>,
     document.body
   );
