@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, Trash2, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, FolderOpen } from 'lucide-react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { listProjects, deleteProjectFile } from '@/utils/fileStorage';
 import type { FileProjectEntry } from '@/utils/fileStorage';
+import { DialogButton, ModalCloseButton, ModalSurface } from './ModalPrimitives';
+import { activeGradient, uiColor } from './uiTokens';
 
 interface Props {
   onClose: () => void;
@@ -19,16 +21,22 @@ export function ProjectManagerModal({ onClose }: Props) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshProjects = useCallback(async () => {
-    setLoading(true);
-    const entries = await listProjects();
-    setProjects(entries);
-    setLoading(false);
-  }, []);
-
   useEffect(() => {
-    refreshProjects();
-  }, [refreshProjects]);
+    let cancelled = false;
+
+    async function loadProjects() {
+      const entries = await listProjects();
+      if (cancelled) return;
+      setProjects(entries);
+      setLoading(false);
+    }
+
+    loadProjects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleNew = () => {
     if (isDirty) {
@@ -56,7 +64,10 @@ export function ProjectManagerModal({ onClose }: Props) {
     if (confirmDeleteId === id) {
       await deleteProjectFile(id);
       setConfirmDeleteId(null);
-      await refreshProjects();
+      setLoading(true);
+      const entries = await listProjects();
+      setProjects(entries);
+      setLoading(false);
       // If we deleted the current project, create a new one
       if (id === currentProjectId) {
         newProject();
@@ -91,36 +102,22 @@ export function ProjectManagerModal({ onClose }: Props) {
       <div className="absolute inset-0 bg-black/40" />
 
       {/* Modal */}
-      <div
-        className="relative w-[520px] max-h-[70vh] flex flex-col rounded-2xl border"
-        style={{
-          background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
-          borderColor: '#d9e3ef',
-          boxShadow: '0 24px 60px rgba(15, 23, 42, 0.18), 0 8px 24px rgba(15, 23, 42, 0.08)',
-        }}
+      <ModalSurface
+        className="relative w-[520px] max-h-[70vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
           <h2 className="text-lg font-semibold text-[var(--color-text)]">Projects</h2>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <ModalCloseButton onClick={onClose} />
         </div>
 
         {/* Actions bar */}
         <div className="px-5 py-3 border-b border-[var(--color-border)] flex items-center gap-2">
-          <button
-            onClick={handleNew}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors"
-            style={{ background: 'linear-gradient(180deg, #3c6fd9 0%, #2f5fc7 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }}
-          >
+          <DialogButton tone="primary" onClick={handleNew} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium">
             <Plus size={14} />
             New Project
-          </button>
+          </DialogButton>
         </div>
 
         {/* Content */}
@@ -142,8 +139,14 @@ export function ProjectManagerModal({ onClose }: Props) {
                   return (
                     <div
                       key={p.id}
-                      className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--color-surface-hover)] transition-colors"
-                      style={isCurrent ? { background: 'linear-gradient(180deg, #eff5ff 0%, #e8f0ff 100%)' } : undefined}
+                      className="flex items-center gap-3 px-5 py-3 transition-colors"
+                      style={isCurrent ? { background: activeGradient() } : undefined}
+                      onMouseEnter={(e) => {
+                        if (!isCurrent) e.currentTarget.style.background = uiColor.hoverSoft;
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isCurrent) e.currentTarget.style.background = 'transparent';
+                      }}
                     >
                       <FolderOpen size={16} className="shrink-0 text-[var(--color-text-muted)]" />
                       <div className="flex-1 min-w-0">
@@ -163,7 +166,14 @@ export function ProjectManagerModal({ onClose }: Props) {
                         {!isCurrent && (
                           <button
                             onClick={() => handleLoad(p.id)}
-                            className="px-2.5 py-1 rounded text-xs font-medium text-[#1e293b] hover:bg-[#1e293b]/10 transition-colors"
+                            className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                            style={{ color: uiColor.text }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(30, 41, 59, 0.08)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                            }}
                           >
                             Open
                           </button>
@@ -191,7 +201,7 @@ export function ProjectManagerModal({ onClose }: Props) {
         <div className="px-5 py-3 border-t border-[var(--color-border)] text-xs text-[var(--color-text-muted)]">
           Projects are saved as .json files in the data/projects folder.
         </div>
-      </div>
+      </ModalSurface>
     </div>,
     document.body
   );

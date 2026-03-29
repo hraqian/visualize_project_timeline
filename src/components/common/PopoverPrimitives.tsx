@@ -1,9 +1,20 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { forwardRef } from 'react';
+import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import { uiColor, uiControlStyles } from './uiTokens';
 
-export function PopoverSurface({ children, style, className }: { children: ReactNode; style?: CSSProperties; className?: string }) {
+type PopoverSurfaceProps = HTMLAttributes<HTMLDivElement> & {
+  children: ReactNode;
+  style?: CSSProperties;
+};
+
+export const PopoverSurface = forwardRef<HTMLDivElement, PopoverSurfaceProps>(function PopoverSurface(
+  { children, style, className, ...props },
+  ref,
+) {
   return (
     <div
+      {...props}
+      ref={ref}
       className={className}
       style={{
         ...uiControlStyles.panel,
@@ -13,7 +24,7 @@ export function PopoverSurface({ children, style, className }: { children: React
       {children}
     </div>
   );
-}
+});
 
 export function MenuRow({
   children,

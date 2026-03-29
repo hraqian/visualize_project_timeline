@@ -7,7 +7,6 @@ import {
   Trash2,
   Info,
   Settings,
-  X,
   Eye,
   EyeOff,
 } from 'lucide-react';
@@ -50,6 +49,7 @@ import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProj
 import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
+import { DialogButton, ModalCloseButton, ModalSurface } from '@/components/common/ModalPrimitives';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -3340,16 +3340,11 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[1100px] mt-12 mx-4 flex flex-col max-h-[calc(100vh-6rem)]">
+      <ModalSurface className="w-full max-w-[1100px] mt-12 mx-4 flex flex-col max-h-[calc(100vh-6rem)] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-5 border-b border-[var(--color-border)]">
           <h2 className="text-lg font-semibold text-[var(--color-text)]">Tier settings</h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors text-[var(--color-text-muted)]"
-          >
-            <X size={18} />
-          </button>
+          <ModalCloseButton onClick={onClose} />
         </div>
 
         {/* Content */}
@@ -3506,22 +3501,19 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-8 py-4 border-t border-[var(--color-border)]">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 rounded-lg text-sm font-medium text-[var(--color-text)] transition-colors border"
-            style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
-          >
+          <DialogButton onClick={onClose} className="px-6 py-2 rounded-lg text-sm font-medium">
             Cancel
-          </button>
-          <button
+          </DialogButton>
+          <DialogButton
+            tone="primary"
             onClick={handleSave}
-            className="px-6 py-2 rounded-lg text-sm font-medium text-white transition-colors"
-            style={{ background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)' }}
+            className="px-6 py-2 rounded-lg text-sm font-medium"
+            style={{ background: 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)' }}
           >
             Save
-          </button>
+          </DialogButton>
         </div>
-      </div>
+      </ModalSurface>
     </div>,
     document.body
   );

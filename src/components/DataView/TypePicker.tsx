@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import type { BarShape, MilestoneIcon, ItemType, TaskStyle, MilestoneStyle } from '@/types';
-import { BAR_SHAPE_LABELS, BAR_SHAPE_OPTIONS, DATA_VIEW_COLOR_SWATCHES, MILESTONE_ICON_OPTIONS } from '@/components/common/pickerOptions';
+import { BAR_SHAPE_OPTIONS, DATA_VIEW_COLOR_SWATCHES, MILESTONE_ICON_OPTIONS } from '@/components/common/pickerOptions';
 import { PopoverSurface } from '@/components/common/PopoverPrimitives';
 import { OptionGridPicker } from '@/components/common/OptionGridPicker';
 import { DataViewColorStrip } from '@/components/common/DataViewColorStrip';
+import { DialogButton } from '@/components/common/ModalPrimitives';
+import { uiColor, uiControlStyles, uiSize } from '@/components/common/uiTokens';
 
 // ─── SVG task bar shape previews ─────────────────────────────────────────────
 
@@ -85,7 +87,16 @@ export function TypePickerCell({ item, onUpdateItem, onUpdateTaskStyle, onUpdate
       {/* Compact cell button */}
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="flex items-center gap-1.5 px-1.5 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)] hover:border-[var(--color-text-muted)] transition-colors cursor-pointer"
+        className="flex items-center transition-colors cursor-pointer"
+        style={{
+          ...uiControlStyles.toolbarButton,
+          height: 28,
+          paddingLeft: 6,
+          paddingRight: 6,
+          gap: 6,
+          lineHeight: uiSize.toolbarLineHeight,
+          color: uiColor.textMuted,
+        }}
       >
         {/* Shape preview */}
         <span className="shrink-0">
@@ -96,9 +107,8 @@ export function TypePickerCell({ item, onUpdateItem, onUpdateTaskStyle, onUpdate
           )}
         </span>
         {/* Type letter */}
-        <span className="text-xs font-medium text-[var(--color-text-secondary)]">{typeLabel}</span>
-        {/* Dropdown arrow */}
-        <ChevronDown size={10} className="text-[var(--color-text-muted)]" />
+        <span className="text-[11px] font-medium text-[var(--color-text-secondary)] leading-none">{typeLabel}</span>
+        <ChevronDown size={10} className="text-[var(--color-text-muted)] shrink-0" />
       </button>
 
       {/* Popover */}
@@ -130,6 +140,7 @@ function TypePickerPopover({ item, onUpdateItem, onUpdateTaskStyle, onUpdateMile
   const selectedBarShape = item.taskStyle.barShape;
   const selectedMilestoneIcon = item.milestoneStyle.icon;
   const activeColor = activeType === 'task' ? item.taskStyle.color : item.milestoneStyle.color;
+  const selectedSwatch = DATA_VIEW_COLOR_SWATCHES.find((swatch) => swatch === activeColor);
 
   const handleSelectType = (type: ItemType) => {
     if (type !== item.type) {
@@ -220,7 +231,7 @@ function TypePickerPopover({ item, onUpdateItem, onUpdateTaskStyle, onUpdateMile
       <div className="p-3 border-b border-[var(--color-border)]">
         <h4 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-2.5">Color</h4>
         <DataViewColorStrip
-          currentColor={DATA_VIEW_COLOR_SWATCHES.includes(activeColor) ? activeColor : undefined}
+          currentColor={selectedSwatch}
           onSelect={handleSelectColor}
           selectedRing
         />
@@ -228,13 +239,9 @@ function TypePickerPopover({ item, onUpdateItem, onUpdateTaskStyle, onUpdateMile
 
       {/* Done button */}
       <div className="p-3 flex justify-center">
-        <button
-          onClick={onClose}
-          className="px-10 py-1.5 rounded-lg border text-sm font-medium text-[var(--color-text-secondary)] transition-colors"
-          style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}
-        >
+        <DialogButton onClick={onClose} className="px-10 py-1.5 text-sm font-medium rounded-lg">
           Done
-        </button>
+        </DialogButton>
       </div>
     </PopoverSurface>
   );
