@@ -285,7 +285,7 @@ export function DataView() {
     }
 
     return null;
-  }, [navigableColumns, flatItemOrder]);
+  }, [navigableColumns, flatItemOrder, isLastInGroup]);
 
   // Create a new task in the appropriate group and focus its title (or specific column)
   const createTaskInGroup = useCallback((swimlaneId: string | null, focusColumn?: CellColumn): void => {
@@ -1183,7 +1183,6 @@ interface SwimlaneGroupProps {
   onItemDragEnd: () => void;
   onItemDragOver: (swimlaneId: string | null, index: number, e: React.DragEvent) => void;
   onItemDrop: (swimlaneId: string | null, index: number) => void;
-  swimlaneIndex: number;
   isDragging: boolean;
   isDropTarget: boolean;
   onDragStart: () => void;
@@ -1207,7 +1206,6 @@ interface SwimlaneGroupProps {
 function SwimlaneGroup({
   swimlane,
   items: swimItems,
-  allItems,
   statusLabels,
   columnVisibility,
   totalColumns,
@@ -1243,7 +1241,6 @@ function SwimlaneGroup({
   onItemDragEnd,
   onItemDragOver,
   onItemDrop,
-  swimlaneIndex,
   isDragging,
   isDropTarget,
   onDragStart,
@@ -1261,16 +1258,14 @@ function SwimlaneGroup({
   onCellEditEnd,
   onCellKeyDown,
 }: SwimlaneGroupProps) {
-  const [editingName, setEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState(swimlane.name);
+  const [editingName, setEditingName] = useState(shouldFocusName);
+  const [nameValue, setNameValue] = useState(() => (shouldFocusName ? swimlane.name : swimlane.name));
 
   useEffect(() => {
     if (shouldFocusName) {
-      setEditingName(true);
-      setNameValue(swimlane.name);
       onClearFocusSwimlane();
     }
-  }, [shouldFocusName, swimlane.name, onClearFocusSwimlane]);
+  }, [shouldFocusName, onClearFocusSwimlane]);
 
   return (
     <>
@@ -1496,7 +1491,6 @@ interface ItemRowProps {
 
 function ItemRow({
   item,
-  allItems,
   statusLabels,
   columnVisibility,
   isSelected,
@@ -1549,6 +1543,7 @@ function ItemRow({
   const startDateRef = useRef<HTMLInputElement>(null);
   const endDateRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const lastEditRequestRef = useRef<string | null>(null);
 
   // Compute the shorthand string for this item's dependencies
   const predecessorsShorthand = useMemo(
@@ -1560,14 +1555,6 @@ function ItemRow({
   const predecessorsWarnings = useMemo(
     () => editingPredecessors ? validateDependencyShorthand(predecessorsValue, item.id, rowNumberMap) : [],
     [editingPredecessors, predecessorsValue, item.id, rowNumberMap]
-  );
-
-  const isEditingLocal = focusedColumn !== null && (
-    (focusedColumn === 'title') || // title is always an input
-    (focusedColumn === 'duration' && editingDuration) ||
-    (focusedColumn === 'percentComplete' && editingProgress) ||
-    (focusedColumn === 'assignedTo' && editingAssigned) ||
-    (focusedColumn === 'predecessors' && editingPredecessors)
   );
 
   // When focusedColumn changes, focus the corresponding td (unless editing)
@@ -1587,22 +1574,29 @@ function ItemRow({
 
   // When focusedColumn changes and editingCellProp is true, enter edit mode for click-to-edit cells
   useEffect(() => {
-    if (focusedColumn && editingCellProp) {
-      if (focusedColumn === 'duration') {
-        setDurationValue(String(duration));
-        setEditingDuration(true);
-      } else if (focusedColumn === 'percentComplete') {
-        setProgressValue(String(item.percentComplete));
-        setEditingProgress(true);
-      } else if (focusedColumn === 'assignedTo') {
-        setAssignedValue(item.assignedTo);
-        setEditingAssigned(true);
-      } else if (focusedColumn === 'predecessors') {
-        setPredecessorsValue(predecessorsShorthand);
-        setEditingPredecessors(true);
-      }
+    const editRequestKey = focusedColumn && editingCellProp ? `${item.id}:${focusedColumn}` : null;
+    if (editRequestKey && editRequestKey !== lastEditRequestRef.current) {
+      lastEditRequestRef.current = editRequestKey;
+      requestAnimationFrame(() => {
+        if (focusedColumn === 'duration') {
+          setDurationValue(String(duration));
+          setEditingDuration(true);
+        } else if (focusedColumn === 'percentComplete') {
+          setProgressValue(String(item.percentComplete));
+          setEditingProgress(true);
+        } else if (focusedColumn === 'assignedTo') {
+          setAssignedValue(item.assignedTo);
+          setEditingAssigned(true);
+        } else if (focusedColumn === 'predecessors') {
+          setPredecessorsValue(predecessorsShorthand);
+          setEditingPredecessors(true);
+        }
+      });
     }
-  }, [focusedColumn, editingCellProp]);
+    if (!editRequestKey) {
+      lastEditRequestRef.current = null;
+    }
+  }, [focusedColumn, editingCellProp, item.id, duration, item.percentComplete, item.assignedTo, predecessorsShorthand]);
 
   // Helper for cell keydown handling
   const handleCellKeyDown = (e: React.KeyboardEvent, column: CellColumn, isEditing: boolean) => {
@@ -2205,7 +2199,6 @@ function ItemRow({
 // ─── Row More Menu ───────────────────────────────────────────────────────────
 
 function RowMoreMenu({
-  itemId,
   isVisible,
   onAddAbove,
   onAddBelow,
@@ -2213,7 +2206,6 @@ function RowMoreMenu({
   onToggleVisibility,
   onDelete,
 }: {
-  itemId: string;
   isVisible: boolean;
   onAddAbove: () => void;
   onAddBelow: () => void;

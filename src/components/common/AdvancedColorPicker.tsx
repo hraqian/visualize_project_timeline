@@ -194,6 +194,7 @@ export function AdvancedColorPicker({ value, onChange, triggerSize = 'default' }
           }}
         >
           <PopoverContent
+            key={value}
             value={value}
             onChange={(c) => {
               onChange(c);
@@ -224,14 +225,6 @@ function PopoverContent({
 
   // Hex input
   const [hexInput, setHexInput] = useState(value);
-
-  // Sync hex input when value changes externally
-  useEffect(() => {
-    setHexInput(value);
-    const newRgb = hexToRgb(value);
-    setRgb(newRgb);
-    setHsv(rgbToHsv(...newRgb));
-  }, [value]);
 
   const applyColor = useCallback(
     (hex: string) => {

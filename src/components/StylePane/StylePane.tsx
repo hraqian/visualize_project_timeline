@@ -3,8 +3,6 @@ import {
   Paintbrush,
   ChevronRight,
   ChevronDown,
-  ChevronUp,
-  Trash2,
   Info,
   Settings,
   Eye,
@@ -12,7 +10,7 @@ import {
 } from 'lucide-react';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { AdvancedColorPicker } from '@/components/common/AdvancedColorPicker';
-import { ShapeDropdown, ShapePreview, getShapeStyle } from '@/components/common/ShapeDropdown';
+import { ShapeDropdown, ShapePreview } from '@/components/common/ShapeDropdown';
 import { SizeControl } from '@/components/common/SizeControl';
 import { SpacingControl } from '@/components/common/SpacingControl';
 import { NumericStepper } from '@/components/common/NumericStepper';
@@ -22,11 +20,9 @@ import { DurationFormatDropdown } from '@/components/common/DurationFormatDropdo
 import { ToggleSwitch } from '@/components/common/ToggleSwitch';
 import { PopoverSurface } from '@/components/common/PopoverPrimitives';
 import { OptionGridPicker } from '@/components/common/OptionGridPicker';
-import { BAR_SHAPE_OPTIONS, MILESTONE_ICON_OPTIONS } from '@/components/common/pickerOptions';
+import { MILESTONE_ICON_OPTIONS } from '@/components/common/pickerOptions';
 import {
   FONT_FAMILIES,
-  FONT_WEIGHTS,
-  type BarShape,
   type LabelPosition,
   type MilestoneIcon,
   type ConnectorThickness,
@@ -35,18 +31,14 @@ import {
   type TimescaleTierConfig,
   type TimescaleBarShape,
   type TierFormat,
-  type TodayMarkerPosition,
   type ElapsedTimeThickness,
   type EndCapConfig,
   type TaskLayout,
-  type DependencySchedulingMode,
-  type DependencyConflictMode,
 } from '@/types';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, differenceInDays, format } from 'date-fns';
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
-import { getGlobalSettings, saveGlobalSettings } from '@/utils/storage';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 import { DialogButton, ModalCloseButton, ModalSurface } from '@/components/common/ModalPrimitives';
@@ -169,37 +161,20 @@ export function StylePane() {
   const swimlanes = useProjectStore((s) => s.swimlanes);
   const updateTaskStyle = useProjectStore((s) => s.updateTaskStyle);
   const updateMilestoneStyle = useProjectStore((s) => s.updateMilestoneStyle);
-  const deleteItem = useProjectStore((s) => s.deleteItem);
   const updateSwimlane = useProjectStore((s) => s.updateSwimlane);
   const timescale = useProjectStore((s) => s.timescale);
   const updateTimescale = useProjectStore((s) => s.updateTimescale);
-  const updateTier = useProjectStore((s) => s.updateTier);
   const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
   const taskLayout = useProjectStore((s) => s.taskLayout);
   const setTaskLayout = useProjectStore((s) => s.setTaskLayout);
 
   const [mainTab, setMainTab] = useState<MainTab>('items');
 
-  // Auto-switch tab when a section is activated (e.g. clicking tier row or task bar)
   const timescaleSections = ['scale', 'todayMarker', 'elapsedTime', 'leftEndCap', 'rightEndCap'];
-  useEffect(() => {
-    if (selectedDepKey) {
-      setMainTab('items');
-      return;
-    }
-
-    if (stylePaneSection) {
-      if (timescaleSections.includes(stylePaneSection)) {
-        setMainTab('timescale');
-      } else {
-        setMainTab('items');
-      }
-    }
-  }, [stylePaneSection, selectedItemId, selectedSwimlaneId, selectedDepKey]);
-
-
-
   const item = items.find((i) => i.id === selectedItemId);
+  const autoMainTab: MainTab = stylePaneSection
+    ? (timescaleSections as string[]).includes(stylePaneSection) ? 'timescale' : 'items'
+    : mainTab;
 
   // Determine which sub-tab to show based on selection
   const autoSubTab: ItemSubTab = selectedDepKey
@@ -211,11 +186,6 @@ export function StylePane() {
         : 'task';
   const [forcedSubTab, setForcedSubTab] = useState<ItemSubTab | null>(null);
   const activeSubTab = forcedSubTab ?? autoSubTab;
-
-  // When selection changes, reset forced sub-tab
-  useEffect(() => {
-    setForcedSubTab(null);
-  }, [selectedItemId, selectedSwimlaneId, selectedDepKey]);
 
   const handleSubTabClick = (tab: ItemSubTab) => {
     setForcedSubTab(tab === autoSubTab ? null : tab);
@@ -238,7 +208,7 @@ export function StylePane() {
             <button
               onClick={() => setMainTab('items')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                mainTab === 'items'
+                autoMainTab === 'items'
                   ? 'bg-slate-700/15 text-slate-800'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
               }`}
@@ -248,7 +218,7 @@ export function StylePane() {
             <button
               onClick={() => setMainTab('timescale')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                mainTab === 'timescale'
+                autoMainTab === 'timescale'
                   ? 'bg-slate-700/15 text-slate-800'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
               }`}
@@ -258,7 +228,7 @@ export function StylePane() {
             <button
               onClick={() => setMainTab('design')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                mainTab === 'design'
+                autoMainTab === 'design'
                   ? 'bg-slate-700/15 text-slate-800'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
               }`}
@@ -269,7 +239,7 @@ export function StylePane() {
         </div>
 
         {/* Sub-icons for Items tab */}
-        {mainTab === 'items' && (
+        {autoMainTab === 'items' && (
           <div className="flex items-center gap-4 px-3 pb-2">
             <button
               onClick={() => handleSubTabClick('task')}
@@ -321,21 +291,19 @@ export function StylePane() {
 
       {/* ─── Content ─── */}
       <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-5">
-        {mainTab === 'items' ? (
+        {autoMainTab === 'items' ? (
           <ItemsTabContent
             item={item}
             activeSubTab={activeSubTab}
             selectedSwimlane={selectedSwimlane}
             updateTaskStyle={updateTaskStyle}
             updateMilestoneStyle={updateMilestoneStyle}
-            deleteItem={deleteItem}
             updateSwimlane={updateSwimlane}
           />
-        ) : mainTab === 'timescale' ? (
+        ) : autoMainTab === 'timescale' ? (
           <TimescaleTabContent
             timescale={timescale}
             updateTimescale={updateTimescale}
-            updateTier={updateTier}
           />
         ) : (
           <DesignTabContent
@@ -356,7 +324,6 @@ function ItemsTabContent({
   selectedSwimlane,
   updateTaskStyle,
   updateMilestoneStyle,
-  deleteItem,
   updateSwimlane,
 }: {
   item: ReturnType<typeof useProjectStore.getState>['items'][number] | undefined;
@@ -364,7 +331,6 @@ function ItemsTabContent({
   selectedSwimlane: ReturnType<typeof useProjectStore.getState>['swimlanes'][number] | undefined;
   updateTaskStyle: ReturnType<typeof useProjectStore.getState>['updateTaskStyle'];
   updateMilestoneStyle: ReturnType<typeof useProjectStore.getState>['updateMilestoneStyle'];
-  deleteItem: ReturnType<typeof useProjectStore.getState>['deleteItem'];
   updateSwimlane: ReturnType<typeof useProjectStore.getState>['updateSwimlane'];
 }) {
   // Dependency tab always shows, regardless of item selection
@@ -1184,27 +1150,6 @@ function DependencyArrowPreview({ size }: { size: number }) {
   );
 }
 
-// ─── Item Header ─────────────────────────────────────────────────────────────
-
-function ItemHeader({ item, onDelete }: { item: { name: string; type: string }; onDelete: () => void }) {
-  return (
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mb-0.5">
-          {item.type === 'task' ? 'Task Style' : 'Milestone Style'}
-        </div>
-        <div className="font-medium text-sm text-[var(--color-text)]">{item.name}</div>
-      </div>
-      <button
-        onClick={onDelete}
-        className="p-1.5 rounded hover:bg-red-500/10 text-[var(--color-text-muted)] hover:text-red-500 transition-all"
-      >
-        <Trash2 size={14} />
-      </button>
-    </div>
-  );
-}
-
 // ─── Collapsible Section Row ─────────────────────────────────────────────────
 
 function CollapsibleRow({
@@ -1260,8 +1205,8 @@ function TaskStyleControls({
   const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
 
-  const handleToggleExpand = (key: string) => {
-    setStylePaneSection(stylePaneSection === key ? null : key as any);
+  const handleToggleExpand = (key: StylePaneSection) => {
+    setStylePaneSection(stylePaneSection === key ? null : key);
   };
 
   const style = item.taskStyle;
@@ -2081,8 +2026,8 @@ function MilestoneStyleControls({
   const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
 
-  const handleToggleExpand = (key: string) => {
-    setStylePaneSection(stylePaneSection === key ? null : key as any);
+  const handleToggleExpand = (key: StylePaneSection) => {
+    setStylePaneSection(stylePaneSection === key ? null : key);
   };
 
   const style = item.milestoneStyle;
@@ -2442,8 +2387,8 @@ function SwimlaneStyleControls({
   const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
 
-  const handleToggleExpand = (key: string) => {
-    setStylePaneSection(stylePaneSection === key ? null : key as any);
+  const handleToggleExpand = (key: StylePaneSection) => {
+    setStylePaneSection(stylePaneSection === key ? null : key);
   };
 
   return (
@@ -2602,18 +2547,16 @@ function SwimlaneStyleControls({
 function TimescaleTabContent({
   timescale,
   updateTimescale,
-  updateTier,
 }: {
   timescale: ReturnType<typeof useProjectStore.getState>['timescale'];
   updateTimescale: ReturnType<typeof useProjectStore.getState>['updateTimescale'];
-  updateTier: ReturnType<typeof useProjectStore.getState>['updateTier'];
 }) {
   const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
   const [tierSettingsOpen, setTierSettingsOpen] = useState(false);
 
-  const handleToggleExpand = (key: string) => {
-    setStylePaneSection(stylePaneSection === key ? null : key as any);
+  const handleToggleExpand = (key: StylePaneSection) => {
+    setStylePaneSection(stylePaneSection === key ? null : key);
   };
 
   return (
