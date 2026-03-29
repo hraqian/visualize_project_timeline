@@ -14,6 +14,7 @@ import {
   isBefore,
   isAfter,
 } from 'date-fns';
+import { uiControlStyles } from '@/components/common/uiTokens';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -369,10 +370,7 @@ export function DatePickerPopover({
         top: popoverTop,
         left: popoverLeft,
         width: popoverWidth,
-        background: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 8,
-        boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+        ...uiControlStyles.panel,
         zIndex: 9999,
         fontFamily: 'system-ui, -apple-system, sans-serif',
         userSelect: 'none',

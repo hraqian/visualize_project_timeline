@@ -28,21 +28,8 @@ import type { ItemType, StatusLabel, TaskStyle, MilestoneStyle, OptionalColumn, 
 import { PRESET_COLORS } from '@/types';
 import { buildRowNumberMap, formatItemDependencies, parseDependencyShorthand, shorthandToDependencies, validateDependencyShorthand } from '@/utils';
 import { DependencyEditorModal } from '@/components/common/DependencyEditorModal';
-
-// ─── Color swatches (matches TypePicker) ─────────────────────────────────────
-
-const COLOR_SWATCHES = [
-  '#22c55e', // green
-  '#ef4444', // red
-  '#2563eb', // blue
-  '#334155', // slate-700
-  '#f8b878', // peach/sand
-  '#000000', // black
-  '#f8fafc', // white-ish
-  '#93a5cf', // blue-gray
-  '#475569', // slate-600
-  '#6b7040', // olive
-];
+import { ToggleSwitch } from '@/components/common/ToggleSwitch';
+import { DataViewColorStrip } from '@/components/common/DataViewColorStrip';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -851,28 +838,7 @@ function ColorPickerButton({ onSetColor }: { onSetColor: (color: string) => void
 
       {open && (
         <div className="absolute left-0 top-full mt-1 rounded-xl p-2.5 z-40" style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}>
-          <div className="flex items-center gap-1.5">
-            {/* Paint bucket icon placeholder */}
-            <div className="w-7 h-7 rounded-lg border flex items-center justify-center" style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}>
-              <Paintbrush size={14} className="text-slate-700" />
-            </div>
-            <div className="w-px h-6 mx-0.5" style={{ background: '#d9e3ef' }} />
-            {COLOR_SWATCHES.map((swatch, i) => {
-              const isLight = ['#f8fafc', '#ffffff', '#fff'].includes(swatch.toLowerCase());
-              return (
-                <button
-                  key={`${swatch}-${i}`}
-                  onClick={() => {
-                    onSetColor(swatch);
-                    setOpen(false);
-                  }}
-                  className={`w-7 h-7 rounded-md hover:scale-110 transition-all ${isLight ? 'border border-slate-200' : ''}`}
-                  style={{ backgroundColor: swatch }}
-                  title={swatch}
-                />
-              );
-            })}
-          </div>
+          <DataViewColorStrip onSelect={(swatch) => { onSetColor(swatch); setOpen(false); }} />
         </div>
       )}
     </div>
@@ -922,29 +888,11 @@ function ColumnConfigButton({
               className="w-full flex items-center justify-between px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 transition-colors"
             >
               <span>{OPTIONAL_COLUMN_LABELS[col]}</span>
-              <ToggleSwitch on={columnVisibility[col]} />
+              <ToggleSwitch checked={columnVisibility[col]} />
             </button>
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── Toggle Switch ───────────────────────────────────────────────────────────
-
-function ToggleSwitch({ on }: { on: boolean }) {
-  return (
-    <div
-      className={`relative w-8 h-[18px] rounded-full transition-colors ${
-        on ? 'bg-green-500' : 'bg-slate-200'
-      }`}
-    >
-      <div
-        className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${
-          on ? 'translate-x-[14px]' : 'translate-x-0.5'
-        }`}
-      />
     </div>
   );
 }
@@ -2459,31 +2407,7 @@ function SwimlaneColorPicker({
           style={{ background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)', border: '1px solid #d9e3ef', boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)' }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center gap-1.5">
-            {/* Paint bucket icon */}
-            <div className="w-7 h-7 rounded-lg border flex items-center justify-center shrink-0" style={{ borderColor: '#d9e3ef', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}>
-              <Paintbrush size={14} className="text-slate-700" />
-            </div>
-            <div className="w-px h-6 mx-0.5 shrink-0" style={{ background: '#d9e3ef' }} />
-            {COLOR_SWATCHES.map((swatch, i) => {
-              const isLight = ['#f8fafc', '#ffffff', '#fff'].includes(swatch.toLowerCase());
-              const isSelected = swatch === currentColor;
-              return (
-                <button
-                  key={`${swatch}-${i}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onChange(swatch);
-                  }}
-                  className={`w-7 h-7 rounded-md shrink-0 hover:scale-110 transition-all ${
-                    isSelected ? 'ring-2 ring-[#4b83e6] ring-offset-1' : ''
-                  } ${isLight ? 'border border-slate-200' : ''}`}
-                  style={{ backgroundColor: swatch }}
-                  title={swatch}
-                />
-              );
-            })}
-          </div>
+          <DataViewColorStrip currentColor={currentColor} selectedRing onSelect={onChange} />
         </div>
       )}
     </div>

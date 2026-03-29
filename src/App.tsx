@@ -8,6 +8,10 @@ import { ProjectManagerModal } from '@/components/common/ProjectManagerModal';
 import { SettingsModal } from '@/components/common/SettingsModal';
 import { ConflictResolutionDialog } from '@/components/common/ConflictResolutionDialog';
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
+import { ToolbarButton, ToolbarIconButton, ToolbarSplitButton } from '@/components/common/ToolbarPrimitives';
+import { PopoverSurface, MenuRow } from '@/components/common/PopoverPrimitives';
+import { ToggleSwitch } from '@/components/common/ToggleSwitch';
+import { toolbarContentStyle } from '@/components/common/ToolbarPrimitives';
 import { toPng } from 'html-to-image';
 import { exportNativePptx } from '@/utils/exportPptx';
 import {
@@ -241,27 +245,30 @@ function App() {
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {isTimeline ? (
             <>
-              <button
+              <ToolbarButton
                 onClick={handleAddTask}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
+                className="flex items-center rounded-lg border transition-all"
+                style={toolbarContentStyle()}
+                icon={<Plus size={14} />}
               >
-                <Plus size={14} />
                 Task
-              </button>
-              <button
+              </ToolbarButton>
+              <ToolbarButton
                 onClick={handleAddMilestone}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
+                className="flex items-center rounded-lg border transition-all"
+                style={toolbarContentStyle()}
+                icon={<Plus size={14} />}
               >
-                <Plus size={14} />
                 Milestone
-              </button>
-              <button
+              </ToolbarButton>
+              <ToolbarButton
                 onClick={handleAddSwimlane}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all"
+                className="flex items-center rounded-lg border transition-all"
+                style={toolbarContentStyle()}
+                icon={<Plus size={14} />}
               >
-                <Plus size={14} />
                 Swimlane
-              </button>
+              </ToolbarButton>
               {/* Dep link actions — always visible, disabled when no dep selected */}
               {(() => {
                 const selectedDep = selectedDepKey ? dependencies.find((d) => `${d.fromId}-${d.toId}` === selectedDepKey) : null;
@@ -269,22 +276,19 @@ function App() {
                 return (
                   <>
                     <div className="w-px h-6 bg-[var(--color-border)] mx-1" />
-                    <button
+                    <ToolbarButton
                       disabled={!selectedDepKey}
                       onClick={() => {
                         if (selectedDep) {
                           updateDependency(selectedDep.fromId, selectedDep.toId, { visible: isHidden ? true : false });
                         }
                       }}
-                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--color-border)] transition-all ${
-                        selectedDepKey
-                          ? 'text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] cursor-pointer'
-                          : 'text-[var(--color-text-muted)] cursor-default'
-                      }`}
+                      className="flex items-center rounded-lg border transition-all"
+                      style={toolbarContentStyle()}
+                      icon={isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
                     >
-                      {isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
                       {isHidden ? 'Show' : 'Hide'}
-                    </button>
+                    </ToolbarButton>
                     <ConnectionPointButton
                       fromPoint={selectedDep?.fromPoint ?? 'auto'}
                       toPoint={selectedDep?.toPoint ?? 'auto'}
@@ -295,7 +299,7 @@ function App() {
                         }
                       }}
                     />
-                    <button
+                    <ToolbarButton
                       disabled={!selectedDepKey}
                       onClick={() => {
                         if (selectedDep) {
@@ -303,15 +307,13 @@ function App() {
                           setSelectedDepKey(null);
                         }
                       }}
-                      className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium border border-[var(--color-border)] transition-all ${
-                        selectedDepKey
-                          ? 'text-[var(--color-danger)] hover:bg-red-50 cursor-pointer'
-                          : 'text-[var(--color-text-muted)] cursor-default'
-                      }`}
+                      className="flex items-center rounded-lg border transition-all"
+                      style={toolbarContentStyle()}
+                      icon={<Trash2 size={14} />}
+                      destructive={selectedDepKey}
                     >
-                      <Trash2 size={14} />
                       Delete
-                    </button>
+                    </ToolbarButton>
                   </>
                 );
               })()}
@@ -355,13 +357,15 @@ function App() {
 
         {/* Right: Projects + Dependencies + Export + Settings */}
         <div className="flex items-center gap-2 flex-1 justify-end">
-          <button
+          <ToolbarButton
             onClick={() => setShowProjectManager(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
+            className="flex items-center rounded-lg border transition-all"
+            style={toolbarContentStyle()}
+            icon={<FolderOpen size={14} />}
+            tone="secondary"
           >
-            <FolderOpen size={14} />
             Projects
-          </button>
+          </ToolbarButton>
           {isTimeline && (
             <DependenciesDropdown
               showDependencies={showDependencies}
@@ -374,12 +378,11 @@ function App() {
             onExportPNG={exportPNG}
             onExportPPTX={exportPPTX}
           />
-          <button
+          <ToolbarIconButton
             onClick={() => setShowSettingsModal(true)}
-            className="p-1.5 rounded-md text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)] transition-all"
           >
             <Settings size={16} />
-          </button>
+          </ToolbarIconButton>
         </div>
       </div>
 
@@ -430,35 +433,31 @@ function ExportButton({
 
   return (
     <div className="relative" ref={ref}>
-      <button
+      <ToolbarSplitButton
         onClick={() => !disabled && setOpen(!open)}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
-          disabled
-            ? 'text-[var(--color-text-secondary)]/40 border-[var(--color-border)]/40 cursor-not-allowed'
-            : 'text-[var(--color-text-secondary)] border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
-        }`}
+        disabled={disabled}
+        icon={<Download size={14} />}
+        chevron={<ChevronDown size={12} />}
       >
-        <Download size={14} />
         Export
-        <ChevronDown size={12} />
-      </button>
+      </ToolbarSplitButton>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 min-w-[180px]">
+        <PopoverSurface className="absolute right-0 top-full mt-1 py-1.5 z-30 min-w-[180px]">
           <button
             onClick={() => { onExportPNG(); setOpen(false); }}
-            className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-2"
+            className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-[#f7fafc] transition-colors flex items-center gap-2"
           >
             <Image size={14} />
             Export as PNG
           </button>
           <button
             onClick={() => { onExportPPTX(); setOpen(false); }}
-            className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-2"
+            className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-[#f7fafc] transition-colors flex items-center gap-2"
           >
             <Presentation size={14} />
             Export as PowerPoint
           </button>
-        </div>
+        </PopoverSurface>
       )}
     </div>
   );
@@ -488,27 +487,21 @@ function DependenciesDropdown({
 
   return (
     <div className="relative" ref={ref}>
-      <button
+      <ToolbarSplitButton
         onClick={() => setOpen(!open)}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-all ${
-          showDependencies
-            ? 'text-[#1e293b] border-[#1e293b]/30 bg-slate-50 hover:bg-slate-100'
-            : 'text-[var(--color-text-secondary)] border-[var(--color-border)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
-        }`}
+        icon={<Link2 size={14} />}
+        chevron={<ChevronDown size={12} />}
+        active={showDependencies}
       >
-        <Link2 size={14} />
         Dependencies
-        <ChevronDown size={12} />
-      </button>
+      </ToolbarSplitButton>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 z-30 min-w-[280px]">
+        <PopoverSurface className="absolute right-0 top-full mt-1 py-1 z-30 min-w-[280px]">
           {/* Critical Path toggle */}
-          <button
-            className="w-full text-left px-3 py-2 text-sm text-slate-400 cursor-not-allowed flex items-center justify-between"
-          >
+          <MenuRow className="w-full text-left px-3 py-2 text-sm text-slate-400 cursor-not-allowed flex items-center justify-between" disabled>
             <span>Critical path</span>
-            <DepToggleSwitch on={showCriticalPath} disabled />
-          </button>
+            <ToggleSwitch checked={showCriticalPath} disabled />
+          </MenuRow>
 
           {/* Separator */}
           <div className="h-px bg-slate-100 mx-2 my-1" />
@@ -516,36 +509,18 @@ function DependenciesDropdown({
           {/* Dependencies toggle */}
           <button
             onClick={() => { onToggleDependencies(); setOpen(false); }}
-            className="w-full text-left px-3 py-2 hover:bg-slate-50 transition-colors"
+            className="w-full text-left px-3 py-2 hover:bg-[#f7fafc] transition-colors"
           >
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-700 font-medium">Dependencies</span>
-              <DepToggleSwitch on={showDependencies} />
+              <ToggleSwitch checked={showDependencies} />
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
               Enable or disable the dependency functionality for this timeline.
             </p>
           </button>
-        </div>
+        </PopoverSurface>
       )}
-    </div>
-  );
-}
-
-// ─── Toggle Switch (for Dependencies dropdown) ──────────────────────────────
-
-function DepToggleSwitch({ on, disabled }: { on: boolean; disabled?: boolean }) {
-  return (
-    <div
-      className={`relative w-8 h-[18px] rounded-full transition-colors shrink-0 ${
-        disabled ? 'opacity-40' : ''
-      } ${on ? 'bg-green-500' : 'bg-slate-200'}`}
-    >
-      <div
-        className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${
-          on ? 'translate-x-[14px]' : 'translate-x-0.5'
-        }`}
-      />
     </div>
   );
 }

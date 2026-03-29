@@ -1,4 +1,4 @@
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { NumericStepper } from './NumericStepper';
 
 // ─── SizeControl ─────────────────────────────────────────────────────────────
 
@@ -51,35 +51,25 @@ export function SizeControl({
       </div>
 
       {/* Numeric stepper */}
-      <div className="flex items-center rounded-lg overflow-hidden border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={value}
-          onChange={(e) => {
-            const v = parseInt(e.target.value);
-            if (!isNaN(v)) onChange(Math.max(min, Math.min(max, v)));
-          }}
-          className="w-10 px-1.5 py-1 text-xs text-center text-[var(--color-text)] bg-transparent outline-none font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-        />
-        <div className="flex flex-col border-l" style={{ borderColor: '#d7e0ea' }}>
-          <button
-            onClick={() => onChange(Math.min(max, value + step))}
-            className="px-1 py-0 hover:bg-[#f7fafc] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
-          >
-            <ChevronUp size={10} />
-          </button>
-          <button
-            onClick={() => onChange(Math.max(min, value - step))}
-            className="px-1 py-0 hover:bg-[#f7fafc] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors border-t"
-            style={{ borderColor: '#d7e0ea' }}
-          >
-            <ChevronDown size={10} />
-          </button>
-        </div>
-      </div>
+      <NumericStepper
+        input={(
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={value}
+            onChange={(e) => {
+              const v = parseInt(e.target.value);
+              if (!isNaN(v)) onChange(Math.max(min, Math.min(max, v)));
+            }}
+            className="w-10 px-1.5 py-1 text-xs text-center text-[var(--color-text)] bg-transparent outline-none font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        )}
+        valueDisplay={null}
+        onIncrement={() => onChange(Math.min(max, value + step))}
+        onDecrement={() => onChange(Math.max(min, value - step))}
+      />
 
       <span className="text-[10px] text-[var(--color-text-muted)]">px</span>
     </div>

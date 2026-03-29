@@ -16,9 +16,14 @@ import { AdvancedColorPicker } from '@/components/common/AdvancedColorPicker';
 import { ShapeDropdown, ShapePreview, getShapeStyle } from '@/components/common/ShapeDropdown';
 import { SizeControl } from '@/components/common/SizeControl';
 import { SpacingControl } from '@/components/common/SpacingControl';
+import { NumericStepper } from '@/components/common/NumericStepper';
 import { FontFamilyDropdown, FontSizeDropdown } from '@/components/common/FontDropdowns';
 import { DateFormatDropdown } from '@/components/common/DateFormatDropdown';
 import { DurationFormatDropdown } from '@/components/common/DurationFormatDropdown';
+import { ToggleSwitch } from '@/components/common/ToggleSwitch';
+import { PopoverSurface } from '@/components/common/PopoverPrimitives';
+import { OptionGridPicker } from '@/components/common/OptionGridPicker';
+import { BAR_SHAPE_OPTIONS, MILESTONE_ICON_OPTIONS } from '@/components/common/pickerOptions';
 import {
   FONT_FAMILIES,
   FONT_WEIGHTS,
@@ -100,39 +105,6 @@ function getTimescaleBarShapeStyle(shape: TimescaleBarShape): React.CSSPropertie
     default: return {};
   }
 }
-
-const MILESTONE_ICONS: { id: MilestoneIcon; label: string }[] = [
-  { id: 'flag', label: 'Flag' },
-  { id: 'triangle-down', label: 'Triangle down' },
-  { id: 'diamond-filled', label: 'Diamond' },
-  { id: 'star', label: 'Star 5 point' },
-  { id: 'star-6pt', label: 'Star 6 point' },
-  { id: 'arrow-up', label: 'Arrow up' },
-  { id: 'arrow-down', label: 'Arrow down' },
-  { id: 'square-ms', label: 'Square outline' },
-  { id: 'square-ms-filled', label: 'Square filled' },
-  { id: 'hexagon', label: 'Hexagon' },
-  { id: 'chevron-right', label: 'Chevron right' },
-  { id: 'triangle', label: 'Triangle up' },
-  { id: 'plus', label: 'Plus' },
-  { id: 'circle-half', label: 'Half circle' },
-  { id: 'circle-filled', label: 'Circle filled' },
-  { id: 'pentagon', label: 'Pentagon' },
-  { id: 'diamond', label: 'Diamond outline' },
-  { id: 'heart', label: 'Heart' },
-];
-
-const BAR_SHAPES: { id: BarShape; label: string }[] = [
-  { id: 'square', label: 'Rectangle' },
-  { id: 'rounded', label: 'Round rectangle' },
-  { id: 'capsule', label: 'Ellipse' },
-  { id: 'chevron', label: 'Pentagon' },
-  { id: 'double-chevron', label: 'Chevron' },
-  { id: 'arrow-right', label: 'Right arrow' },
-  { id: 'pointed', label: 'Double arrow' },
-  { id: 'arrow-both', label: 'Modern' },
-  { id: 'notched', label: 'Leaf' },
-];
 
 const LABEL_POSITIONS: { id: LabelPosition; label: string }[] = [
   { id: 'far-left', label: 'Far Left' },
@@ -848,28 +820,14 @@ function DependencyLineWidthControl({
   };
 
   return (
-    <div className="flex items-center rounded-lg overflow-hidden border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
-      <div className="px-3 min-w-[82px] h-9 flex items-center justify-center text-xs text-[var(--color-text)] tabular-nums">
-        {formatValue(clamped)}
-      </div>
-      <div className="flex flex-col border-l" style={{ borderColor: '#d7e0ea' }}>
-        <button
-          onClick={() => onChange(Math.min(8, Math.round((clamped + step) * 100) / 100))}
-          className="px-1.5 h-[18px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center"
-          title="Increase line width"
-        >
-          <ChevronRight size={10} className="-rotate-90" />
-        </button>
-        <button
-          onClick={() => onChange(Math.max(0.5, Math.round((clamped - step) * 100) / 100))}
-          className="px-1.5 h-[18px] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center border-t"
-          style={{ borderColor: '#d7e0ea' }}
-          title="Decrease line width"
-        >
-          <ChevronRight size={10} className="rotate-90" />
-        </button>
-      </div>
-    </div>
+    <NumericStepper
+      axis="horizontal"
+      valueDisplay={<div className="px-3 min-w-[82px] h-9 flex items-center justify-center text-xs text-[var(--color-text)] tabular-nums">{formatValue(clamped)}</div>}
+      onIncrement={() => onChange(Math.min(8, Math.round((clamped + step) * 100) / 100))}
+      onDecrement={() => onChange(Math.max(0.5, Math.round((clamped - step) * 100) / 100))}
+      incrementTitle="Increase line width"
+      decrementTitle="Decrease line width"
+    />
   );
 }
 
@@ -1130,28 +1088,6 @@ function ItemHeader({ item, onDelete }: { item: { name: string; type: string }; 
   );
 }
 
-// ─── Toggle Switch ───────────────────────────────────────────────────────────
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-        checked ? 'bg-green-500' : 'bg-slate-300'
-      }`}
-    >
-      <span
-        className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
-        }`}
-      />
-    </button>
-  );
-}
-
 // ─── Collapsible Section Row ─────────────────────────────────────────────────
 
 function CollapsibleRow({
@@ -1181,7 +1117,7 @@ function CollapsibleRow({
           {label}
         </button>
         {toggle && (
-          <Toggle checked={toggle.checked} onChange={toggle.onChange} />
+          <ToggleSwitch checked={toggle.checked} onChange={toggle.onChange} />
         )}
       </div>
       {expanded && children && (
@@ -1988,7 +1924,7 @@ function MilestoneShapeDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  const selectedIcon = MILESTONE_ICONS.find((i) => i.id === value);
+  const selectedIcon = MILESTONE_ICON_OPTIONS.find((i) => i.id === value);
 
   return (
     <div className="relative">
@@ -2004,7 +1940,7 @@ function MilestoneShapeDropdown({
       </button>
 
       {open && createPortal(
-        <div
+        <PopoverSurface
           ref={popoverRef}
           style={{
             position: 'fixed',
@@ -2012,38 +1948,20 @@ function MilestoneShapeDropdown({
             left: pos.left,
             transform: 'translateX(-100%)',
             zIndex: 9999,
-            background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
-            border: '1px solid #d9e3ef',
-            borderRadius: 12,
-            boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)',
             padding: 10,
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
-            {MILESTONE_ICONS.map((ic) => (
-              <button
-                key={ic.id}
-                onClick={() => { onChange(ic.id); setOpen(false); }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  border: value === ic.id ? '1px solid #c7d8f8' : '1px solid transparent',
-                  cursor: 'pointer',
-                  background: value === ic.id ? 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' : 'transparent',
-                }}
-                title={ic.label}
-                onMouseEnter={(e) => { if (value !== ic.id) e.currentTarget.style.background = '#f7fafc'; }}
-                onMouseLeave={(e) => { if (value !== ic.id) e.currentTarget.style.background = 'transparent'; }}
-              >
-                <MilestoneIconComponent icon={ic.id} size={18} color={value === ic.id ? '#1e293b' : '#475569'} />
-              </button>
-            ))}
-          </div>
-        </div>,
+          <OptionGridPicker
+            options={MILESTONE_ICON_OPTIONS}
+            value={value}
+            onSelect={(next) => { onChange(next); setOpen(false); }}
+            columns={6}
+            tileSize={36}
+            renderOption={(ic, selected) => (
+              <MilestoneIconComponent icon={ic.id} size={18} color={selected ? '#1e293b' : '#475569'} />
+            )}
+          />
+        </PopoverSurface>,
         document.body,
       )}
     </div>
@@ -2129,31 +2047,23 @@ function MilestoneStyleControls({
                    {p.label}
                  </button>
                ))}
-              <div className="flex items-center rounded-lg overflow-hidden ml-1 border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
-                <input
-                  type="number"
-                  min={8}
-                  max={48}
-                  value={style.size}
-                  onChange={(e) => updateMilestoneStyle(item.id, { size: Math.max(8, Math.min(48, parseInt(e.target.value) || 8)) })}
-                  className="w-12 h-9 text-center text-sm text-[var(--color-text)] bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-                <div className="flex flex-col border-l" style={{ borderColor: '#d7e0ea' }}>
-                  <button
-                    onClick={() => updateMilestoneStyle(item.id, { size: Math.min(48, style.size + 1) })}
-                    className="px-1.5 h-[18px] hover:bg-[#f7fafc] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center"
-                  >
-                    <ChevronRight size={10} className="-rotate-90" />
-                  </button>
-                  <button
-                    onClick={() => updateMilestoneStyle(item.id, { size: Math.max(8, style.size - 1) })}
-                    className="px-1.5 h-[18px] hover:bg-[#f7fafc] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors flex items-center justify-center border-t"
-                    style={{ borderColor: '#d7e0ea' }}
-                  >
-                    <ChevronRight size={10} className="rotate-90" />
-                  </button>
-                </div>
-              </div>
+               <NumericStepper
+                 axis="horizontal"
+                 style={{ marginLeft: 4 }}
+                 input={(
+                   <input
+                     type="number"
+                     min={8}
+                     max={48}
+                     value={style.size}
+                     onChange={(e) => updateMilestoneStyle(item.id, { size: Math.max(8, Math.min(48, parseInt(e.target.value) || 8)) })}
+                     className="w-12 h-9 text-center text-sm text-[var(--color-text)] bg-transparent outline-none border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                   />
+                 )}
+                 valueDisplay={null}
+                 onIncrement={() => updateMilestoneStyle(item.id, { size: Math.min(48, style.size + 1) })}
+                 onDecrement={() => updateMilestoneStyle(item.id, { size: Math.max(8, style.size - 1) })}
+               />
             </div>
           </div>
 
@@ -3084,45 +2994,26 @@ function TimescaleBarShapeDropdown({ value, onChange }: { value: TimescaleBarSha
         <ChevronDown size={11} className="text-[#607086] shrink-0" />
       </button>
       {open && createPortal(
-        <div
+        <PopoverSurface
           ref={popoverRef}
           style={{
             position: 'fixed',
             top: pos.top,
             left: pos.left,
             zIndex: 9999,
-            background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
-            border: '1px solid #d9e3ef',
-            borderRadius: 12,
-            boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)',
             padding: 10,
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-            {TIMESCALE_BAR_SHAPES.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => { onChange(s.id); setOpen(false); }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  border: value === s.id ? '1px solid #c7d8f8' : '1px solid transparent',
-                  cursor: 'pointer',
-                  background: value === s.id ? 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' : 'transparent',
-                }}
-                title={s.label}
-                onMouseEnter={(e) => { if (value !== s.id) e.currentTarget.style.background = '#f7fafc'; }}
-                onMouseLeave={(e) => { if (value !== s.id) e.currentTarget.style.background = 'transparent'; }}
-              >
-                <ShapePreview shape={TIMESCALE_TO_BAR_SHAPE[s.id]} color={value === s.id ? '#1e293b' : TIMESCALE_ICON_COLOR} width={19} height={10} />
-              </button>
-            ))}
-          </div>
-        </div>,
+          <OptionGridPicker
+            options={TIMESCALE_BAR_SHAPES}
+            value={value}
+            onSelect={(next) => { onChange(next); setOpen(false); }}
+            columns={5}
+            renderOption={(s, selected) => (
+              <ShapePreview shape={TIMESCALE_TO_BAR_SHAPE[s.id]} color={selected ? '#1e293b' : TIMESCALE_ICON_COLOR} width={19} height={10} />
+            )}
+          />
+        </PopoverSurface>,
         document.body,
       )}
     </div>
@@ -3655,7 +3546,7 @@ function TierColumn({
         <span className="text-sm font-semibold text-[var(--color-text)]">{label}</span>
         <div className="flex items-center gap-2">
           <span className="text-xs text-[var(--color-text-muted)]">Show</span>
-          <Toggle checked={tier.visible} onChange={(v) => updateTier({ visible: v })} />
+          <ToggleSwitch checked={tier.visible} onChange={(v) => updateTier({ visible: v })} />
         </div>
       </div>
 
@@ -4796,32 +4687,22 @@ function SwimlaneSpacingSection() {
           </button>
         ))}
       </div>
-      <div className="flex items-center rounded-lg overflow-hidden border" style={{ borderColor: '#c8d3df', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)' }}>
-        <input
-          type="text"
-          value={swimlaneSpacing}
-          onChange={(e) => {
-            const n = parseInt(e.target.value, 10);
-            if (!isNaN(n) && n >= 0 && n <= 40) setSwimlaneSpacing(n);
-          }}
-          className="w-10 h-9 text-center text-sm bg-transparent text-[var(--color-text)] outline-none"
-        />
-        <div className="flex flex-col border-l" style={{ borderColor: '#d7e0ea' }}>
-          <button
-            onClick={() => setSwimlaneSpacing(Math.min(40, swimlaneSpacing + 1))}
-            className="px-1.5 h-[18px] flex items-center justify-center hover:bg-[#f7fafc] transition-colors text-[var(--color-text-muted)]"
-          >
-            <ChevronUp size={10} />
-          </button>
-          <button
-            onClick={() => setSwimlaneSpacing(Math.max(0, swimlaneSpacing - 1))}
-            className="px-1.5 h-[18px] flex items-center justify-center hover:bg-[#f7fafc] transition-colors border-t text-[var(--color-text-muted)]"
-            style={{ borderColor: '#d7e0ea' }}
-          >
-            <ChevronDown size={10} />
-          </button>
-        </div>
-      </div>
+      <NumericStepper
+        input={(
+          <input
+            type="text"
+            value={swimlaneSpacing}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10);
+              if (!isNaN(n) && n >= 0 && n <= 40) setSwimlaneSpacing(n);
+            }}
+            className="w-10 h-9 text-center text-sm bg-transparent text-[var(--color-text)] outline-none"
+          />
+        )}
+        valueDisplay={null}
+        onIncrement={() => setSwimlaneSpacing(Math.min(40, swimlaneSpacing + 1))}
+        onDecrement={() => setSwimlaneSpacing(Math.max(0, swimlaneSpacing - 1))}
+      />
     </div>
   );
 }

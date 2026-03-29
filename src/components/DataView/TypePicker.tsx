@@ -2,66 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Paintbrush } from 'lucide-react';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import type { BarShape, MilestoneIcon, ItemType, TaskStyle, MilestoneStyle } from '@/types';
-
-// ─── Shape data ──────────────────────────────────────────────────────────────
-
-const BAR_SHAPES: BarShape[] = [
-  'square',
-  'rounded',
-  'capsule',
-  'chevron',
-  'double-chevron',
-  'arrow-right',
-  'pointed',
-  'arrow-both',
-  'notched',
-];
-
-const BAR_SHAPE_LABELS: Record<string, string> = {
-  square: 'Rectangle',
-  rounded: 'Round rectangle',
-  capsule: 'Ellipse',
-  chevron: 'Pentagon',
-  'double-chevron': 'Chevron',
-  'arrow-right': 'Right arrow',
-  pointed: 'Double arrow',
-  'arrow-both': 'Modern',
-  notched: 'Leaf',
-};
-
-const MILESTONE_ICONS: MilestoneIcon[] = [
-  'flag',
-  'triangle-down',
-  'diamond-filled',
-  'star',
-  'star-6pt',
-  'arrow-up',
-  'arrow-down',
-  'square-ms',
-  'square-ms-filled',
-  'hexagon',
-  'chevron-right',
-  'triangle',
-  'plus',
-  'circle-half',
-  'circle-filled',
-  'pentagon',
-  'diamond',
-  'heart',
-];
-
-const COLOR_SWATCHES = [
-  '#22c55e', // green
-  '#ef4444', // red
-  '#2563eb', // blue
-  '#334155', // slate-700
-  '#f8b878', // peach/sand
-  '#000000', // black
-  '#f8fafc', // white-ish
-  '#93a5cf', // blue-gray
-  '#475569', // slate-600
-  '#6b7040', // olive
-];
+import { BAR_SHAPE_LABELS, BAR_SHAPE_OPTIONS, DATA_VIEW_COLOR_SWATCHES, MILESTONE_ICON_OPTIONS } from '@/components/common/pickerOptions';
 
 // ─── SVG task bar shape previews ─────────────────────────────────────────────
 
@@ -231,20 +172,20 @@ function TypePickerPopover({ item, onUpdateItem, onUpdateTaskStyle, onUpdateMile
             Task
           </h4>
           <div className="grid grid-cols-3 gap-1.5">
-            {BAR_SHAPES.map((shape) => (
+            {BAR_SHAPE_OPTIONS.map((shape) => (
               <button
-                key={shape}
-                onClick={() => handleSelectBarShape(shape)}
+                key={shape.id}
+                onClick={() => handleSelectBarShape(shape.id)}
                 className={`flex items-center justify-center w-11 h-11 rounded-md transition-all ${
-                  activeType === 'task' && selectedBarShape === shape
+                  activeType === 'task' && selectedBarShape === shape.id
                     ? 'bg-slate-200'
                     : 'hover:bg-[var(--color-surface-hover)]'
                 }`}
-                title={BAR_SHAPE_LABELS[shape] ?? shape}
+                title={shape.label}
               >
                 <TaskShapePreview
-                  shape={shape}
-                  color={activeType === 'task' && selectedBarShape === shape ? '#1e293b' : '#64748b'}
+                  shape={shape.id}
+                  color={activeType === 'task' && selectedBarShape === shape.id ? '#1e293b' : '#64748b'}
                   size={28}
                 />
               </button>
@@ -262,21 +203,21 @@ function TypePickerPopover({ item, onUpdateItem, onUpdateTaskStyle, onUpdateMile
             Milestone
           </h4>
           <div className="grid grid-cols-6 gap-1.5">
-            {MILESTONE_ICONS.map((icon) => (
+            {MILESTONE_ICON_OPTIONS.map((icon) => (
               <button
-                key={icon}
-                onClick={() => handleSelectMilestoneIcon(icon)}
+                key={icon.id}
+                onClick={() => handleSelectMilestoneIcon(icon.id)}
                 className={`flex items-center justify-center w-9 h-9 rounded-md transition-all ${
-                  activeType === 'milestone' && selectedMilestoneIcon === icon
+                  activeType === 'milestone' && selectedMilestoneIcon === icon.id
                     ? 'bg-slate-200'
                     : 'hover:bg-[var(--color-surface-hover)]'
                 }`}
-                title={icon}
+                title={icon.label}
               >
                 <MilestoneIconComponent
-                  icon={icon}
+                  icon={icon.id}
                   size={18}
-                  color={activeType === 'milestone' && selectedMilestoneIcon === icon ? '#1e293b' : '#64748b'}
+                  color={activeType === 'milestone' && selectedMilestoneIcon === icon.id ? '#1e293b' : '#64748b'}
                 />
               </button>
             ))}
@@ -291,7 +232,7 @@ function TypePickerPopover({ item, onUpdateItem, onUpdateTaskStyle, onUpdateMile
           {/* Paint bucket icon — custom color trigger */}
           <button
             className={`w-8 h-8 rounded-md border-2 flex items-center justify-center transition-all ${
-              !COLOR_SWATCHES.includes(activeColor)
+              !DATA_VIEW_COLOR_SWATCHES.includes(activeColor)
                 ? 'border-[var(--color-text-muted)]'
                 : 'border-[var(--color-border)]'
             } hover:border-[var(--color-text-muted)]`}
@@ -302,7 +243,7 @@ function TypePickerPopover({ item, onUpdateItem, onUpdateTaskStyle, onUpdateMile
           {/* Separator */}
           <div className="w-px h-6 bg-[var(--color-border)] mx-0.5" />
           {/* Color swatches */}
-          {COLOR_SWATCHES.map((swatch, i) => {
+          {DATA_VIEW_COLOR_SWATCHES.map((swatch, i) => {
             const isLight = ['#f8fafc', '#ffffff', '#fff'].includes(swatch.toLowerCase());
             return (
               <button

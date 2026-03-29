@@ -2,20 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import type { BarShape } from '@/types';
-
-// ─── Shape data ──────────────────────────────────────────────────────────────
-
-export const BAR_SHAPE_OPTIONS: { id: BarShape; label: string }[] = [
-  { id: 'square', label: 'Rectangle' },
-  { id: 'rounded', label: 'Round rectangle' },
-  { id: 'capsule', label: 'Ellipse' },
-  { id: 'chevron', label: 'Pentagon' },
-  { id: 'double-chevron', label: 'Chevron' },
-  { id: 'arrow-right', label: 'Right arrow' },
-  { id: 'pointed', label: 'Double arrow' },
-  { id: 'arrow-both', label: 'Modern' },
-  { id: 'notched', label: 'Leaf' },
-];
+import { PopoverSurface } from './PopoverPrimitives';
+import { OptionGridPicker } from './OptionGridPicker';
+import { BAR_SHAPE_OPTIONS } from './pickerOptions';
 
 // ─── Shape preview rendering ─────────────────────────────────────────────────
 
@@ -186,48 +175,29 @@ export function ShapeDropdown({ value, color, onChange }: ShapeDropdownProps) {
 
       {/* Dropdown — portal to body so it escapes overflow clipping */}
       {isOpen && createPortal(
-        <div
+        <PopoverSurface
           ref={popoverRef}
           style={{
             position: 'fixed',
             top: pos.top,
             left: pos.left,
             zIndex: 9999,
-            background: 'linear-gradient(180deg, #ffffff 0%, #fcfdff 100%)',
-            border: '1px solid #d9e3ef',
-            borderRadius: 12,
-            boxShadow: '0 14px 34px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)',
             padding: 10,
           }}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
-            {BAR_SHAPE_OPTIONS.map((shape) => (
-              <button
-                key={shape.id}
-                onClick={() => {
-                  onChange(shape.id);
-                  setIsOpen(false);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  border: value === shape.id ? '1px solid #c7d8f8' : '1px solid transparent',
-                  cursor: 'pointer',
-                  background: value === shape.id ? 'linear-gradient(180deg, #eff5ff 0%, #e6efff 100%)' : 'transparent',
-                }}
-                title={shape.label}
-                onMouseEnter={(e) => { if (value !== shape.id) e.currentTarget.style.background = '#f7fafc'; }}
-                onMouseLeave={(e) => { if (value !== shape.id) e.currentTarget.style.background = 'transparent'; }}
-              >
-                <ShapePreview shape={shape.id} color={value === shape.id ? '#1e293b' : ICON_COLOR} width={19} height={10} />
-              </button>
-            ))}
-          </div>
-        </div>,
+          <OptionGridPicker
+            options={BAR_SHAPE_OPTIONS}
+            value={value}
+            onSelect={(next) => {
+              onChange(next);
+              setIsOpen(false);
+            }}
+            columns={6}
+            renderOption={(shape, selected) => (
+              <ShapePreview shape={shape.id} color={selected ? '#1e293b' : ICON_COLOR} width={19} height={10} />
+            )}
+          />
+        </PopoverSurface>,
         document.body,
       )}
     </div>

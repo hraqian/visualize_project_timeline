@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import type { ConnectionPoint } from '@/types';
+import { toolbarContentStyle } from './ToolbarPrimitives';
+import { uiColor, uiControlStyles, uiSize } from './uiTokens';
 
 const CP_OPTIONS: { value: Exclude<ConnectionPoint, 'auto'>; label: string }[] = [
   { value: 'side', label: 'Side' },
@@ -191,20 +193,19 @@ export function ConnectionPointButton({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 7,
-          padding: '5px 12px',
+          ...toolbarContentStyle(),
+          height: uiSize.toolbarHeight,
           borderRadius: 8,
-          fontSize: 13,
+          fontSize: uiSize.toolbarFontSize,
+          lineHeight: uiSize.toolbarLineHeight,
           fontWeight: 600,
-          border: disabled ? '1px solid #d7dee8' : '1px solid #c8d3df',
-          background: disabled
-            ? 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)'
-            : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-          color: disabled ? '#94a3b8' : '#334155',
+          border: disabled ? `1px solid ${uiColor.borderSoft}` : `1px solid ${uiColor.border}`,
+          background: disabled ? uiControlStyles.toolbarButtonDisabled.background : uiControlStyles.toolbarButton.background,
+          color: disabled ? uiColor.textDisabled : uiColor.text,
           cursor: disabled ? 'default' : 'pointer',
           transition: 'all 0.15s',
           whiteSpace: 'nowrap',
-          boxShadow: disabled ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.9)',
+          boxShadow: disabled ? 'none' : uiControlStyles.toolbarButton.boxShadow,
         }}
       >
         <svg width={16} height={16} viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
