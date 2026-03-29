@@ -112,13 +112,15 @@ let recentColors: string[] = [];
 interface AdvancedColorPickerProps {
   value: string;
   onChange: (color: string) => void;
+  triggerSize?: 'default' | 'compact';
 }
 
-export function AdvancedColorPicker({ value, onChange }: AdvancedColorPickerProps) {
+export function AdvancedColorPicker({ value, onChange, triggerSize = 'default' }: AdvancedColorPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const isCompact = triggerSize === 'compact';
 
   const updatePos = useCallback(() => {
     if (!triggerRef.current) return;
@@ -168,11 +170,13 @@ export function AdvancedColorPicker({ value, onChange }: AdvancedColorPickerProp
           if (!isOpen) updatePos();
           setIsOpen(!isOpen);
         }}
-        className="w-8 h-8 rounded-[10px] border cursor-pointer transition-all"
+        className={`border cursor-pointer transition-all ${isCompact ? 'w-9 h-9 rounded-[10px]' : 'w-8 h-8 rounded-[10px]'}`}
         style={{
           backgroundColor: value,
           borderColor: '#c8d3df',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55)',
+          boxShadow: isCompact
+            ? 'inset 0 1px 0 rgba(255,255,255,0.38), 0 1px 1px rgba(15,23,42,0.04)'
+            : 'inset 0 1px 0 rgba(255,255,255,0.55)',
         }}
         title={value}
       />

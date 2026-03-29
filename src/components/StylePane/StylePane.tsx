@@ -51,6 +51,7 @@ import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsM
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 import { DialogButton, ModalCloseButton, ModalSurface } from '@/components/common/ModalPrimitives';
 import { getDependencyArrowPreviewProps } from '@/components/common/dependencyArrowGeometry';
+import { ColorTransparencyControl } from '@/components/common/ColorTransparencyControl';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -535,36 +536,18 @@ function DependencyLinkControls() {
           <div
             className={`space-y-3 transition-opacity ${isVisible ? '' : 'opacity-40 pointer-events-none'}`}
           >
-            {/* Color */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Color</span>
-              <AdvancedColorPicker
-                value={depColor}
-                onChange={(color) => {
-                  if (!selectedDep) return;
-                  updateDependency(selectedDep.fromId, selectedDep.toId, { color });
-                }}
-              />
-            </div>
-
-            {/* Transparency */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Transparency</span>
-              <div className="flex items-center gap-2 w-[180px]">
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={depTransparency}
-                  onChange={(e) => {
-                    if (!selectedDep) return;
-                    updateDependency(selectedDep.fromId, selectedDep.toId, { transparency: Number(e.target.value) });
-                  }}
-                  className="flex-1 h-1.5 accent-slate-700 cursor-pointer"
-                />
-                <span className="text-xs text-[var(--color-text-secondary)] w-8 text-right tabular-nums">{depTransparency}%</span>
-              </div>
-            </div>
+            <ColorTransparencyControl
+              color={depColor}
+              transparency={depTransparency}
+              onColorChange={(color) => {
+                if (!selectedDep) return;
+                updateDependency(selectedDep.fromId, selectedDep.toId, { color });
+              }}
+              onTransparencyChange={(transparency) => {
+                if (!selectedDep) return;
+                updateDependency(selectedDep.fromId, selectedDep.toId, { transparency });
+              }}
+            />
 
             {/* Line dash */}
             <div className="flex items-center justify-between">
@@ -2477,68 +2460,26 @@ function SwimlaneStyleControls({
       >
         <div className="space-y-5">
           {/* ── Header sub-group ── */}
-          <div>
-            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium mb-2">Header</div>
-            <div className="flex gap-3 items-end">
-              <div>
-                <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                  Color
-                </label>
-                <AdvancedColorPicker
-                  value={swimlane.headerColor}
-                  onChange={(headerColor) => updateSwimlane(swimlane.id, { headerColor })}
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                  Transparency
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={swimlane.headerTransparency}
-                    onChange={(e) => updateSwimlane(swimlane.id, { headerTransparency: Number(e.target.value) })}
-                    className="flex-1 h-1.5 accent-slate-700 cursor-pointer"
-                  />
-                  <span className="text-xs text-[var(--color-text-secondary)] w-8 text-right tabular-nums">{swimlane.headerTransparency}%</span>
-                </div>
-              </div>
+            <div>
+              <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium mb-2">Header</div>
+              <ColorTransparencyControl
+                color={swimlane.headerColor}
+                transparency={swimlane.headerTransparency}
+                onColorChange={(headerColor) => updateSwimlane(swimlane.id, { headerColor })}
+                onTransparencyChange={(headerTransparency) => updateSwimlane(swimlane.id, { headerTransparency })}
+              />
             </div>
-          </div>
 
           {/* ── Body sub-group ── */}
-          <div>
-            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium mb-2">Body</div>
-            <div className="flex gap-3 items-end">
-              <div>
-                <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                  Color
-                </label>
-                <AdvancedColorPicker
-                  value={swimlane.bodyColor}
-                  onChange={(bodyColor) => updateSwimlane(swimlane.id, { bodyColor })}
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                  Transparency
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={swimlane.bodyTransparency}
-                    onChange={(e) => updateSwimlane(swimlane.id, { bodyTransparency: Number(e.target.value) })}
-                    className="flex-1 h-1.5 accent-slate-700 cursor-pointer"
-                  />
-                  <span className="text-xs text-[var(--color-text-secondary)] w-8 text-right tabular-nums">{swimlane.bodyTransparency}%</span>
-                </div>
-              </div>
+            <div>
+              <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium mb-2">Body</div>
+              <ColorTransparencyControl
+                color={swimlane.bodyColor}
+                transparency={swimlane.bodyTransparency}
+                onColorChange={(bodyColor) => updateSwimlane(swimlane.id, { bodyColor })}
+                onTransparencyChange={(bodyTransparency) => updateSwimlane(swimlane.id, { bodyTransparency })}
+              />
             </div>
-          </div>
 
           {/* ── Outline sub-group ── */}
           <div>
