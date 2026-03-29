@@ -71,3 +71,60 @@ export default defineConfig([
   },
 ])
 ```
+# Project Timeline
+
+## Storage Backends
+
+The app supports two storage modes behind the same save/load/delete UI:
+
+### 1. Local dev file storage
+
+Default when no Supabase environment variables are configured.
+
+- uses the Vite dev plugin endpoints at `/api/projects`
+- saves project JSON files under `data/projects/`
+- intended for local development only
+
+### 2. Hosted storage with Supabase
+
+Enabled when both of these environment variables are present:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+In this mode the app keeps the same project-manager UX, but saves projects in Supabase instead of local files.
+
+## Supabase Setup
+
+Create a table named `projects` with columns:
+
+- `id` `text primary key`
+- `name` `text not null`
+- `last_modified` `timestamptz not null`
+- `data` `jsonb not null`
+
+Example SQL:
+
+```sql
+create table if not exists projects (
+  id text primary key,
+  name text not null,
+  last_modified timestamptz not null,
+  data jsonb not null
+);
+```
+
+For a first pass, you can allow public read/write on this table if the app is only for personal testing. For a real public deployment, add auth and proper row-level security.
+
+## Environment
+
+Copy `.env.example` to `.env.local` for local hosted-storage testing.
+
+If no Supabase variables are set, the app falls back to local file storage.
+
+## Deployment Recommendation
+
+- local development: keep using the current Vite dev workflow
+- production deployment: use Vercel or Cloudflare Pages for the frontend and Supabase for storage
+
+This keeps the visible save/load/delete behavior similar between local and deployed versions, while allowing the local workflow to continue unchanged.
