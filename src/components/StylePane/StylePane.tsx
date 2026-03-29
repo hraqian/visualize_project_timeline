@@ -52,6 +52,8 @@ import { ConnectionPointButton } from '@/components/common/ConnectionPointButton
 import { DialogButton, ModalCloseButton, ModalSurface } from '@/components/common/ModalPrimitives';
 import { getDependencyArrowPreviewProps } from '@/components/common/dependencyArrowGeometry';
 import { ColorTransparencyControl } from '@/components/common/ColorTransparencyControl';
+import { PropertyControlRow } from '@/components/common/PropertyControlRow';
+import { LabeledFieldPair } from '@/components/common/LabeledFieldPair';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -550,8 +552,7 @@ function DependencyLinkControls() {
             />
 
             {/* Line dash */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Line Dash</span>
+            <PropertyControlRow label="Line Dash">
               <DependencyLineDashDropdown
                 value={depLineDash}
                 onChange={(lineDash) => {
@@ -559,11 +560,10 @@ function DependencyLinkControls() {
                   updateDependency(selectedDep.fromId, selectedDep.toId, { lineDash });
                 }}
               />
-            </div>
+            </PropertyControlRow>
 
             {/* Line width */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Line Width</span>
+            <PropertyControlRow label="Line Width">
               <DependencyLineWidthControl
                 value={selectedDep?.lineWidth ?? 1.5}
                 onChange={(lineWidth) => {
@@ -571,11 +571,10 @@ function DependencyLinkControls() {
                   updateDependency(selectedDep.fromId, selectedDep.toId, { lineWidth });
                 }}
               />
-            </div>
+            </PropertyControlRow>
 
             {/* Arrow type */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Arrow Type</span>
+            <PropertyControlRow label="Arrow Type">
               <DependencyArrowTypeDropdown
                 value={depArrowType}
                 onChange={(arrowType) => {
@@ -583,11 +582,10 @@ function DependencyLinkControls() {
                   updateDependency(selectedDep.fromId, selectedDep.toId, { arrowType });
                 }}
               />
-            </div>
+            </PropertyControlRow>
 
             {/* Arrow size */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Arrow Size</span>
+            <PropertyControlRow label="Arrow Size">
               <DependencyArrowSizeDropdown
                 value={depArrowSize}
                 onChange={(arrowSize) => {
@@ -595,11 +593,10 @@ function DependencyLinkControls() {
                   updateDependency(selectedDep.fromId, selectedDep.toId, { arrowSize });
                 }}
               />
-            </div>
+            </PropertyControlRow>
 
             {/* Connection points */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">Connection Points</span>
+            <PropertyControlRow label="Connection Points">
               <ConnectionPointButton
                 fromPoint={selectedDep?.fromPoint ?? 'auto'}
                 toPoint={selectedDep?.toPoint ?? 'auto'}
@@ -609,7 +606,7 @@ function DependencyLinkControls() {
                   updateDependency(selectedDep.fromId, selectedDep.toId, { fromPoint, toPoint });
                 }}
               />
-            </div>
+            </PropertyControlRow>
           </div>
 
           {selectedDep && (
@@ -1167,27 +1164,23 @@ function TaskStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Shape */}
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={style.color}
                 onChange={(color) => updateTaskStyle(item.id, { color })}
               />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Shape
-              </label>
+            )}
+            rightLabel="Shape"
+            right={(
               <ShapeDropdown
                 value={style.barShape}
                 color={style.color}
                 onChange={(barShape) => updateTaskStyle(item.id, { barShape })}
               />
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: Size */}
           <div>
@@ -1224,20 +1217,16 @@ function TaskStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Text */}
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={style.fontColor}
                 onChange={(fontColor) => updateTaskStyle(item.id, { fontColor })}
               />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Text
-              </label>
+            )}
+            rightLabel="Text"
+            right={(
               <div className="flex gap-1.5">
                 <FontFamilyDropdown
                   value={style.fontFamily}
@@ -1249,8 +1238,8 @@ function TaskStyleControls({
                   onChange={(fontSize) => updateTaskStyle(item.id, { fontSize })}
                 />
               </div>
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: B / I / U toggles + alignment */}
           <div className="flex gap-1">
@@ -1381,20 +1370,16 @@ function TaskStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Text */}
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={style.dateFontColor}
                 onChange={(dateFontColor) => updateTaskStyle(item.id, { dateFontColor })}
               />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Text
-              </label>
+            )}
+            rightLabel="Text"
+            right={(
               <div className="flex gap-1.5">
                 <FontFamilyDropdown
                   value={style.dateFontFamily}
@@ -1406,8 +1391,8 @@ function TaskStyleControls({
                   onChange={(dateFontSize) => updateTaskStyle(item.id, { dateFontSize })}
                 />
               </div>
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: B / I / U toggles */}
           <div className="flex gap-1">
@@ -1549,20 +1534,16 @@ function TaskStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Text */}
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={style.durationFontColor}
                 onChange={(durationFontColor) => updateTaskStyle(item.id, { durationFontColor })}
               />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Text
-              </label>
+            )}
+            rightLabel="Text"
+            right={(
               <div className="flex gap-1.5">
                 <FontFamilyDropdown
                   value={style.durationFontFamily}
@@ -1574,8 +1555,8 @@ function TaskStyleControls({
                   onChange={(durationFontSize) => updateTaskStyle(item.id, { durationFontSize })}
                 />
               </div>
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: B / I / U + Alignment */}
           <div className="flex gap-1">
@@ -1717,20 +1698,16 @@ function TaskStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Text */}
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={style.pctFontColor}
                 onChange={(pctFontColor) => updateTaskStyle(item.id, { pctFontColor })}
               />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Text
-              </label>
+            )}
+            rightLabel="Text"
+            right={(
               <div className="flex gap-1.5">
                 <FontFamilyDropdown
                   value={style.pctFontFamily}
@@ -1742,8 +1719,8 @@ function TaskStyleControls({
                   onChange={(pctFontSize) => updateTaskStyle(item.id, { pctFontSize })}
                 />
               </div>
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: B / I / U */}
           <div className="flex gap-1">
@@ -1829,26 +1806,22 @@ function TaskStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Thickness */}
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={style.connectorColor}
                 onChange={(connectorColor) => updateTaskStyle(item.id, { connectorColor })}
               />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Thickness
-              </label>
+            )}
+            rightLabel="Thickness"
+            right={(
               <ConnectorThicknessDropdown
                 value={style.connectorThickness}
                 onChange={(connectorThickness) => updateTaskStyle(item.id, { connectorThickness })}
               />
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: Apply to all tasks */}
           <ConnectorApplyToAll item={item} />
@@ -2012,27 +1985,23 @@ function MilestoneStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Shape */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={style.color}
                 onChange={(color) => updateMilestoneStyle(item.id, { color })}
               />
-            </div>
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Shape
-              </label>
+            )}
+            rightLabel="Shape"
+            right={(
               <MilestoneShapeDropdown
                 value={style.icon}
                 color={style.color}
                 onChange={(icon) => updateMilestoneStyle(item.id, { icon })}
               />
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: Size */}
           <div>
@@ -2131,20 +2100,16 @@ function MilestoneStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Text */}
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={style.fontColor}
                 onChange={(fontColor) => updateMilestoneStyle(item.id, { fontColor })}
               />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Text
-              </label>
+            )}
+            rightLabel="Text"
+            right={(
               <div className="flex gap-1.5">
                 <FontFamilyDropdown
                   value={style.fontFamily}
@@ -2156,8 +2121,8 @@ function MilestoneStyleControls({
                   onChange={(fontSize) => updateMilestoneStyle(item.id, { fontSize })}
                 />
               </div>
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: B / I / U toggles */}
           <div className="flex gap-1">
@@ -2237,20 +2202,16 @@ function MilestoneStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Text */}
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={style.dateFontColor}
                 onChange={(dateFontColor) => updateMilestoneStyle(item.id, { dateFontColor })}
               />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Text
-              </label>
+            )}
+            rightLabel="Text"
+            right={(
               <div className="flex gap-1.5">
                 <FontFamilyDropdown
                   value={style.dateFontFamily}
@@ -2262,8 +2223,8 @@ function MilestoneStyleControls({
                   onChange={(dateFontSize) => updateMilestoneStyle(item.id, { dateFontSize })}
                 />
               </div>
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: B / I / U toggles */}
           <div className="flex gap-1">
@@ -2383,20 +2344,16 @@ function SwimlaneStyleControls({
       >
         <div className="space-y-4">
           {/* Row 1: Color + Text */}
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker
                 value={swimlane.titleFontColor}
                 onChange={(titleFontColor) => updateSwimlane(swimlane.id, { titleFontColor })}
               />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Text
-              </label>
+            )}
+            rightLabel="Text"
+            right={(
               <div className="flex gap-1.5">
                 <FontFamilyDropdown
                   value={swimlane.titleFontFamily}
@@ -2408,8 +2365,8 @@ function SwimlaneStyleControls({
                   onChange={(titleFontSize) => updateSwimlane(swimlane.id, { titleFontSize })}
                 />
               </div>
-            </div>
-          </div>
+            )}
+          />
 
           {/* Row 2: B / I / U toggles */}
           <div className="flex gap-1">
@@ -2723,20 +2680,16 @@ function ElapsedTimeSection() {
   return (
     <div className="space-y-4">
       {/* Row: Color + Thickness */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-            Color
-          </label>
+      <LabeledFieldPair
+        leftLabel="Color"
+        left={(
           <AdvancedColorPicker
             value={color}
             onChange={(elapsedTimeColor) => updateTimescale({ elapsedTimeColor })}
           />
-        </div>
-        <div>
-          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-            Thickness
-          </label>
+        )}
+        rightLabel="Thickness"
+        right={(
           <div className="relative">
             <select
               value={thickness}
@@ -2750,8 +2703,8 @@ function ElapsedTimeSection() {
             </select>
             <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
           </div>
-        </div>
-      </div>
+        )}
+      />
 
       {/* Position */}
       <div>
@@ -3096,23 +3049,19 @@ function ScaleSection() {
       </label>
 
       {/* Color + Text (font family + font size) */}
-      <div className="flex gap-3">
-        <div>
-          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-            Color
-          </label>
+      <LabeledFieldPair
+        leftLabel="Color"
+        left={(
           <AdvancedColorPicker value={tier.fontColor} onChange={(c) => updateTier(activeTierStoreIndex, { fontColor: c })} />
-        </div>
-        <div className="flex-1">
-          <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-            Text
-          </label>
+        )}
+        rightLabel="Text"
+        right={(
           <div className="flex gap-1.5">
             <FontFamilyDropdown value={tier.fontFamily} onChange={(f) => updateTier(activeTierStoreIndex, { fontFamily: f })} fonts={FONT_FAMILIES} />
             <FontSizeDropdown value={tier.fontSize} onChange={(s) => updateTier(activeTierStoreIndex, { fontSize: s, fontSizeAuto: false })} />
           </div>
-        </div>
-      </div>
+        )}
+      />
 
       {/* B / I / U + Alignment */}
       <div className="flex gap-1">
@@ -3208,23 +3157,19 @@ function ScaleSection() {
       {visibleCount === 1 && (
         <div>
           <label className="text-xs font-semibold text-[var(--color-text)] block mb-2">Bar style</label>
-          <div className="flex gap-3">
-            <div>
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Color
-              </label>
+          <LabeledFieldPair
+            leftLabel="Color"
+            left={(
               <AdvancedColorPicker value={tier.backgroundColor} onChange={(c) => updateTier(activeTierStoreIndex, { backgroundColor: c })} />
-            </div>
-            <div className="flex-1">
-              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
-                Shape
-              </label>
+            )}
+            rightLabel="Shape"
+            right={(
               <TimescaleBarShapeDropdown
                 value={timescale.barShape}
                 onChange={(s) => updateTimescale({ barShape: s })}
               />
-            </div>
-          </div>
+            )}
+          />
         </div>
       )}
 

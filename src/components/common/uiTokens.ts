@@ -35,6 +35,11 @@ export const uiSize = {
   toolbarPaddingX: 12,
   controlHeight: 32,
   controlFontSize: 13,
+  sidePanelRowHeight: 36,
+  sidePanelLabelFontSize: 13,
+  sidePanelCompositeSwatchWidth: 48,
+  sidePanelCompositeValueWidth: 68,
+  sidePanelCompositeGap: 12,
 } as const;
 
 export function surfaceGradient(bottom: string = uiColor.surfaceBottom) {

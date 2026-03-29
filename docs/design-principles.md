@@ -222,3 +222,50 @@ The immediate bar for the color/transparency family is:
 - conservative, proportional sizing for the thumb, track, swatch, and value field
 - clearer hierarchy between label, interactive track, and numeric value
 - one shared primitive used everywhere this family appears
+
+## Side-Panel Form Grid
+
+The StylePane should use a small set of repeatable row grammars instead of ad hoc label/control placement.
+
+### Row Grammar A: simple property row
+
+Use for rows like:
+
+- line dash
+- line width
+- arrow type
+- arrow size
+- connection points
+
+Structure:
+
+- left column: property label
+- right column: control
+
+Rules:
+
+- labels align to the same left edge
+- controls align to the same right edge
+- row height and vertical centering should be consistent across siblings
+- right-side controls should use a small set of standard widths rather than drifting by content
+
+### Row Grammar B: calibrated composite row
+
+Use for rows like:
+
+- color + transparency
+
+Structure:
+
+- column 1: compact swatch
+- column 2: flexible calibrated control area
+- column 3: compact stable value box
+
+Rules:
+
+- the middle column should absorb available width
+- the value box should stay compact and should not steal space from the main control
+- the swatch column should be only as wide as needed for alignment, not decorative breathing room
+- sibling composite rows should reuse the exact same column proportions
+
+When a side-panel area mixes these grammars, each grammar should still be internally consistent. Do not improvise widths row-by-row.

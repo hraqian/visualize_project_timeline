@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { AdvancedColorPicker } from './AdvancedColorPicker';
-import { uiColor, uiRadius } from './uiTokens';
+import { uiRadius, uiSize } from './uiTokens';
 
 interface ColorTransparencyControlProps {
   color: string;
@@ -40,16 +40,22 @@ export function ColorTransparencyControl({
 
   return (
     <div className={className}>
-      <div className="grid grid-cols-[56px_minmax(0,1fr)_82px] gap-x-3 gap-y-2">
-        <div className="text-[13px] leading-5 text-[#526277] font-medium">Color</div>
-        <div className="text-[13px] leading-5 text-[#526277] font-medium">Transparency</div>
+      <div
+        className="grid gap-y-2"
+        style={{
+          gridTemplateColumns: `${uiSize.sidePanelCompositeSwatchWidth}px minmax(0, 1fr) ${uiSize.sidePanelCompositeValueWidth}px`,
+          columnGap: uiSize.sidePanelCompositeGap,
+        }}
+      >
+        <div className="leading-5 text-[#526277] font-medium" style={{ fontSize: uiSize.sidePanelLabelFontSize }}>Color</div>
+        <div className="leading-5 text-[#526277] font-medium" style={{ fontSize: uiSize.sidePanelLabelFontSize }}>Transparency</div>
         <div />
 
-        <div className="h-9 flex items-center justify-start">
+        <div className="flex items-center justify-start" style={{ height: uiSize.sidePanelRowHeight }}>
           <AdvancedColorPicker value={color} onChange={onColorChange} triggerSize="compact" />
         </div>
 
-        <div className="min-w-0 h-9 flex items-center">
+        <div className="min-w-0 flex items-center" style={{ height: uiSize.sidePanelRowHeight }}>
           <div className="w-full flex items-center min-w-0">
             <input
               type="range"
@@ -64,8 +70,9 @@ export function ColorTransparencyControl({
         </div>
 
         <div
-          className="h-9 rounded-[10px] border flex items-center justify-center text-[13px] font-medium tabular-nums text-[#1f2937]"
+          className="rounded-[10px] border flex items-center justify-center text-[13px] font-medium tabular-nums text-[#1f2937]"
           style={{
+            height: uiSize.sidePanelRowHeight,
             borderColor: '#d7dee8',
             background: 'linear-gradient(180deg, #ffffff 0%, #fdfefe 100%)',
             boxShadow: '0 1px 0 rgba(255,255,255,0.88), inset 0 1px 0 rgba(255,255,255,0.72)',
