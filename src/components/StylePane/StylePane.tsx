@@ -171,12 +171,31 @@ export function StylePane() {
   const setTaskLayout = useProjectStore((s) => s.setTaskLayout);
 
   const [mainTab, setMainTab] = useState<MainTab>('items');
+  const [forcedMainTab, setForcedMainTab] = useState<MainTab | null>(null);
 
   const timescaleSections = ['scale', 'todayMarker', 'elapsedTime', 'leftEndCap', 'rightEndCap'];
   const item = items.find((i) => i.id === selectedItemId);
-  const autoMainTab: MainTab = stylePaneSection
-    ? (timescaleSections as string[]).includes(stylePaneSection) ? 'timescale' : 'items'
-    : mainTab;
+  const selectionKey = selectedDepKey
+    ? `dep:${selectedDepKey}`
+    : selectedSwimlaneId
+      ? `swimlane:${selectedSwimlaneId}`
+      : item
+        ? `item:${item.id}`
+        : null;
+  const hasItemSelection = Boolean(selectionKey);
+  const autoMainTab: MainTab = hasItemSelection
+    ? 'items'
+    : stylePaneSection
+      ? (timescaleSections as string[]).includes(stylePaneSection) ? 'timescale' : 'items'
+      : mainTab;
+  const activeMainTab = forcedMainTab ?? autoMainTab;
+
+  useEffect(() => {
+    if (selectionKey) {
+      setForcedMainTab(null);
+      setMainTab('items');
+    }
+  }, [selectionKey]);
 
   // Determine which sub-tab to show based on selection
   const autoSubTab: ItemSubTab = selectedDepKey
@@ -191,6 +210,11 @@ export function StylePane() {
 
   const handleSubTabClick = (tab: ItemSubTab) => {
     setForcedSubTab(tab === autoSubTab ? null : tab);
+  };
+
+  const handleMainTabClick = (tab: MainTab) => {
+    setMainTab(tab);
+    setForcedMainTab(tab === autoMainTab ? null : tab);
   };
 
   // Swimlane: prefer direct selection, fall back to selected item's swimlane
@@ -208,9 +232,9 @@ export function StylePane() {
           <Paintbrush size={14} className="text-slate-700 mr-2 shrink-0" />
           <div className="flex items-center gap-0.5 flex-1">
             <button
-              onClick={() => setMainTab('items')}
+              onClick={() => handleMainTabClick('items')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                autoMainTab === 'items'
+                activeMainTab === 'items'
                   ? 'bg-slate-700/15 text-slate-800'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
               }`}
@@ -218,9 +242,9 @@ export function StylePane() {
               Items
             </button>
             <button
-              onClick={() => setMainTab('timescale')}
+              onClick={() => handleMainTabClick('timescale')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                autoMainTab === 'timescale'
+                activeMainTab === 'timescale'
                   ? 'bg-slate-700/15 text-slate-800'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
               }`}
@@ -228,9 +252,9 @@ export function StylePane() {
               Timescale
             </button>
             <button
-              onClick={() => setMainTab('design')}
+              onClick={() => handleMainTabClick('design')}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                autoMainTab === 'design'
+                activeMainTab === 'design'
                   ? 'bg-slate-700/15 text-slate-800'
                   : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
               }`}
@@ -241,7 +265,7 @@ export function StylePane() {
         </div>
 
         {/* Sub-icons for Items tab */}
-        {autoMainTab === 'items' && (
+        {activeMainTab === 'items' && (
           <div className="flex items-center gap-4 px-3 pb-2">
             <button
               onClick={() => handleSubTabClick('task')}
@@ -293,7 +317,7 @@ export function StylePane() {
 
       {/* ─── Content ─── */}
       <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-5">
-        {autoMainTab === 'items' ? (
+        {activeMainTab === 'items' ? (
           <ItemsTabContent
             item={item}
             activeSubTab={activeSubTab}
@@ -302,7 +326,7 @@ export function StylePane() {
             updateMilestoneStyle={updateMilestoneStyle}
             updateSwimlane={updateSwimlane}
           />
-        ) : autoMainTab === 'timescale' ? (
+        ) : activeMainTab === 'timescale' ? (
           <TimescaleTabContent
             timescale={timescale}
             updateTimescale={updateTimescale}

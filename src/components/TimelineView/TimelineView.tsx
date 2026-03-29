@@ -1822,6 +1822,46 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [selectedDepKey, removeDependency, depPaths, setSelectedDepKey]);
 
+  useEffect(() => {
+    if (!draggingId && !depDragActive && !datePicker && !selectedDepKey) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+
+      let handled = false;
+
+      if (dragRef.current || draggingId) {
+        dragRef.current = null;
+        setDragState(null);
+        handled = true;
+      }
+
+      if (depDragRef.current || depDragLatestRef.current) {
+        depDragRef.current = null;
+        setDepDrag(null);
+        handled = true;
+      }
+
+      if (datePicker) {
+        setDatePicker(null);
+        handled = true;
+      }
+
+      if (selectedDepKey) {
+        setSelectedDepKey(null);
+        handled = true;
+      }
+
+      if (handled) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [draggingId, depDragActive, datePicker, selectedDepKey, setSelectedDepKey]);
+
   // ─── Render helpers ────────────────────────────────────────────────
 
   const belowMilestoneGap = 4; // px between timescale bar bottom edge and milestone top edge
@@ -2945,9 +2985,9 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               : style.labelPosition === 'center'
               ? { left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: style.textAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
               : style.labelPosition === 'above'
-              ? { left: 0, bottom: '100%', marginBottom: 2 }
+              ? { left: 0, right: 0, bottom: '100%', marginBottom: 2, textAlign: style.textAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
               : style.labelPosition === 'below'
-              ? { left: 0, top: '100%', marginTop: 2 }
+              ? { left: 0, right: 0, top: '100%', marginTop: 2, textAlign: style.textAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
           }}
           onClick={(e) => { e.stopPropagation(); onClickSection('title'); }}
