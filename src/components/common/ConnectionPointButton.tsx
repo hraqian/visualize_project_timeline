@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import type { ConnectionPoint } from '@/types';
-import { toolbarContentStyle } from './ToolbarPrimitives';
+import { toolbarContentStyle } from './toolbarContentStyle';
 import { uiColor, uiControlStyles, uiSize } from './uiTokens';
 
 const CP_OPTIONS: { value: Exclude<ConnectionPoint, 'auto'>; label: string }[] = [
@@ -38,7 +38,6 @@ function ConnectionPointIllustration({
   const resolvedFrom = isAuto ? 'side' : fromPoint;
   const resolvedTo = isAuto ? 'side' : toPoint;
   const W = 250;
-  const H = 88;
   const barH = 16;
   const barW = 66;
   const bar1X = 26;

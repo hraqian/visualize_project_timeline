@@ -586,7 +586,6 @@ function drawTaskBar(
   item: ProjectItem,
   yBasePx: number,
   rowYPx: number,
-  rowH: number,
 ) {
   const style = item.taskStyle;
   const x = itemX(item.startDate, ctx);
@@ -783,7 +782,6 @@ function drawMilestone(
   item: ProjectItem,
   yBasePx: number,
   rowYPx: number,
-  rowH: number,
   isAbove: boolean,
   aboveYPx?: number,
 ) {
@@ -940,10 +938,8 @@ function getItemCenterYPx(
   swimlanedItems: ProjectItem[],
   swimlaneLayout: SwimlaneLayout[],
   getRowY: (item: ProjectItem) => number,
-  getRowH: (item: ProjectItem) => number,
 ): number {
   const rowY = getRowY(item);
-  const rowH = getRowH(item);
   // Check if independent
   if (belowIndependentItems.some(i => i.id === item.id)) {
     return INDEPENDENT_SECTION_PADDING + rowY + ROW_BASE / 2;
@@ -974,8 +970,6 @@ export async function exportNativePptx(
     belowIndependentItems,
     swimlanedItems,
     swimlaneLayout,
-    sortedSwimlanes,
-    getRow,
     getRowY,
     getRowH,
     canvasHeight,

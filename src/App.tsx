@@ -9,9 +9,9 @@ import { SettingsModal } from '@/components/common/SettingsModal';
 import { ConflictResolutionDialog } from '@/components/common/ConflictResolutionDialog';
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 import { ToolbarButton, ToolbarIconButton, ToolbarSplitButton } from '@/components/common/ToolbarPrimitives';
+import { toolbarContentStyle } from '@/components/common/toolbarContentStyle';
 import { PopoverSurface, MenuRow } from '@/components/common/PopoverPrimitives';
 import { ToggleSwitch } from '@/components/common/ToggleSwitch';
-import { toolbarContentStyle } from '@/components/common/ToolbarPrimitives';
 import { toPng } from 'html-to-image';
 import { exportNativePptx } from '@/utils/exportPptx';
 import {

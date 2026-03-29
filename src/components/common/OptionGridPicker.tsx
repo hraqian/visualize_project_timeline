@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { uiColor } from './uiTokens';
 
 type OptionGridPickerProps<T extends string> = {

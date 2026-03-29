@@ -444,7 +444,6 @@ function routeDepLink(
     preferredY: number,
     dir: AnchorDir,
     oppositeX: number,
-    _oppositeY: number,
   ): [number, number][] => {
     const candidates = new Set<string>();
     const addPoint = (x: number, y: number) => {
@@ -1395,8 +1394,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       });
   }, [origin, totalDays, rangeEndDate, timescale]);
 
-  const timescaleHeight = tierLabels.length * 28;
-
   // Dependency lines SVG paths — orthogonal routing (right-angle segments only)
   const depPaths = useMemo(() => {
     if (!showDependencies) return [];
@@ -1536,7 +1533,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         };
       })
       .filter(Boolean);
-  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, getRowH, zoom]);
+  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, zoom]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
   const verticalConnectors = useMemo(() => {
@@ -1584,7 +1581,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     }
 
     return lines;
-  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, zoom, getRowY, getRowH]);
+  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, zoom, getRowY]);
 
   // ─── Drag handlers ─────────────────────────────────────────────────
 
@@ -1658,7 +1655,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
     for (const item of visibleItems) {
       const yBase = getItemYBase(item);
-      const rowH = getRowH(item);
       if (item.type === 'task') {
         const xStart = itemToX(item.startDate);
         const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
@@ -1686,7 +1682,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       }
     }
     return positions;
-  }, [visibleItems, swimlaneIds, swimlaneLayout, getRowY, getRowH, itemToX, zoom]);
+  }, [visibleItems, swimlaneIds, swimlaneLayout, getRowY, itemToX, zoom]);
   getItemPositionsRef.current = getItemPositions;
 
   const handleDepHandleMouseDown = useCallback(
@@ -1802,7 +1798,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedDepKey, removeDependency, depPaths]);
+  }, [selectedDepKey, removeDependency, depPaths, setSelectedDepKey]);
 
   // ─── Render helpers ────────────────────────────────────────────────
 
@@ -2657,7 +2653,7 @@ interface TaskBarProps {
   depDragTargetSide: 'start' | 'end' | null;
 }
 
-function TaskBar({ item, x, y, rowHeight, width, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: TaskBarProps) {
+function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: TaskBarProps) {
   const isEditing = (field: string) => editingField?.itemId === item.id && editingField?.field === field;
   const style = item.taskStyle;
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
@@ -3129,7 +3125,7 @@ interface MilestoneItemProps {
   depDragTargetSide: 'start' | 'end' | null;
 }
 
-function MilestoneItem({ item, x, y, rowHeight, iconTopOverride, translateX, isSelected, isDragging, isHovered, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: MilestoneItemProps) {
+function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget }: MilestoneItemProps) {
   const isEditingTitle = editingField?.itemId === item.id && editingField?.field === 'milestoneTitle';
   const style = item.milestoneStyle;
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);

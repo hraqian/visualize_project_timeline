@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Eye, EyeOff, Trash2, Search } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Search } from 'lucide-react';
 import type { Dependency, DependencyType, LagUnit, ProjectItem } from '@/types';
 import { DialogButton, ModalCloseButton, ModalSurface } from './ModalPrimitives';
 
@@ -72,8 +72,8 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
   const typeLabel = item.type === 'milestone' ? 'Milestone' : 'Task';
 
   // Items available to add as predecessors (not already in deps, not self)
-  const existingFromIds = new Set(deps.map((d) => d.fromId));
   const availableItems = useMemo(() => {
+    const existingFromIds = new Set(deps.map((d) => d.fromId));
     const q = searchQuery.toLowerCase().trim();
     return allItems
       .filter((i) => i.id !== item.id && !existingFromIds.has(i.id))
@@ -82,7 +82,7 @@ export function DependencyEditorModal({ item, allItems, dependencies, rowNumberM
         const rn = rowNumberMap.get(i.id);
         return i.name.toLowerCase().includes(q) || (rn != null && String(rn).includes(q));
       });
-  }, [allItems, item.id, existingFromIds, searchQuery, rowNumberMap]);
+  }, [allItems, item.id, deps, searchQuery, rowNumberMap]);
 
   const updateDep = (fromId: string, updates: Partial<EditableDep>) => {
     setDeps((prev) => prev.map((d) => d.fromId === fromId ? { ...d, ...updates } : d));

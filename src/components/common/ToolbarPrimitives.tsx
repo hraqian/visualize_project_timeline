@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react';
-import { uiColor, uiControlStyles, uiSize } from './uiTokens';
+import { uiColor, uiControlStyles } from './uiTokens';
 
 type ToolbarButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   icon?: ReactNode;
@@ -97,14 +97,4 @@ export function ToolbarIconButton({ children, disabled, style, className, ...pro
       {children}
     </button>
   );
-}
-
-export function toolbarContentStyle(extra?: CSSProperties): CSSProperties {
-  return {
-    gap: uiSize.toolbarGap,
-    paddingLeft: uiSize.toolbarPaddingX,
-    paddingRight: uiSize.toolbarPaddingX,
-    lineHeight: uiSize.toolbarLineHeight,
-    ...extra,
-  };
 }
