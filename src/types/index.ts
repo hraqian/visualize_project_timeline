@@ -352,7 +352,7 @@ export interface SchedulingConflict {
 export interface DependencyLagAdjustment {
   fromId: string;
   toId: string;
-  newLag: number;         // new lag value in days
+  newLag: number;         // new lag value in newLagUnit
   newLagUnit: LagUnit;
 }
 

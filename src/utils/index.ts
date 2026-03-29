@@ -501,6 +501,47 @@ function addLag(date: Date, lag: number, unit: LagUnit): string {
   return result.toISOString().split('T')[0];
 }
 
+function getDependencyAnchorDate(dep: Dependency, predecessor: ProjectItem, successor: ProjectItem) {
+  const predStart = parseISO(predecessor.startDate);
+  const predEnd = parseISO(predecessor.endDate);
+  const succStart = parseISO(successor.startDate);
+  const succEnd = parseISO(successor.endDate);
+
+  switch (dep.type) {
+    case 'finish-to-start':
+      return { predecessorAnchor: addDays(predEnd, 1), successorAnchor: succStart };
+    case 'start-to-start':
+      return { predecessorAnchor: predStart, successorAnchor: succStart };
+    case 'finish-to-finish':
+      return { predecessorAnchor: predEnd, successorAnchor: succEnd };
+    case 'start-to-finish':
+      return { predecessorAnchor: predStart, successorAnchor: succEnd };
+    default:
+      return { predecessorAnchor: predStart, successorAnchor: succStart };
+  }
+}
+
+function computeRequiredLagAdjustment(dep: Dependency, pred: ProjectItem, succ: ProjectItem): { lag: number; lagUnit: LagUnit } {
+  const { predecessorAnchor, successorAnchor } = getDependencyAnchorDate(dep, pred, succ);
+  const preferredUnit = dep.lagUnit ?? 'd';
+
+  if (preferredUnit === 'm') {
+    const monthLag = differenceInCalendarMonths(successorAnchor, predecessorAnchor);
+    if (addLag(predecessorAnchor, monthLag, 'm') === successorAnchor.toISOString().split('T')[0]) {
+      return { lag: monthLag, lagUnit: 'm' };
+    }
+  }
+
+  if (preferredUnit === 'w') {
+    const dayDiff = differenceInDays(successorAnchor, predecessorAnchor);
+    if (dayDiff % 7 === 0) {
+      return { lag: dayDiff / 7, lagUnit: 'w' };
+    }
+  }
+
+  return { lag: differenceInDays(successorAnchor, predecessorAnchor), lagUnit: 'd' };
+}
+
 /**
  * For a given dependency, compute the earliest allowed start and end dates
  * for the successor, based on the predecessor's current dates.
@@ -567,27 +608,6 @@ export function scheduleDependents(
   const itemMap = new Map(updated.map((i) => [i.id, i]));
   const conflicts: SchedulingConflict[] = [];
   const lagAdjustments: DependencyLagAdjustment[] = [];
-
-  /**
-   * Compute the lag (in days) that a single dependency would need so that
-   * its constraint matches the successor's actual position.
-   */
-  const computeRequiredLag = (dep: Dependency, pred: ProjectItem, succ: ProjectItem): number => {
-    const predStart = parseISO(pred.startDate);
-    const predEnd = parseISO(pred.endDate);
-    const succStart = parseISO(succ.startDate);
-    const succEnd = parseISO(succ.endDate);
-
-    switch (dep.type) {
-      // FS: natural baseline gap is 1 day (successor starts day after predecessor ends),
-      // so required lag = actual gap - 1.
-      case 'finish-to-start':  return differenceInDays(succStart, predEnd) - 1;
-      case 'start-to-start':   return differenceInDays(succStart, predStart);
-      case 'finish-to-finish': return differenceInDays(succEnd, predEnd);
-      case 'start-to-finish':  return differenceInDays(succEnd, predStart);
-      default: return 0;
-    }
-  };
 
   /** Evaluate a successor against all its predecessors. Returns true if BFS should cascade. */
   const evaluateSuccessor = (succId: string): boolean => {
@@ -673,14 +693,15 @@ export function scheduleDependents(
       for (const dep of allDepsToSuccessor) {
         const pred = itemMap.get(dep.fromId);
         if (!pred) continue;
-        const requiredLag = computeRequiredLag(dep, pred, successor);
+        const requiredLag = computeRequiredLagAdjustment(dep, pred, successor);
         const currentLagDays = lagToDays(dep.lag ?? 0, dep.lagUnit ?? 'd');
-        if (requiredLag !== currentLagDays) {
+        const nextLagDays = lagToDays(requiredLag.lag, requiredLag.lagUnit);
+        if (nextLagDays !== currentLagDays || requiredLag.lagUnit !== (dep.lagUnit ?? 'd')) {
           lagAdjustments.push({
             fromId: dep.fromId,
             toId: dep.toId,
-            newLag: requiredLag,
-            newLagUnit: 'd',
+            newLag: requiredLag.lag,
+            newLagUnit: requiredLag.lagUnit,
           });
         }
       }
