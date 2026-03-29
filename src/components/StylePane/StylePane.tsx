@@ -644,103 +644,80 @@ function DependencyLinkControls() {
             </button>
           </div>
 
-          <div className={`space-y-4 transition-opacity ${showCriticalPath ? '' : 'opacity-40 pointer-events-none'}`}>
-            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-3">
-              <div className="text-xs font-semibold text-[var(--color-text)]">Tasks & Milestones</div>
+          <div className={`space-y-4 rounded-xl border border-[var(--color-border)] p-4 transition-opacity ${showCriticalPath ? '' : 'opacity-40 pointer-events-none'}`}>
+            <div className="space-y-2.5">
+              <div className="text-[13px] font-semibold text-[var(--color-text)]">Tasks & Milestones</div>
 
-              <PropertyCard
+              <InlineOverrideRow
                 label="Background Color"
-                checked={criticalPathStyle.itemBackground.enabled}
-                onChange={(enabled) => updateCriticalPathStyle({ itemBackground: { ...criticalPathStyle.itemBackground, enabled } })}
-              >
-                <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: criticalPathStyle.itemBackground.color }} />
-              </PropertyCard>
-              {criticalPathStyle.itemBackground.enabled && (
-                <PropertyControlRow label="Color">
+                enabled={criticalPathStyle.itemBackground.enabled}
+                onToggle={(enabled) => updateCriticalPathStyle({ itemBackground: { ...criticalPathStyle.itemBackground, enabled } })}
+                trailing={(
                   <AdvancedColorPicker
                     value={criticalPathStyle.itemBackground.color}
+                    triggerSize="small"
                     onChange={(color) => updateCriticalPathStyle({ itemBackground: { ...criticalPathStyle.itemBackground, color } })}
                   />
-                </PropertyControlRow>
-              )}
+                )}
+              />
 
-              <PropertyCard
+              <InlineOverrideRow
                 label="Outline"
-                checked={criticalPathStyle.itemOutline.enabled}
-                onChange={(enabled) => updateCriticalPathStyle({ itemOutline: { ...criticalPathStyle.itemOutline, enabled } })}
-              >
-                <ThicknessIcon />
-              </PropertyCard>
-              {criticalPathStyle.itemOutline.enabled && (
-                <LabeledFieldPair
-                  leftLabel="Color"
-                  left={(
-                    <AdvancedColorPicker
-                      value={criticalPathStyle.itemOutline.color}
-                      onChange={(color) => updateCriticalPathStyle({ itemOutline: { ...criticalPathStyle.itemOutline, color } })}
-                    />
-                  )}
-                  rightLabel="Thickness"
-                  right={(
-                    <OutlineThicknessDropdown
-                      value={criticalPathStyle.itemOutline.thickness}
-                      onChange={(thickness) => updateCriticalPathStyle({ itemOutline: { ...criticalPathStyle.itemOutline, thickness } })}
-                    />
-                  )}
-                />
-              )}
+                enabled={criticalPathStyle.itemOutline.enabled}
+                onToggle={(enabled) => updateCriticalPathStyle({ itemOutline: { ...criticalPathStyle.itemOutline, enabled } })}
+                inlineControl={(
+                  <OutlineThicknessDropdown
+                    value={criticalPathStyle.itemOutline.thickness}
+                    onChange={(thickness) => updateCriticalPathStyle({ itemOutline: { ...criticalPathStyle.itemOutline, thickness } })}
+                  />
+                )}
+                trailing={(
+                  <AdvancedColorPicker
+                    value={criticalPathStyle.itemOutline.color}
+                    triggerSize="small"
+                    onChange={(color) => updateCriticalPathStyle({ itemOutline: { ...criticalPathStyle.itemOutline, color } })}
+                  />
+                )}
+              />
 
-              <PropertyCard
+              <InlineOverrideRow
                 label="Title Color"
-                checked={criticalPathStyle.titleColor.enabled}
-                onChange={(enabled) => updateCriticalPathStyle({ titleColor: { ...criticalPathStyle.titleColor, enabled } })}
-              >
-                <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: criticalPathStyle.titleColor.color }} />
-              </PropertyCard>
-              {criticalPathStyle.titleColor.enabled && (
-                <PropertyControlRow label="Color">
+                enabled={criticalPathStyle.titleColor.enabled}
+                onToggle={(enabled) => updateCriticalPathStyle({ titleColor: { ...criticalPathStyle.titleColor, enabled } })}
+                trailing={(
                   <AdvancedColorPicker
                     value={criticalPathStyle.titleColor.color}
+                    triggerSize="small"
                     onChange={(color) => updateCriticalPathStyle({ titleColor: { ...criticalPathStyle.titleColor, color } })}
                   />
-                </PropertyControlRow>
-              )}
+                )}
+              />
             </div>
 
-            <div className="space-y-3 rounded-xl border border-[var(--color-border)] p-3">
-              <div className="text-xs font-semibold text-[var(--color-text)]">Dependency Links</div>
+            <div className="space-y-2.5 border-t border-[var(--color-border)] pt-4">
+              <div className="text-[13px] font-semibold text-[var(--color-text)]">Dependency Links</div>
 
-              <PropertyCard
+              <InlineOverrideRow
                 label="Color"
-                checked={criticalPathStyle.dependencyColor.enabled}
-                onChange={(enabled) => updateCriticalPathStyle({ dependencyColor: { ...criticalPathStyle.dependencyColor, enabled } })}
-              >
-                <div className="w-5 h-5 rounded border border-[var(--color-border)]" style={{ backgroundColor: criticalPathStyle.dependencyColor.color }} />
-              </PropertyCard>
-              {criticalPathStyle.dependencyColor.enabled && (
-                <PropertyControlRow label="Color">
+                enabled={criticalPathStyle.dependencyColor.enabled}
+                onToggle={(enabled) => updateCriticalPathStyle({ dependencyColor: { ...criticalPathStyle.dependencyColor, enabled } })}
+                trailing={(
                   <AdvancedColorPicker
                     value={criticalPathStyle.dependencyColor.color}
+                    triggerSize="small"
                     onChange={(color) => updateCriticalPathStyle({ dependencyColor: { ...criticalPathStyle.dependencyColor, color } })}
                   />
-                </PropertyControlRow>
-              )}
+                )}
+              />
 
-              <PropertyCard
+              <InlineOverrideRow
                 label="Dash Type"
-                checked={criticalPathStyle.dependencyDash.enabled}
-                onChange={(enabled) => updateCriticalPathStyle({ dependencyDash: { ...criticalPathStyle.dependencyDash, enabled } })}
-              >
-                <DependencyDashPreview dasharray={DEP_LINE_DASH_OPTIONS.find((option) => option.id === criticalPathStyle.dependencyDash.dash)?.dasharray} />
-              </PropertyCard>
-              {criticalPathStyle.dependencyDash.enabled && (
-                <PropertyControlRow label="Dash">
-                  <DependencyLineDashDropdown
-                    value={criticalPathStyle.dependencyDash.dash}
-                    onChange={(dash) => updateCriticalPathStyle({ dependencyDash: { ...criticalPathStyle.dependencyDash, dash } })}
-                  />
-                </PropertyControlRow>
-              )}
+                enabled={criticalPathStyle.dependencyDash.enabled}
+                onToggle={(enabled) => updateCriticalPathStyle({ dependencyDash: { ...criticalPathStyle.dependencyDash, enabled } })}
+                inlineControl={(
+                  <DependencyDashPreview dasharray={DEP_LINE_DASH_OPTIONS.find((option) => option.id === criticalPathStyle.dependencyDash.dash)?.dasharray} />
+                )}
+              />
             </div>
           </div>
         </div>
@@ -1925,6 +1902,44 @@ function PropertyCard({
         className="accent-[var(--color-text)] w-4 h-4 cursor-pointer"
       />
     </div>
+  );
+}
+
+function InlineOverrideRow({
+  label,
+  enabled,
+  onToggle,
+  inlineControl,
+  trailing,
+}: {
+  label: string;
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+  inlineControl?: React.ReactNode;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <label className="flex items-center gap-3 min-h-9">
+      <span className="flex items-center gap-2 min-w-0 shrink-0">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onToggle(e.target.checked)}
+          className="accent-[var(--color-text)] w-4 h-4 cursor-pointer shrink-0"
+        />
+        <span className="text-sm font-medium text-[var(--color-text)] whitespace-nowrap">{label}</span>
+      </span>
+      {inlineControl && (
+        <div className="min-w-0 flex-1 flex justify-start">
+          {inlineControl}
+        </div>
+      )}
+      {trailing && (
+        <div className="shrink-0 ml-auto">
+          {trailing}
+        </div>
+      )}
+    </label>
   );
 }
 

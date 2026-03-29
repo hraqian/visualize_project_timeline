@@ -112,7 +112,7 @@ let recentColors: string[] = [];
 interface AdvancedColorPickerProps {
   value: string;
   onChange: (color: string) => void;
-  triggerSize?: 'default' | 'compact';
+  triggerSize?: 'default' | 'compact' | 'small';
 }
 
 export function AdvancedColorPicker({ value, onChange, triggerSize = 'default' }: AdvancedColorPickerProps) {
@@ -121,6 +121,7 @@ export function AdvancedColorPicker({ value, onChange, triggerSize = 'default' }
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const isCompact = triggerSize === 'compact';
+  const isSmall = triggerSize === 'small';
 
   const updatePos = useCallback(() => {
     if (!triggerRef.current) return;
@@ -170,11 +171,13 @@ export function AdvancedColorPicker({ value, onChange, triggerSize = 'default' }
           if (!isOpen) updatePos();
           setIsOpen(!isOpen);
         }}
-        className={`border cursor-pointer transition-all ${isCompact ? 'w-9 h-9 rounded-[10px]' : 'w-8 h-8 rounded-[10px]'}`}
+        className={`border cursor-pointer transition-all ${isSmall ? 'w-5 h-5 rounded-md' : isCompact ? 'w-9 h-9 rounded-[10px]' : 'w-8 h-8 rounded-[10px]'}`}
         style={{
           backgroundColor: value,
           borderColor: '#c8d3df',
-          boxShadow: isCompact
+          boxShadow: isSmall
+            ? 'inset 0 1px 0 rgba(255,255,255,0.35)'
+            : isCompact
             ? 'inset 0 1px 0 rgba(255,255,255,0.38), 0 1px 1px rgba(15,23,42,0.04)'
             : 'inset 0 1px 0 rgba(255,255,255,0.55)',
         }}

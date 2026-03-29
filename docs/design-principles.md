@@ -269,3 +269,26 @@ Rules:
 - sibling composite rows should reuse the exact same column proportions
 
 When a side-panel area mixes these grammars, each grammar should still be internally consistent. Do not improvise widths row-by-row.
+
+### Row Grammar C: override settings row
+
+Use for settings like:
+
+- critical path overrides
+- other optional visual overrides where a property can be enabled or disabled independently
+
+Structure:
+
+- checkbox
+- property label
+- optional inline control in the same row
+- optional compact preview chip or summary on the far right
+
+Rules:
+
+- these rows should stay flat and lightweight, not appear as cards within cards
+- enabling a property should not create a large expanded block if the control can reasonably fit inline
+- summary chips and inline swatches should belong to the same visual family and scale
+- section labels may group these rows, but the rows themselves should remain simple and quiet
+
+This grammar is for override-style settings, not for apply-to-all selection cards.
