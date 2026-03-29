@@ -780,7 +780,6 @@ function routeDepLink(
       dir: fromAxis,
     });
   }
-
   for (const point of endPorts) {
     const key = nodeKey(point[0], point[1]);
     const anchor = endPortToAnchor.get(key);
@@ -792,7 +791,6 @@ function routeDepLink(
       dir: toAxis,
     });
   }
-
   const stateKey = (node: NodeKey, dir: EdgeDir): StateKey => `${node}|${dir}`;
   const stateNode = new Map<StateKey, NodeKey>();
   const dist = new Map<StateKey, number>();
@@ -866,11 +864,19 @@ function routeDepLink(
 
   if (deduped.length < 2) return '';
 
+  const preservedIndices = new Set<number>();
+  if (deduped.length > 2) preservedIndices.add(1);
+  if (deduped.length > 3) preservedIndices.add(deduped.length - 2);
+
   const simplified: [number, number][] = [deduped[0]];
   for (let i = 1; i < deduped.length - 1; i++) {
     const a = simplified[simplified.length - 1];
     const b = deduped[i];
     const c = deduped[i + 1];
+    if (preservedIndices.has(i)) {
+      simplified.push(b);
+      continue;
+    }
     if ((approxEq(a[0], b[0]) && approxEq(b[0], c[0])) || (approxEq(a[1], b[1]) && approxEq(b[1], c[1]))) {
       continue;
     }
@@ -1452,7 +1458,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       }
     }
 
-    return dependencies
+    const entries = dependencies
       .map((dep) => {
         const from = visibleItems.find((i) => i.id === dep.fromId);
         const to = visibleItems.find((i) => i.id === dep.toId);
@@ -1537,7 +1543,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const endInset = dependencyArrowEndInset(arrowType, arrowSize, lineWidth, toDir);
         const path = routeDepLink(fromX, fromY, toX, toY, allObjRects, startObjRect, endObjRect, fromDir, toDir, visualClearance, endInset);
 
-        return {
+        const result = {
           path,
           isCritical,
           isHidden,
@@ -1553,8 +1559,10 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           targetX: toX,
           targetY: toY,
         };
+        return result;
       })
-      .filter(Boolean);
+      .filter((d): d is NonNullable<typeof d> => Boolean(d));
+    return entries;
   }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, zoom]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
