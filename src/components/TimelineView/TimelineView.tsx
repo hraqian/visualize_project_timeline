@@ -6,7 +6,7 @@ import { buildDependencyRenderGeometry, dependencyArrowEndInset, dependencyArrow
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, resolveAutoUnit } from '@/utils';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { DatePickerPopover } from './DatePickerPopover';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyType } from '@/types';
 
 // ─── Types for inline editing ────────────────────────────────────────────────
 
@@ -101,6 +101,59 @@ const SWIMLANE_PADDING_BOTTOM = 10;
 interface ObstacleRect { leftX: number; rightX: number; topY: number; bottomY: number }
 
 type AnchorDir = 'right' | 'left' | 'top' | 'bottom';
+
+function dependencyTypeToSides(type: DependencyType): { fromSide: 'start' | 'end'; toSide: 'start' | 'end' } {
+  switch (type) {
+    case 'start-to-start':
+      return { fromSide: 'start', toSide: 'start' };
+    case 'finish-to-finish':
+      return { fromSide: 'end', toSide: 'end' };
+    case 'start-to-finish':
+      return { fromSide: 'start', toSide: 'end' };
+    case 'finish-to-start':
+    default:
+      return { fromSide: 'end', toSide: 'start' };
+  }
+}
+
+function dependencySidesToType(fromSide: 'start' | 'end', toSide: 'start' | 'end'): DependencyType {
+  if (fromSide === 'start' && toSide === 'start') return 'start-to-start';
+  if (fromSide === 'end' && toSide === 'end') return 'finish-to-finish';
+  if (fromSide === 'start' && toSide === 'end') return 'start-to-finish';
+  return 'finish-to-start';
+}
+
+function getItemHorizontalAnchor(item: ProjectItem, side: 'start' | 'end', zoom: number, itemToX: (date: string) => number) {
+  if (item.type === 'milestone') {
+    const centerX = itemToX(item.startDate);
+    return side === 'start'
+      ? centerX - item.milestoneStyle.size / 2
+      : centerX + item.milestoneStyle.size / 2;
+  }
+
+  const startX = itemToX(item.startDate);
+  const endX = startX + differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+  return side === 'start' ? startX : endX;
+}
+
+function getDependencyPreviewOffset(type: DependencyType, predecessor: ProjectItem, successor: ProjectItem) {
+  const predStart = parseISO(predecessor.startDate);
+  const predEnd = parseISO(predecessor.endDate);
+  const succStart = parseISO(successor.startDate);
+  const succEnd = parseISO(successor.endDate);
+
+  switch (type) {
+    case 'start-to-start':
+      return differenceInDays(predStart, succStart);
+    case 'finish-to-finish':
+      return differenceInDays(predEnd, succEnd);
+    case 'start-to-finish':
+      return differenceInDays(predStart, succEnd);
+    case 'finish-to-start':
+    default:
+      return differenceInDays(addDays(predEnd, 1), succStart);
+  }
+}
 
 const DEFAULT_DEPENDENCY_COLOR = '#475569';
 const DEPENDENCY_DASH_MAP: Record<string, string | undefined> = {
@@ -1390,6 +1443,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const toRowTop = getItemRowTopY(to);
         const fp = dep.fromPoint ?? 'auto';
         const tp = dep.toPoint ?? 'auto';
+        const depSides = dependencyTypeToSides(dep.type ?? 'finish-to-start');
 
         // Compute actual bar/milestone vertical bounds within the row
         const fromBarTop = from.type === 'task'
@@ -1419,10 +1473,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
             : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom) / 2;
           fromY = fromBarBottom;
         } else {
-          // 'auto' or 'side' — FS default: right edge center of predecessor
-          fromX = from.type === 'milestone'
-            ? itemToX(from.startDate) + from.milestoneStyle.size / 2
-            : itemToX(from.startDate) + differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom;
+          fromX = getItemHorizontalAnchor(from, depSides.fromSide, zoom, itemToX);
           fromY = fromRowTop + ROW_BASE / 2;
         }
 
@@ -1444,16 +1495,13 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
             : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * zoom + zoom) / 2;
           toY = toBarBottom;
         } else {
-          // 'auto' or 'side' — FS default: left edge center of successor
-          toX = to.type === 'milestone'
-            ? itemToX(to.startDate) - to.milestoneStyle.size / 2
-            : itemToX(to.startDate);
+          toX = getItemHorizontalAnchor(to, depSides.toSide, zoom, itemToX);
           toY = toRowTop + ROW_BASE / 2;
         }
 
         // Determine anchor directions for routing
-        const fromDir: AnchorDir = (fp === 'top') ? 'top' : (fp === 'bottom') ? 'bottom' : 'right';
-        const toDir: AnchorDir = (tp === 'top') ? 'top' : (tp === 'bottom') ? 'bottom' : 'left';
+        const fromDir: AnchorDir = (fp === 'top') ? 'top' : (fp === 'bottom') ? 'bottom' : (depSides.fromSide === 'start' ? 'left' : 'right');
+        const toDir: AnchorDir = (tp === 'top') ? 'top' : (tp === 'bottom') ? 'bottom' : (depSides.toSide === 'start' ? 'left' : 'right');
         const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
 
         // Pass all obstacles + source/target object rects to the router
@@ -1686,9 +1734,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const inX = mouseX >= pos.leftX - HIT_PAD && mouseX <= pos.rightX + HIT_PAD;
         const inY = mouseY >= pos.centerY - pos.barHeight / 2 - HIT_PAD && mouseY <= pos.centerY + pos.barHeight / 2 + HIT_PAD;
         if (inX && inY) {
-          // For FS deps, always connect to 'start' side of target
           bestId = pos.id;
-          bestSide = 'start';
+          bestSide = mouseX <= (pos.leftX + pos.rightX) / 2 ? 'start' : 'end';
           break;
         }
       }
@@ -1711,21 +1758,20 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       setDepDrag(null);
 
       if (currentDrag?.targetId && currentDrag.targetId !== currentDrag.sourceId) {
-        // Determine fromId/toId based on FS convention
-        // Drag from right handle (end) of predecessor → left handle (start) of successor
-        const fromId = currentDrag.sourceSide === 'end' ? currentDrag.sourceId : currentDrag.targetId;
-        const toId = currentDrag.sourceSide === 'end' ? currentDrag.targetId : currentDrag.sourceId;
+        const targetSide = currentDrag.targetSide ?? 'start';
+        const dependencyType = dependencySidesToType(currentDrag.sourceSide, targetSide);
+        const fromId = currentDrag.sourceId;
+        const toId = currentDrag.targetId;
 
         // Check if dependency already exists
         const deps = dependenciesRef.current;
         const existing = deps.find((d) => d.fromId === fromId && d.toId === toId);
         if (existing) {
-          if (existing.type !== 'finish-to-start') {
-            updateDependencyRef.current(fromId, toId, { type: 'finish-to-start', forceSchedule: true });
+          if (existing.type !== dependencyType) {
+            updateDependencyRef.current(fromId, toId, { type: dependencyType, forceSchedule: true });
           }
-          // else: same FS already exists, ignore
         } else {
-          addDependencyRef.current(fromId, toId, { type: 'finish-to-start', forceSchedule: true });
+          addDependencyRef.current(fromId, toId, { type: dependencyType, forceSchedule: true });
         }
       }
     };
@@ -1775,19 +1821,15 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   }, [draggingId, dragOffset, zoom, items]);
 
   // ─── Dependency drag preview: compute where the target would move ────────
-  // For FS: successor start = predecessor endDate + 1 day
   const depDragPreview = useMemo<{ targetId: string; offsetPx: number } | null>(() => {
     if (!depDrag?.targetId) return null;
-    // Determine fromId/toId based on FS convention (same logic as onUp)
-    const fromId = depDrag.sourceSide === 'end' ? depDrag.sourceId : depDrag.targetId;
-    const toId = depDrag.sourceSide === 'end' ? depDrag.targetId : depDrag.sourceId;
+    const dependencyType = dependencySidesToType(depDrag.sourceSide, depDrag.targetSide ?? 'start');
+    const fromId = depDrag.sourceId;
+    const toId = depDrag.targetId;
     const predecessor = visibleItems.find((i) => i.id === fromId);
     const successor = visibleItems.find((i) => i.id === toId);
     if (!predecessor || !successor) return null;
-    // FS constraint: successor starts the day after predecessor ends
-    const constrainedStart = addDays(parseISO(predecessor.endDate), 1);
-    const currentStart = parseISO(successor.startDate);
-    const daysDelta = differenceInDays(constrainedStart, currentStart);
+    const daysDelta = getDependencyPreviewOffset(dependencyType, predecessor, successor);
     if (daysDelta <= 0) return null; // Already at or after constraint — no move needed
     return { targetId: toId, offsetPx: daysDelta * zoom };
   }, [depDrag, visibleItems, zoom]);
@@ -2291,7 +2333,9 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     .map((p) => ({ leftX: p.leftX, rightX: p.rightX, topY: p.centerY - p.barHeight / 2, bottomY: p.centerY + p.barHeight / 2 }));
                   const sourceObjRect = allObjRects[sourceIdx >= 0 ? sourceIdx : 0];
                   const targetObjRect = allObjRects[targetIdx >= 0 ? targetIdx : 0];
-                  path = routeDepLink(fromX, fromY, endX, endY, allObjRects, sourceObjRect, targetObjRect, 'right', 'left', dependencyArrowVisualClearance(1.5, 4), dependencyArrowEndInset('standard', 4, 1.5, 'left'));
+                  const fromDir: AnchorDir = depDrag.sourceSide === 'start' ? 'left' : 'right';
+                  const toDir: AnchorDir = depDrag.targetSide === 'end' ? 'right' : 'left';
+                  path = routeDepLink(fromX, fromY, endX, endY, allObjRects, sourceObjRect, targetObjRect, fromDir, toDir, dependencyArrowVisualClearance(1.5, 4), dependencyArrowEndInset('standard', 4, 1.5, toDir));
                 } else {
                   // Free-dragging — simple orthogonal routing
                   const gap = endX - fromX;
