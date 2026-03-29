@@ -634,6 +634,28 @@ function routeDepLink(
     addY(py);
   }
 
+  const innerMinX = minX;
+  const innerMaxX = maxX;
+  const innerMinY = minY;
+  const innerMaxY = maxY;
+
+  const addGapMidpoints = (values: Set<number>, lower: number, upper: number) => {
+    const sorted = Array.from(values).sort((a, b) => a - b);
+    for (let i = 0; i < sorted.length - 1; i += 1) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      const gap = b - a;
+      if (gap <= 8) continue;
+      const mid = round3((a + b) / 2);
+      if (mid > lower + GEOM_EPS && mid < upper - GEOM_EPS) {
+        values.add(mid);
+      }
+    }
+  };
+
+  addGapMidpoints(xSet, innerMinX, innerMaxX);
+  addGapMidpoints(ySet, innerMinY, innerMaxY);
+
   const xs = Array.from(xSet).sort((a, b) => a - b);
   const ys = Array.from(ySet).sort((a, b) => a - b);
 
