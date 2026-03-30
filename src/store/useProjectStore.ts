@@ -195,11 +195,17 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     const computeNext = (prev: ProjectStore): ProjectStore => {
       const next = typeof partial === 'function' ? partial(prev) : partial;
       const keys = Object.keys(next as object);
-      // Check if any saveable key is being changed
-      const touchesSaveable = keys.some((k) => SAVEABLE_KEYS.has(k));
+      const nextRecord = next as unknown as Record<string, unknown>;
+      const prevRecord = prev as unknown as Record<string, unknown>;
+      const changedKeys = keys.filter((k) => !Object.is(
+        nextRecord[k],
+        prevRecord[k],
+      ));
+      // Check if any saveable key actually changed
+      const touchesSaveable = changedKeys.some((k) => SAVEABLE_KEYS.has(k));
       if (touchesSaveable && !Object.prototype.hasOwnProperty.call(next as Record<string, unknown>, 'isDirty')) {
         // Push undo snapshot only when undoable keys are touched
-        const touchesUndoable = keys.some((k) => UNDOABLE_KEYS.has(k as UndoableKey));
+        const touchesUndoable = changedKeys.some((k) => UNDOABLE_KEYS.has(k as UndoableKey));
         if (!isUndoRedoing && touchesUndoable) {
           undoStack.push(takeSnapshot(prev as unknown as ProjectStore));
           if (undoStack.length > MAX_UNDO) undoStack.shift();
