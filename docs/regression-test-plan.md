@@ -28,9 +28,16 @@ npm run verify:regression
 - all 4 `toPoint` connection settings
 - total: 64 combinations
 
+- style-variant routing robustness checks
+- Data <-> Timeline view switching
+
 - scheduling cascade behavior
 - dependency add / update / remove behavior
 - save / load / delete project flow through the storage layer
+- Escape cancellation for timeline task drag
+- Escape cancellation for dependency drag-to-connect
+- Escape cancellation for timeline date picker
+- Escape deselection for selected dependency
 
 The verification currently flags these failure patterns:
 
@@ -41,6 +48,7 @@ The verification currently flags these failure patterns:
 - failed scheduling cascade expectations
 - failed dependency update/remove expectations
 - failed save/load/delete expectations
+- failed Escape cancellation expectations
 
 ## When to run the automated verification
 
