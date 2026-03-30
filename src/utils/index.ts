@@ -403,25 +403,13 @@ export function getTimescaleFitDiagnostics(
   });
 }
 
-export function resolveAutoUnitByFit(
-  rangeStart: Date,
-  rangeEnd: Date,
-  fiscalYearStartMonth: number,
-  barWidthPx: number,
-  tierConfig?: Pick<TimescaleTierConfig, 'fontFamily' | 'fontWeight' | 'fontStyle' | 'fontSize'>,
-): Exclude<TimescaleTier, 'auto'> {
-  const totalDays = differenceInDays(rangeEnd, rangeStart) + 1;
-  const startUnit = resolveAutoUnit(totalDays);
-  const diagnostics = getTimescaleFitDiagnostics(rangeStart, rangeEnd, fiscalYearStartMonth, barWidthPx, tierConfig);
-  const startIdx = AUTO_UNIT_ORDER.indexOf(startUnit);
-  const firstFitting = diagnostics.slice(startIdx).find((entry) => entry.fitsPrefixedFirstCell);
-  return firstFitting?.unit ?? 'year';
-}
-
 /**
  * Build visible tier cells from raw labels.
  * Shared by both the main TimelineView and the Tier Settings Modal preview.
  * Works in fractional (0-1) coordinates; callers convert to px or % as needed.
+ *
+ * `allowSkip` is only intended for explicit user-selected units. In `Auto`,
+ * the unit solver should escalate the unit instead of relying on skipped labels.
  */
 export function buildVisibleTierCells(
   labels: TimescaleLabel[],
@@ -436,7 +424,7 @@ export function buildVisibleTierCells(
   const minLabelWidth: Record<string, number> = { day: 60, week: 70, month: 50, quarter: 50, year: 50 };
   const minW = minLabelWidth[unit] ?? 40;
 
-  // Calculate skip factor using a full interior cell
+  // For explicit user-selected units, skip labels only as a readability fallback.
   let skipFactor = 1;
   if (allowSkip && labels.length > 1) {
     const refIdx = Math.min(1, labels.length - 1);
@@ -448,7 +436,7 @@ export function buildVisibleTierCells(
     }
   }
 
-  // Build cells — origin and end are aligned to unit boundaries so no partial cells
+  // Build cells — origin and end are already aligned to full unit boundaries.
   const rawCells: TierCell[] = [];
   for (let i = 0; i < labels.length; i += skipFactor) {
     const startFrac = Math.max(differenceInDays(labels[i].startDate, originDate) / totalDays, 0);
