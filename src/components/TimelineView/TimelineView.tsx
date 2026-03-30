@@ -3060,9 +3060,27 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               : style.dateLabelPosition === 'center'
               ? { left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: style.dateTextAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
               : style.dateLabelPosition === 'above'
-              ? { left: 0, bottom: '100%', marginBottom: style.showTitle && style.labelPosition === 'above' ? 16 : 2 }
+              ? {
+                  left: 0,
+                  right: 0,
+                  bottom: '100%',
+                  marginBottom: style.showTitle && style.labelPosition === 'above' ? 16 : 2,
+                  textAlign: style.dateTextAlign ?? 'left',
+                  maxWidth: 'none',
+                  paddingLeft: 4,
+                  paddingRight: 4,
+                }
               : style.dateLabelPosition === 'below'
-              ? { left: 0, top: '100%', marginTop: style.showTitle && style.labelPosition === 'below' ? 16 : 2 }
+              ? {
+                  left: 0,
+                  right: 0,
+                  top: '100%',
+                  marginTop: style.showTitle && style.labelPosition === 'below' ? 16 : 2,
+                  textAlign: style.dateTextAlign ?? 'left',
+                  maxWidth: 'none',
+                  paddingLeft: 4,
+                  paddingRight: 4,
+                }
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
           }}
           onClick={(e) => { e.stopPropagation(); onClickSection('date'); }}
