@@ -35,6 +35,11 @@ import {
 } from 'lucide-react';
 import type { ActiveView } from '@/types';
 
+type ExportTestApi = {
+  exportPNG: () => Promise<void>;
+  exportPPTX: () => Promise<void>;
+};
+
 function App() {
   const activeView = useProjectStore((s) => s.activeView);
   const setActiveView = useProjectStore((s) => s.setActiveView);
@@ -153,11 +158,27 @@ function App() {
       store.swimlanes,
       store.dependencies,
       store.timescale,
-      store.zoom,
       store.taskLayout,
       store.swimlaneSpacing,
     );
   }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const testWindow = window as Window & {
+      __PROJECT_STORE__?: typeof useProjectStore;
+      __EXPORT_TEST_API__?: ExportTestApi;
+    };
+    testWindow.__PROJECT_STORE__ = useProjectStore;
+    testWindow.__EXPORT_TEST_API__ = {
+      exportPNG,
+      exportPPTX,
+    };
+    return () => {
+      delete testWindow.__PROJECT_STORE__;
+      delete testWindow.__EXPORT_TEST_API__;
+    };
+  }, [exportPNG, exportPPTX]);
 
   const viewTabs: { id: ActiveView; label: string; icon: typeof List }[] = [
     { id: 'data', label: 'Data', icon: List },
