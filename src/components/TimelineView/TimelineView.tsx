@@ -2379,6 +2379,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     <g key={dep.key} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
                       {/* Invisible fat hit area for clicking */}
                       <path
+                        data-testid={`dependency-hit-${dep.key}`}
                         d={linePath}
                         fill="none"
                         stroke="transparent"
@@ -2932,6 +2933,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
           {/* Left (start) handle */}
           <div
             className="dep-handle"
+            data-testid={`dep-handle-start-${item.id}`}
             title="Click+drag to add dependency"
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
             style={{
@@ -2950,6 +2952,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
           {/* Right (end) handle */}
           <div
             className="dep-handle"
+            data-testid={`dep-handle-end-${item.id}`}
             title="Click+drag to add dependency"
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
             style={{
@@ -3000,6 +3003,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       {/* Title Label */}
       {style.showTitle && (
         <div
+          data-testid={`task-title-label-${item.id}`}
           className={`absolute whitespace-nowrap cursor-pointer ${isEditing('title') ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
           style={{
             fontSize: style.fontSize,
@@ -3042,6 +3046,7 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
       {/* Date Label */}
       {style.showDate && (
         <div
+          data-testid={`task-date-label-${item.id}`}
           className="absolute whitespace-nowrap truncate cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
           style={{
             fontSize: style.dateFontSize,
@@ -3302,6 +3307,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
     // Build the date element
     const dateEl = style.showDate ? (
       <div
+        data-testid={`milestone-date-label-${item.id}`}
         className="whitespace-nowrap cursor-pointer text-center hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
         style={{
           fontSize: style.dateFontSize,
@@ -3375,6 +3381,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
             {/* Left handle */}
             <div
               className="dep-handle"
+              data-testid={`dep-handle-start-${item.id}`}
               title="Click+drag to add dependency"
               onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
               style={{
@@ -3393,6 +3400,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
             {/* Right handle */}
             <div
               className="dep-handle"
+              data-testid={`dep-handle-end-${item.id}`}
               title="Click+drag to add dependency"
               onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
               style={{
@@ -3486,6 +3494,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           {/* Left handle */}
           <div
             className="dep-handle"
+            data-testid={`dep-handle-start-${item.id}`}
             title="Click+drag to add dependency"
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
             style={{
@@ -3503,6 +3512,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           {/* Right handle */}
           <div
             className="dep-handle"
+            data-testid={`dep-handle-end-${item.id}`}
             title="Click+drag to add dependency"
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
             style={{
@@ -3568,8 +3578,9 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
               item.name
             )}
           </div>
-          <div
-            className="cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
+            <div
+              data-testid={`milestone-date-label-${item.id}`}
+              className="cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
             style={{
               fontSize: style.dateFontSize,
               fontFamily: style.dateFontFamily,
@@ -3621,6 +3632,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           {/* Date label */}
           {style.showDate && (
             <div
+              data-testid={`milestone-date-label-${item.id}`}
               className="absolute whitespace-nowrap cursor-pointer hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1"
               style={{
                 fontSize: style.dateFontSize,
