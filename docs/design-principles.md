@@ -179,6 +179,41 @@ These heuristics should be used when evaluating any new or existing control.
 - spacing should indicate group boundaries more than borders do
 - close, cancel, and confirm actions should always follow the same visual logic
 
+## Timescale Rules
+
+The timescale bar is not freeform text layout. It is a deterministic schedule scale and must follow strict construction rules.
+
+These rules apply equally to:
+
+- the main Timeline view timescale bar
+- the Tier Settings modal preview
+
+### Construction Rules
+
+1. Start from the total visible bar width.
+2. For a chosen unit, all rendered cells use the same width.
+3. The required width for that unit is based on the label pattern that must fit in the first visible cell.
+4. For sequential units, the first visible cell must fit the prefixed label:
+   - `Week <n>` for week tiers
+   - `Day <n>` for day tiers
+5. No partial units are allowed in the rendered bar.
+6. If a unit cannot fit the visible schedule using full cells, `Auto` must move to the next larger unit:
+   - `day -> week -> month -> quarter -> year`
+7. This unit escalation rule applies only when the unit is `Auto`.
+8. If the user explicitly selects a unit, the app must keep that unit and allow visual overflow rather than silently changing units.
+9. The timescale layout must be recalculated whenever the schedule range changes.
+
+### Behavioral Implications
+
+- the first and last visible cells must represent full units, not clipped fragments
+- the first visible week/day cell must not be prefixed unless the full prefixed label can fit in that unit's real cell width
+- skipping labels inside a unit is not a substitute for unit escalation in `Auto`
+- if a user-selected unit is too dense, the UI may overflow, but it must still preserve full-unit boundaries
+
+### Debugging Rule
+
+If the bar shows distorted labels such as `Week 80`, clipped prefixes, or overlapping first-cell text, treat that as a timescale construction failure first, not a schedule-data failure.
+
 ## Red Flags
 
 The following usually indicate UI drift or weak design quality:

@@ -98,7 +98,7 @@ interface LayoutContext {
   origin: string;
   totalDays: number;
   totalWidth: number; // px
-  zoom: number;
+  dayWidth: number;
   scale: number; // px to inches
   offsetX: number; // inches offset for content area
   offsetY: number; // inches offset (below timescale)
@@ -152,7 +152,6 @@ function computeLayout(
   items: ProjectItem[],
   swimlanes: Swimlane[],
   timescale: TimescaleConfig,
-  zoom: number,
   taskLayout: TaskLayout,
   swimlaneSpacing: number,
 ): {
@@ -204,8 +203,12 @@ function computeLayout(
   };
 
   // Range computation — shared with TimelineView
-  const { origin, totalDays, rangeEndDate } = getProjectRangePadded(items, timescale);
-  const totalWidth = totalDays * zoom;
+  const EXPORT_TIMESCALE_SIDE_MARGIN = 24;
+  const getReservedEndCapWidth = (fontSize?: number) => (fontSize ?? 16) * 3 + 16;
+  const availableBarWidthPx = 920 - (EXPORT_TIMESCALE_SIDE_MARGIN * 2) - getReservedEndCapWidth(timescale.leftEndCap?.fontSize) - getReservedEndCapWidth(timescale.rightEndCap?.fontSize);
+  const { origin, totalDays, rangeEndDate } = getProjectRangePadded(items, timescale, availableBarWidthPx);
+  const totalWidth = Math.max(availableBarWidthPx, 200);
+  const dayWidth = totalDays > 0 ? totalWidth / totalDays : 0;
 
   // Above milestones height
   const aboveRowGap = 4;
@@ -270,7 +273,7 @@ function computeLayout(
     origin,
     totalDays,
     totalWidth,
-    zoom,
+    dayWidth,
     scale,
     offsetX,
     offsetY: offsetY + (aboveHeightPx + timescaleHeightPx) * scale,
@@ -347,7 +350,7 @@ function px2in(px: number, scale: number): number {
 }
 
 function itemX(date: string, ctx: LayoutContext): number {
-  return ctx.offsetX + differenceInDays(parseISO(date), parseISO(ctx.origin)) * ctx.zoom * ctx.scale;
+  return ctx.offsetX + differenceInDays(parseISO(date), parseISO(ctx.origin)) * ctx.dayWidth * ctx.scale;
 }
 
 function canvasY(pyPx: number, ctx: LayoutContext): number {
@@ -461,7 +464,7 @@ function drawTimescale(
 
   // Today marker
   if (timescale.showToday) {
-    const todayXPx = differenceInDays(new Date(), parseISO(origin)) * ctx.zoom;
+    const todayXPx = differenceInDays(new Date(), parseISO(origin)) * ctx.dayWidth;
     if (todayXPx >= 0 && todayXPx <= ctx.totalWidth) {
       const tx = ctx.offsetX + px2in(todayXPx, ctx.scale);
       const lineTop = ctx.timescaleY;
@@ -479,7 +482,7 @@ function drawTimescale(
 
   // Elapsed time bar
   if (timescale.showElapsedTime) {
-    const todayXPx = differenceInDays(new Date(), parseISO(origin)) * ctx.zoom;
+    const todayXPx = differenceInDays(new Date(), parseISO(origin)) * ctx.dayWidth;
     if (todayXPx > 0) {
       const barW = px2in(Math.min(todayXPx, ctx.totalWidth), ctx.scale);
       const thickness = (timescale.elapsedTimeThickness ?? 'thin') === 'thick' ? 6 : 3;
@@ -508,7 +511,7 @@ function drawGridLines(
   if (tierLabels.length === 0) return;
   const lastTier = tierLabels[tierLabels.length - 1];
   for (const label of lastTier.labels) {
-    const xPx = differenceInDays(label.startDate, parseISO(ctx.origin)) * ctx.zoom;
+    const xPx = differenceInDays(label.startDate, parseISO(ctx.origin)) * ctx.dayWidth;
     if (xPx <= 0 || xPx >= ctx.totalWidth) continue;
     const x = ctx.offsetX + px2in(xPx, ctx.scale);
     slide.addShape('line', {
@@ -589,7 +592,7 @@ function drawTaskBar(
 ) {
   const style = item.taskStyle;
   const x = itemX(item.startDate, ctx);
-  const barWidthPx = (differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) + 1) * ctx.zoom;
+  const barWidthPx = (differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) + 1) * ctx.dayWidth;
   const w = px2in(Math.max(barWidthPx, 8), ctx.scale);
   const barHeightPx = style.thickness;
   const h = px2in(barHeightPx, ctx.scale);
@@ -786,7 +789,7 @@ function drawMilestone(
   aboveYPx?: number,
 ) {
   const style = item.milestoneStyle;
-  const xPx = differenceInDays(parseISO(item.startDate), parseISO(ctx.origin)) * ctx.zoom;
+  const xPx = differenceInDays(parseISO(item.startDate), parseISO(ctx.origin)) * ctx.dayWidth;
   const centerX = ctx.offsetX + px2in(xPx, ctx.scale);
   const sizePx = style.size;
   const sizeIn = px2in(sizePx, ctx.scale);
@@ -894,12 +897,12 @@ function drawDependencies(
     if (!from || !to) continue;
 
     // Compute from point
-    const fromEndXPx = differenceInDays(parseISO(from.endDate), parseISO(ctx.origin)) * ctx.zoom +
-      (from.type === 'task' ? ctx.zoom : from.milestoneStyle.size / 2);
+    const fromEndXPx = differenceInDays(parseISO(from.endDate), parseISO(ctx.origin)) * ctx.dayWidth +
+      (from.type === 'task' ? ctx.dayWidth : from.milestoneStyle.size / 2);
     const fromX = ctx.offsetX + px2in(fromEndXPx, ctx.scale);
 
     // Compute to point
-    const toStartXPx = differenceInDays(parseISO(to.startDate), parseISO(ctx.origin)) * ctx.zoom -
+    const toStartXPx = differenceInDays(parseISO(to.startDate), parseISO(ctx.origin)) * ctx.dayWidth -
       (to.type === 'milestone' ? to.milestoneStyle.size / 2 : 0);
     const toX = ctx.offsetX + px2in(toStartXPx, ctx.scale);
 
@@ -957,7 +960,6 @@ export async function exportNativePptx(
   swimlanes: Swimlane[],
   dependencies: Dependency[],
   timescale: TimescaleConfig,
-  zoom: number,
   taskLayout: TaskLayout,
   swimlaneSpacing: number,
 ): Promise<void> {
@@ -971,7 +973,7 @@ export async function exportNativePptx(
     canvasHeight,
     tierLabels,
     rangeEndDate,
-  } = computeLayout(items, swimlanes, timescale, zoom, taskLayout, swimlaneSpacing);
+  } = computeLayout(items, swimlanes, timescale, taskLayout, swimlaneSpacing);
 
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });
@@ -1026,5 +1028,13 @@ export async function exportNativePptx(
 
   // Write file
   const fileName = `${projectName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx`;
+  if (import.meta.env.DEV) {
+    (window as Window & {
+      __LAST_PPTX_EXPORT__?: { fileName: string; slideCount: number };
+    }).__LAST_PPTX_EXPORT__ = {
+      fileName,
+      slideCount: 1,
+    };
+  }
   await pptx.writeFile({ fileName });
 }

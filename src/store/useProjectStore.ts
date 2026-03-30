@@ -47,7 +47,6 @@ interface ProjectActions {
   setSelectedSwimlane: (id: string | null) => void;
   setSelectedDepKey: (key: string | null) => void;
   setStylePaneSection: (section: StylePaneSection | null) => void;
-  setZoom: (zoom: number) => void;
   setTaskLayout: (layout: TaskLayout) => void;
   setSwimlaneSpacing: (spacing: number) => void;
   setSelectedTierIndex: (index: number | null) => void;
@@ -159,7 +158,7 @@ type DependencyStyleKey = keyof Pick<Dependency, 'visible' | 'fromPoint' | 'toPo
 // Keys that mark the project dirty (all saveable project data + settings)
 const SAVEABLE_KEYS: Set<string> = new Set([
   'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies',
-  'statusLabels', 'columnVisibility', 'timescale', 'zoom', 'swimlaneSpacing', 'showCriticalPath', 'criticalPathStyle', 'taskLayout',
+  'statusLabels', 'columnVisibility', 'timescale', 'swimlaneSpacing', 'showCriticalPath', 'criticalPathStyle', 'taskLayout',
   'showDependencies', 'dependencySettings',
 ]);
 
@@ -244,7 +243,6 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   criticalPathStyle: { ...DEFAULT_CRITICAL_PATH_STYLE },
   showDependencies: false,
   dependencySettings: { ...DEFAULT_DEPENDENCY_SETTINGS },
-  zoom: 8,
   taskLayout: 'single-row',
   swimlaneSpacing: 5,
   selectedTierIndex: null,
@@ -257,7 +255,6 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   setSelectedSwimlane: (id) => set({ selectedSwimlaneId: id, selectedItemId: null, selectedDepKey: null, stylePaneSection: 'swimlaneTitle' }),
   setSelectedDepKey: (key) => set({ selectedDepKey: key, selectedItemId: null, selectedSwimlaneId: null, stylePaneSection: null }),
   setStylePaneSection: (section) => set({ stylePaneSection: section }),
-  setZoom: (zoom) => set({ zoom: Math.max(2, Math.min(30, zoom)) }),
   setTaskLayout: (layout) => set({ taskLayout: layout }),
   setSwimlaneSpacing: (spacing) => set({ swimlaneSpacing: Math.max(0, Math.min(40, spacing)) }),
   setSelectedTierIndex: (index) => set({ selectedTierIndex: index }),
@@ -351,7 +348,6 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       criticalPathStyle: { ...DEFAULT_CRITICAL_PATH_STYLE },
       showDependencies: depDefaults.enabled,
       dependencySettings: { ...depDefaults },
-      zoom: 8,
       taskLayout: 'single-row',
       swimlaneSpacing: 5,
       selectedTierIndex: null,

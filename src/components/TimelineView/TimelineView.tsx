@@ -3,10 +3,9 @@ import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, addDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { buildDependencyRenderGeometry, dependencyArrowEndInset, dependencyArrowVisualClearance } from '@/components/common/dependencyArrowGeometry';
-import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, resolveAutoUnit } from '@/utils';
-import { ZoomIn, ZoomOut } from 'lucide-react';
+import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, getTimescaleFitDiagnostics, resolveAutoUnit, resolveAutoUnitByFit } from '@/utils';
 import { DatePickerPopover } from './DatePickerPopover';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyType } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyType, TimescaleTier } from '@/types';
 
 // ─── Types for inline editing ────────────────────────────────────────────────
 
@@ -123,7 +122,7 @@ function dependencySidesToType(fromSide: 'start' | 'end', toSide: 'start' | 'end
   return 'finish-to-start';
 }
 
-function getItemHorizontalAnchor(item: ProjectItem, side: 'start' | 'end', zoom: number, itemToX: (date: string) => number) {
+function getItemHorizontalAnchor(item: ProjectItem, side: 'start' | 'end', dayWidth: number, itemToX: (date: string) => number) {
   if (item.type === 'milestone') {
     const centerX = itemToX(item.startDate);
     return side === 'start'
@@ -132,7 +131,7 @@ function getItemHorizontalAnchor(item: ProjectItem, side: 'start' | 'end', zoom:
   }
 
   const startX = itemToX(item.startDate);
-  const endX = startX + differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+  const endX = startX + differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
   return side === 'start' ? startX : endX;
 }
 
@@ -1058,8 +1057,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const swimlanes = useProjectStore((s) => s.swimlanes);
   const dependencies = useProjectStore((s) => s.dependencies);
   const timescale = useProjectStore((s) => s.timescale);
-  const zoom = useProjectStore((s) => s.zoom);
-  const setZoom = useProjectStore((s) => s.setZoom);
   const selectedItemId = useProjectStore((s) => s.selectedItemId);
   const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
   const selectedSwimlaneId = useProjectStore((s) => s.selectedSwimlaneId);
@@ -1148,6 +1145,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const containerRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [timelineContainerWidth, setTimelineContainerWidth] = useState(0);
   useImperativeHandle(ref, () => ({
     getExportElement: () => exportRef.current,
   }));
@@ -1311,9 +1309,32 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   }, [getRow, belowIndependentItems, swimlanedItems, sortedSwimlanes]);
 
   // Compute project range with padding — origin aligned to unit boundaries
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const updateWidth = () => setTimelineContainerWidth(el.clientWidth);
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const TIMESCALE_SIDE_MARGIN = 24;
+  const getReservedEndCapWidth = (fontSize?: number) => (fontSize ?? 16) * 3 + 16;
+
+  const timelineAutoBarWidth = useMemo(() => {
+    if (timelineContainerWidth <= 0) return undefined;
+    const reserved = (TIMESCALE_SIDE_MARGIN * 2)
+      + getReservedEndCapWidth(timescale.leftEndCap?.fontSize)
+      + getReservedEndCapWidth(timescale.rightEndCap?.fontSize);
+    return Math.max(timelineContainerWidth - reserved, 200);
+  }, [timelineContainerWidth, timescale.leftEndCap?.fontSize, timescale.rightEndCap?.fontSize]);
+
   const { origin, totalDays, rangeEndDate } = useMemo(
-    () => getProjectRangePadded(items, timescale),
-    [items, timescale],
+    () => getProjectRangePadded(items, timescale, timelineAutoBarWidth),
+    [items, timescale, timelineAutoBarWidth],
   );
 
   // Migrate legacy single-tier {unit:'month', format:'MMM'} to unit:'auto' for already-loaded projects
@@ -1328,39 +1349,62 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-fit zoom to container width on mount
-  useEffect(() => {
-    if (!containerRef.current || totalDays <= 0) return;
-    const containerWidth = containerRef.current.clientWidth;
-    if (containerWidth <= 0) return;
-    // Reserve space for end cap labels so the bar + caps fit without scrolling
-    let reserved = 0;
-    if (timescale.leftEndCap?.show) reserved += (timescale.leftEndCap.fontSize ?? 16) * 3 + 12;
-    if (timescale.rightEndCap?.show) reserved += (timescale.rightEndCap.fontSize ?? 16) * 3 + 12;
-    const available = Math.max(containerWidth - reserved, totalDays * 2);
-    const idealZoom = Math.floor(available / totalDays);
-    const clamped = Math.max(2, Math.min(30, idealZoom));
-    if (clamped !== zoom) setZoom(clamped);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalDays]);
+  const totalWidth = timelineAutoBarWidth ?? Math.max(totalDays * 8, 200);
+  const dayWidth = totalDays > 0 ? totalWidth / totalDays : 0;
+  const resolvedAutoUnitByWidth = useMemo(
+    () => resolveAutoUnitByFit(
+      parseISO(origin),
+      rangeEndDate,
+      timescale.fiscalYearStartMonth,
+      totalWidth,
+      timescale.tiers.find((tier) => tier.unit === 'auto'),
+    ),
+    [origin, rangeEndDate, timescale.fiscalYearStartMonth, totalWidth, timescale.tiers],
+  );
 
-  const totalWidth = totalDays * zoom;
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const diagnostics = getTimescaleFitDiagnostics(
+      parseISO(origin),
+      rangeEndDate,
+      timescale.fiscalYearStartMonth,
+      totalWidth,
+      timescale.tiers.find((tier) => tier.unit === 'auto'),
+    );
+    (window as Window & {
+      __TIMESCALE_FIT_DEBUG__?: {
+        origin: string;
+        totalDays: number;
+        totalWidth: number;
+        resolvedAutoUnit: Exclude<TimescaleTier, 'auto'>;
+        resolvedAutoUnitByWidth: Exclude<TimescaleTier, 'auto'>;
+        diagnostics: ReturnType<typeof getTimescaleFitDiagnostics>;
+      };
+    }).__TIMESCALE_FIT_DEBUG__ = {
+      origin,
+      totalDays,
+      totalWidth,
+      resolvedAutoUnit: resolveAutoUnit(totalDays),
+      resolvedAutoUnitByWidth,
+      diagnostics,
+    };
+  }, [origin, totalDays, totalWidth, rangeEndDate, timescale.fiscalYearStartMonth, resolvedAutoUnitByWidth, timescale.tiers]);
 
   // Reserve horizontal space for end cap labels so they don't get clipped
-  const leftCapWidth = timescale.leftEndCap?.show ? (timescale.leftEndCap.fontSize ?? 16) * 3 + 12 : 0;
-  const rightCapWidth = timescale.rightEndCap?.show ? (timescale.rightEndCap.fontSize ?? 16) * 3 + 12 : 0;
+  const leftCapWidth = getReservedEndCapWidth(timescale.leftEndCap?.fontSize);
+  const rightCapWidth = getReservedEndCapWidth(timescale.rightEndCap?.fontSize);
 
   // Map item to x position
   const itemToX = useCallback(
-    (date: string) => differenceInDays(parseISO(date), parseISO(origin)) * zoom,
-    [origin, zoom]
+    (date: string) => differenceInDays(parseISO(date), parseISO(origin)) * dayWidth,
+    [origin, dayWidth]
   );
 
   // Today line position
   const todayX = useMemo(() => {
     const today = new Date();
-    return differenceInDays(today, parseISO(origin)) * zoom;
-  }, [origin, zoom]);
+    return differenceInDays(today, parseISO(origin)) * dayWidth;
+  }, [origin, dayWidth]);
   const todayPos = timescale.todayPosition ?? 'below';
 
   // ─── Layout computation ────────────────────────────────────────────
@@ -1412,7 +1456,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       .map((tier, idx) => ({ tier, storeIndex: idx }))
       .filter(({ tier }) => tier.visible)
       .map(({ tier, storeIndex }) => {
-        const resolvedUnit = tier.unit === 'auto' ? resolveAutoUnit(totalDays) : tier.unit;
+        const resolvedUnit = tier.unit === 'auto' ? resolvedAutoUnitByWidth : tier.unit;
         const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
         return {
           tier: { ...tier, unit: resolvedUnit },
@@ -1420,7 +1464,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           labels: generateTierLabels(resolvedUnit, rangeStart, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat),
         };
       });
-  }, [origin, totalDays, rangeEndDate, timescale]);
+  }, [origin, totalDays, rangeEndDate, timescale, resolvedAutoUnitByWidth]);
 
   // Dependency lines SVG paths — orthogonal routing (right-angle segments only)
   const depPaths = useMemo(() => {
@@ -1445,7 +1489,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       const rowTop = getItemRowTopY(item);
       if (item.type === 'task') {
         const xStart = itemToX(item.startDate);
-        const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+        const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
         const barTop = rowTop + (ROW_BASE - item.taskStyle.thickness) / 2;
         const barBottom = barTop + item.taskStyle.thickness;
         allObstacles.push({ id: item.id, leftX: xStart, rightX: xStart + barWidth, topY: barTop, bottomY: barBottom });
@@ -1491,15 +1535,15 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         if (fp === 'top') {
           fromX = from.type === 'milestone'
             ? itemToX(from.startDate)
-            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom) / 2;
+            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * dayWidth + dayWidth) / 2;
           fromY = fromBarTop;
         } else if (fp === 'bottom') {
           fromX = from.type === 'milestone'
             ? itemToX(from.startDate)
-            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * zoom + zoom) / 2;
+            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * dayWidth + dayWidth) / 2;
           fromY = fromBarBottom;
         } else {
-          fromX = getItemHorizontalAnchor(from, depSides.fromSide, zoom, itemToX);
+          fromX = getItemHorizontalAnchor(from, depSides.fromSide, dayWidth, itemToX);
           fromY = fromRowTop + ROW_BASE / 2;
         }
 
@@ -1513,15 +1557,15 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         if (tp === 'top') {
           toX = to.type === 'milestone'
             ? itemToX(to.startDate)
-            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * zoom + zoom) / 2;
+            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * dayWidth + dayWidth) / 2;
           toY = toBarTop;
         } else if (tp === 'bottom') {
           toX = to.type === 'milestone'
             ? itemToX(to.startDate)
-            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * zoom + zoom) / 2;
+            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * dayWidth + dayWidth) / 2;
           toY = toBarBottom;
         } else {
-          toX = getItemHorizontalAnchor(to, depSides.toSide, zoom, itemToX);
+          toX = getItemHorizontalAnchor(to, depSides.toSide, dayWidth, itemToX);
           toY = toRowTop + ROW_BASE / 2;
         }
 
@@ -1563,7 +1607,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       })
       .filter((d): d is NonNullable<typeof d> => Boolean(d));
     return entries;
-  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, zoom]);
+  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, dayWidth]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
   const verticalConnectors = useMemo(() => {
@@ -1584,7 +1628,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       if (!style.showVerticalConnector) continue;
 
       const startX = itemToX(item.startDate);
-      const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+      const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
       const endX = startX + barWidth;
       const barY = getItemY(item) + (ROW_BASE - style.thickness) / 2;
       const strokeWidth = CONNECTOR_THICKNESS_MAP[style.connectorThickness] ?? 1;
@@ -1611,7 +1655,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     }
 
     return lines;
-  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, zoom, getRowY]);
+  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, dayWidth, getRowY]);
 
   // ─── Drag handlers ─────────────────────────────────────────────────
 
@@ -1635,7 +1679,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     const onUp = (e: MouseEvent) => {
       if (!dragRef.current) return;
       const offset = e.clientX - dragRef.current.startX;
-      const daysDelta = Math.round(offset / zoom);
+      const daysDelta = dayWidth > 0 ? Math.round(offset / dayWidth) : 0;
       const itemId = dragRef.current.id;
       dragRef.current = null;
       // Clear drag state synchronously BEFORE moveItem.
@@ -1653,7 +1697,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
-  }, [draggingId, zoom, moveItem]);
+  }, [draggingId, dayWidth, moveItem]);
 
   const handleDropOnSwimlane = useCallback(
     (swimlaneId: string, e: React.DragEvent) => {
@@ -1687,7 +1731,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       const yBase = getItemYBase(item);
       if (item.type === 'task') {
         const xStart = itemToX(item.startDate);
-        const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+        const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
         const bh = item.taskStyle.thickness;
         const barY = yBase + (ROW_BASE - bh) / 2;
         positions.push({
@@ -1712,7 +1756,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       }
     }
     return positions;
-  }, [visibleItems, swimlaneIds, swimlaneLayout, getRowY, itemToX, zoom]);
+  }, [visibleItems, swimlaneIds, swimlaneLayout, getRowY, itemToX, dayWidth]);
   getItemPositionsRef.current = getItemPositions;
 
   const handleDepHandleMouseDown = useCallback(
@@ -1879,13 +1923,13 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     if (!draggingId || dragOffset === 0) return null;
     const item = items.find((i) => i.id === draggingId);
     if (!item) return null;
-    const daysDelta = Math.round(dragOffset / zoom);
+    const daysDelta = dayWidth > 0 ? Math.round(dragOffset / dayWidth) : 0;
     if (daysDelta === 0) return null;
-    const snappedOffsetPx = daysDelta * zoom;
+    const snappedOffsetPx = daysDelta * dayWidth;
     const newStart = addDays(parseISO(item.startDate), daysDelta);
     const newEnd = addDays(parseISO(item.endDate), daysDelta);
     return { item, daysDelta, snappedOffsetPx, newStart, newEnd };
-  }, [draggingId, dragOffset, zoom, items]);
+  }, [draggingId, dragOffset, dayWidth, items]);
 
   // ─── Dependency drag preview: compute where the target would move ────────
   const depDragPreview = useMemo<{ targetId: string; offsetPx: number } | null>(() => {
@@ -1898,15 +1942,15 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     if (!predecessor || !successor) return null;
     const daysDelta = getDependencyPreviewOffset(dependencyType, predecessor, successor);
     if (daysDelta <= 0) return null; // Already at or after constraint — no move needed
-    return { targetId: toId, offsetPx: daysDelta * zoom };
-  }, [depDrag, visibleItems, zoom]);
+    return { targetId: toId, offsetPx: daysDelta * dayWidth };
+  }, [depDrag, visibleItems, dayWidth]);
 
   const renderItem = (item: ProjectItem, yBase: number) => {
     const x = itemToX(item.startDate);
     const y = yBase + getRowY(item);
     const isDragging = draggingId === item.id;
     // Snap to day grid during drag so the bar doesn't jump on drop
-    let translateX = isDragging ? Math.round(dragOffset / zoom) * zoom : 0;
+    let translateX = isDragging && dayWidth > 0 ? Math.round(dragOffset / dayWidth) * dayWidth : 0;
     // Apply dependency drag preview offset
     if (depDragPreview && item.id === depDragPreview.targetId) {
       translateX += depDragPreview.offsetPx;
@@ -1950,7 +1994,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       );
     }
 
-    const width = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom;
+    const width = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
 
     return (
       <TaskBar
@@ -1998,14 +2042,14 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         }}
       >
         <div style={{
-          width: totalWidth + leftCapWidth + rightCapWidth,
+          width: totalWidth + leftCapWidth + rightCapWidth + (TIMESCALE_SIDE_MARGIN * 2),
           margin: '12px auto 0',
         }}>
         <div ref={exportRef} style={{
           width: totalWidth,
           position: 'relative',
-          marginLeft: leftCapWidth,
-          marginRight: rightCapWidth,
+          marginLeft: leftCapWidth + TIMESCALE_SIDE_MARGIN,
+          marginRight: rightCapWidth + TIMESCALE_SIDE_MARGIN,
         }}>
           {/* ─── "Above" milestones row (before sticky timescale header) ─── */}
           {aboveHeight > 0 && (
@@ -2019,7 +2063,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 if (s.showDate) stackH += Math.ceil(s.dateFontSize * 1.25) + 1;
                 const ay = aboveHeight - stackH - aboveRowGap;
                 const isDraggingItem = draggingId === item.id;
-                let txl = isDraggingItem ? Math.round(dragOffset / zoom) * zoom : 0;
+                let txl = isDraggingItem && dayWidth > 0 ? Math.round(dragOffset / dayWidth) * dayWidth : 0;
                 if (depDragPreview && item.id === depDragPreview.targetId) txl += depDragPreview.offsetPx;
                 const isSel = selectedItemId === item.id;
                 return (
@@ -2573,7 +2617,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
               }
 
               const barHeight = item.taskStyle.thickness;
-              const width = Math.max(differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * zoom + zoom, 8);
+              const width = Math.max(differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth, 8);
               const gy = yBase + getRowY(item) + (getRowH(item) - barHeight) / 2;
               const snapLeft = gx + snappedOffsetPx;
               const snapRight = snapLeft + width;
@@ -2663,23 +2707,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
          </div>
          </div>
        </div>
-
-      {/* ─── Zoom controls (bottom-right overlay) ─── */}
-      <div className="absolute bottom-4 right-4 flex items-center gap-1 bg-white/90 border border-[var(--color-border)] rounded-lg px-2 py-1 shadow-sm z-20">
-        <button
-          onClick={() => setZoom(zoom - 2)}
-          className="p-1 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-        >
-          <ZoomOut size={14} />
-        </button>
-        <span className="text-[11px] text-[var(--color-text-muted)] w-7 text-center">{zoom}px</span>
-        <button
-          onClick={() => setZoom(zoom + 2)}
-          className="p-1 rounded text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-        >
-          <ZoomIn size={14} />
-        </button>
-      </div>
       </div>
 
       {/* ─── Date Picker Popover ─── */}

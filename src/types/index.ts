@@ -425,7 +425,6 @@ export interface ProjectState {
   criticalPathStyle: CriticalPathStyle;
   showDependencies: boolean; // master toggle — controls dep lines on timeline + Predecessors column in DataView
   dependencySettings: DependencySettings; // scheduling mode config (per-project)
-  zoom: number; // pixels per day
   taskLayout: TaskLayout; // how tasks are arranged vertically in swimlanes
   swimlaneSpacing: number; // px gap between swimlane bands
   selectedTierIndex: number | null; // which tier row is selected for Scale section editing

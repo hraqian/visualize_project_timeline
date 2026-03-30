@@ -27,6 +27,7 @@ import type {
   LagUnit,
   TimescaleTier,
   TimescaleConfig,
+  TimescaleTierConfig,
   TierFormat,
   DependencyConflictMode,
   SchedulingConflict,
@@ -65,69 +66,127 @@ export function getDuration(item: ProjectItem): number {
 export function getProjectRangePadded(
   items: ProjectItem[],
   timescale: TimescaleConfig,
+  autoBarWidthPx?: number,
 ): { origin: string; totalDays: number; rangeEndDate: Date } {
   const range = getProjectRange(items);
-  let padStart = startOfMonth(subDays(parseISO(range.start), 14));
-
-  // First pass: compute rough padEnd to get totalDays for resolveAutoUnit
-  const roughEndMonth = startOfMonth(parseISO(range.end));
-  const roughNumMonths = differenceInCalendarMonths(roughEndMonth, padStart) + 1;
-  const roughPadEnd = addMonths(padStart, roughNumMonths);
-  const roughTotalDays = differenceInDays(roughPadEnd, padStart);
+  const scheduleStart = parseISO(range.start);
+  const scheduleEnd = parseISO(range.end);
+  let padStart = scheduleStart;
+  let padEnd = addDays(scheduleEnd, 1);
+  const scheduleTotalDays = differenceInDays(padEnd, padStart);
 
   // Resolve visible tier units using the padded span (same as TimelineView)
   const visibleUnits = timescale.tiers
     .filter((t) => t.visible)
-    .map((t) => t.unit === 'auto' ? resolveAutoUnit(roughTotalDays) : t.unit);
+    .map((t) => t.unit === 'auto'
+      ? (autoBarWidthPx
+          ? resolveAutoUnitByFit(scheduleStart, scheduleEnd, timescale.fiscalYearStartMonth, autoBarWidthPx)
+          : resolveAutoUnit(scheduleTotalDays))
+      : t.unit);
 
-  // Align padStart backwards to the earliest unit boundary
-  for (const unit of visibleUnits) {
-    let aligned: Date;
+  const alignStartForUnit = (date: Date, unit: Exclude<TimescaleTier, 'auto'>): Date => {
     switch (unit) {
       case 'week':
-        aligned = startOfWeek(padStart, { weekStartsOn: 1 });
-        break;
+        return startOfWeek(date, { weekStartsOn: 1 });
+      case 'month':
+        return startOfMonth(date);
       case 'quarter':
-        aligned = startOfQuarter(padStart);
-        break;
+        return startOfQuarter(date);
       case 'year':
-        aligned = startOfYear(padStart);
-        break;
+        return startOfYear(date);
       default:
-        aligned = padStart;
+        return date;
     }
-    if (aligned < padStart) padStart = aligned;
+  };
+
+  const alignEndForUnitExclusive = (date: Date, unit: Exclude<TimescaleTier, 'auto'>): Date => {
+    switch (unit) {
+      case 'week':
+        return addDays(startOfWeek(date, { weekStartsOn: 1 }), 7);
+      case 'month':
+        return addMonths(startOfMonth(date), 1);
+      case 'quarter':
+        return addMonths(startOfQuarter(date), 3);
+      case 'year':
+        return addMonths(startOfYear(date), 12);
+      default:
+        return addDays(date, 1);
+    }
+  };
+
+  for (const unit of visibleUnits) {
+    const alignedStart = alignStartForUnit(scheduleStart, unit);
+    if (alignedStart < padStart) padStart = alignedStart;
+    const alignedEnd = alignEndForUnitExclusive(scheduleEnd, unit);
+    if (alignedEnd > padEnd) padEnd = alignedEnd;
   }
 
-  // Compute padEnd from the aligned padStart
-  const endMonth = startOfMonth(parseISO(range.end));
-  const numMonths = differenceInCalendarMonths(endMonth, padStart) + 1;
-  let padEnd = addMonths(padStart, numMonths);
-
-  // Extend padEnd forward to the next full unit boundary
-  for (const unit of visibleUnits) {
-    let aligned: Date;
-    switch (unit) {
-      case 'week': {
-        const weekStart = startOfWeek(padEnd, { weekStartsOn: 1 });
-        aligned = weekStart < padEnd ? addDays(weekStart, 7) : padEnd;
-        break;
-      }
-      case 'quarter':
-        aligned = startOfQuarter(addMonths(padEnd, 3));
-        if (aligned <= padEnd) aligned = startOfQuarter(addMonths(padEnd, 6));
-        break;
-      case 'year':
-        aligned = startOfYear(addMonths(padEnd, 12));
-        if (aligned <= padEnd) aligned = startOfYear(addMonths(padEnd, 24));
-        break;
-      default:
-        aligned = padEnd;
-    }
-    if (aligned > padEnd) padEnd = aligned;
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    (window as Window & {
+      __PADDED_RANGE_DEBUG__?: Array<{
+        inputStart: string;
+        inputEnd: string;
+        padStartInitial: string;
+        roughPadEnd: string;
+        roughTotalDays: number;
+        autoBarWidthPx?: number;
+        visibleUnits: string[];
+        origin: string;
+        rangeEndDate: string;
+        totalDays: number;
+      }>;
+    }).__PADDED_RANGE_DEBUG__ = [
+      ...((window as Window & { __PADDED_RANGE_DEBUG__?: Array<unknown> }).__PADDED_RANGE_DEBUG__ ?? []),
+      {
+        inputStart: range.start,
+        inputEnd: range.end,
+        padStartInitial: scheduleStart.toISOString().split('T')[0],
+        roughPadEnd: scheduleEnd.toISOString().split('T')[0],
+        roughTotalDays: scheduleTotalDays,
+        autoBarWidthPx,
+        visibleUnits,
+        origin: '',
+        rangeEndDate: '',
+        totalDays: 0,
+      },
+    ] as Array<{
+      inputStart: string;
+      inputEnd: string;
+      padStartInitial: string;
+      roughPadEnd: string;
+      roughTotalDays: number;
+      autoBarWidthPx?: number;
+      visibleUnits: string[];
+      origin: string;
+      rangeEndDate: string;
+      totalDays: number;
+    }>;
   }
 
   const total = differenceInDays(padEnd, padStart);
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    const win = window as Window & {
+      __PADDED_RANGE_DEBUG__?: Array<{
+        inputStart: string;
+        inputEnd: string;
+        padStartInitial: string;
+        roughPadEnd: string;
+        roughTotalDays: number;
+        autoBarWidthPx?: number;
+        visibleUnits: string[];
+        origin: string;
+        rangeEndDate: string;
+        totalDays: number;
+      }>;
+    };
+    const entries = win.__PADDED_RANGE_DEBUG__ ?? [];
+    const last = entries[entries.length - 1];
+    if (last) {
+      last.origin = padStart.toISOString().split('T')[0];
+      last.rangeEndDate = subDays(padEnd, 1).toISOString().split('T')[0];
+      last.totalDays = total;
+    }
+  }
   return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: subDays(padEnd, 1) };
 }
 
@@ -266,6 +325,80 @@ export interface TierCell {
   label: string;
   fraction: number;   // 0-1 position within bar
   widthFrac: number;  // 0-1 width within bar
+}
+
+export type TimescaleFitDiagnostic = {
+  unit: Exclude<TimescaleTier, 'auto'>;
+  cellCount: number;
+  fullCellWidthPx: number;
+  firstLabel: string;
+  firstLabelWidthPx: number;
+  prefixedFirstLabel: string;
+  prefixedFirstLabelWidthPx: number;
+  fitsFullCells: boolean;
+  fitsPrefixedFirstCell: boolean;
+};
+
+const AUTO_UNIT_ORDER: Exclude<TimescaleTier, 'auto'>[] = ['day', 'week', 'month', 'quarter', 'year'];
+
+function measureTextWidth(text: string, fontFamily: string, fontWeight: number, fontStyle: 'normal' | 'italic', fontSize: number): number {
+  const ctx = getMeasureCtx();
+  if (!ctx) return text.length * fontSize * 0.6;
+  ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+  return ctx.measureText(text).width;
+}
+
+export function getTimescaleFitDiagnostics(
+  rangeStart: Date,
+  rangeEnd: Date,
+  fiscalYearStartMonth: number,
+  barWidthPx: number,
+  tierConfig?: Pick<TimescaleTierConfig, 'fontFamily' | 'fontWeight' | 'fontStyle' | 'fontSize'>,
+): TimescaleFitDiagnostic[] {
+  const fontFamily = tierConfig?.fontFamily ?? 'Inter';
+  const fontWeight = tierConfig?.fontWeight ?? 400;
+  const fontStyle = tierConfig?.fontStyle ?? 'normal';
+  const fontSize = tierConfig?.fontSize ?? 12;
+
+  return AUTO_UNIT_ORDER.map((unit) => {
+    const labels = generateTierLabels(unit, rangeStart, rangeEnd, fiscalYearStartMonth);
+    const cellCount = labels.length;
+    const fullCellWidthPx = cellCount > 0 ? barWidthPx / cellCount : 0;
+    const firstLabel = labels[0]?.label ?? '';
+    const prefixedFirstLabel = unit === 'week'
+      ? `Week ${firstLabel}`
+      : unit === 'day'
+        ? `Day ${firstLabel}`
+        : firstLabel;
+    const firstLabelWidthPx = measureTextWidth(firstLabel, fontFamily, fontWeight, fontStyle, fontSize);
+    const prefixedFirstLabelWidthPx = measureTextWidth(prefixedFirstLabel, fontFamily, fontWeight, fontStyle, fontSize);
+    return {
+      unit,
+      cellCount,
+      fullCellWidthPx,
+      firstLabel,
+      firstLabelWidthPx,
+      prefixedFirstLabel,
+      prefixedFirstLabelWidthPx,
+      fitsFullCells: cellCount > 0,
+      fitsPrefixedFirstCell: fullCellWidthPx >= prefixedFirstLabelWidthPx + 12,
+    };
+  });
+}
+
+export function resolveAutoUnitByFit(
+  rangeStart: Date,
+  rangeEnd: Date,
+  fiscalYearStartMonth: number,
+  barWidthPx: number,
+  tierConfig?: Pick<TimescaleTierConfig, 'fontFamily' | 'fontWeight' | 'fontStyle' | 'fontSize'>,
+): Exclude<TimescaleTier, 'auto'> {
+  const totalDays = differenceInDays(rangeEnd, rangeStart) + 1;
+  const startUnit = resolveAutoUnit(totalDays);
+  const diagnostics = getTimescaleFitDiagnostics(rangeStart, rangeEnd, fiscalYearStartMonth, barWidthPx, tierConfig);
+  const startIdx = AUTO_UNIT_ORDER.indexOf(startUnit);
+  const firstFitting = diagnostics.slice(startIdx).find((entry) => entry.fitsPrefixedFirstCell);
+  return firstFitting?.unit ?? 'year';
 }
 
 /**

@@ -40,7 +40,7 @@ import {
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, differenceInDays, format } from 'date-fns';
-import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnit } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnitByFit } from '@/utils';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 import { DialogButton, ModalCloseButton, ModalSurface } from '@/components/common/ModalPrimitives';
@@ -3310,7 +3310,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
   // Project range — same padded computation as main TimelineView
   const { origin, totalDays, rangeEndDate } = useMemo(
-    () => getProjectRangePadded(items, timescale),
+    () => getProjectRangePadded(items, timescale, 920),
     [items, timescale],
   );
 
@@ -3324,6 +3324,16 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
   const visibleTiers = useMemo(() => tiers.filter((t) => t.visible), [tiers]);
   const visibleCount = visibleTiers.length;
+  const previewAutoUnit = useMemo(
+    () => resolveAutoUnitByFit(
+      parseISO(origin),
+      rangeEndDate,
+      timescale.fiscalYearStartMonth,
+      920,
+      tiers.find((tier) => tier.unit === 'auto'),
+    ),
+    [origin, rangeEndDate, timescale.fiscalYearStartMonth, tiers],
+  );
 
   // Generate labels using shared buildVisibleTierCells utility
   const previewTierLabels = useMemo(() => {
@@ -3331,13 +3341,13 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     const BAR_WIDTH_PX = 920;
 
     return visibleTiers.map((tier) => {
-      const resolvedUnit = tier.unit === 'auto' ? resolveAutoUnit(totalDays) : tier.unit;
+      const resolvedUnit = tier.unit === 'auto' ? previewAutoUnit : tier.unit;
       const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
       const labels = generateTierLabels(resolvedUnit, originDate, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat);
       const cells = buildVisibleTierCells(labels, resolvedUnit, originDate, totalDays, BAR_WIDTH_PX);
       return { tier: { ...tier, unit: resolvedUnit }, cells };
     });
-  }, [visibleTiers, origin, totalDays, rangeEndDate, timescale.fiscalYearStartMonth]);
+  }, [visibleTiers, origin, totalDays, rangeEndDate, timescale.fiscalYearStartMonth, previewAutoUnit]);
 
   const handleSave = () => {
     updateTimescale({ tiers: tiers });
