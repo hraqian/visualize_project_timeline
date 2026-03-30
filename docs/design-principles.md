@@ -200,15 +200,16 @@ These rules apply equally to:
 6. If a unit cannot fit the visible schedule using full cells, `Auto` must move to the next larger unit:
    - `day -> week -> month -> quarter -> year`
 7. This unit escalation rule applies only when the unit is `Auto`.
-8. If the user explicitly selects a unit, the app must keep that unit and allow visual overflow rather than silently changing units.
-9. The timescale layout must be recalculated whenever the schedule range changes.
+8. In `Auto`, label skipping is not the primary solution. `Auto` should escalate the unit instead of staying on the same unit and hiding labels.
+9. If the user explicitly selects a unit, the app must keep that unit and may use label skipping as a readability fallback rather than silently changing units.
+10. The timescale layout must be recalculated whenever the schedule range changes.
 
 ### Behavioral Implications
 
 - the first and last visible cells must represent full units, not clipped fragments
 - the first visible week/day cell must not be prefixed unless the full prefixed label can fit in that unit's real cell width
 - skipping labels inside a unit is not a substitute for unit escalation in `Auto`
-- if a user-selected unit is too dense, the UI may overflow, but it must still preserve full-unit boundaries
+- if a user-selected unit is too dense, the UI may use label skipping, but it must still preserve full-unit boundaries
 
 ### Debugging Rule
 

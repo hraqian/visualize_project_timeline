@@ -3,7 +3,7 @@ import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, addDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { buildDependencyRenderGeometry, dependencyArrowEndInset, dependencyArrowVisualClearance } from '@/components/common/dependencyArrowGeometry';
-import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, getTimescaleFitDiagnostics, resolveAutoUnit, resolveAutoUnitByFit } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getTimescaleFitDiagnostics, resolveAutoUnit, resolveTimescaleRange } from '@/utils';
 import { DatePickerPopover } from './DatePickerPopover';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyType, TimescaleTier } from '@/types';
 
@@ -1332,10 +1332,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     return Math.max(timelineContainerWidth - reserved, 200);
   }, [timelineContainerWidth, timescale.leftEndCap?.fontSize, timescale.rightEndCap?.fontSize]);
 
-  const { origin, totalDays, rangeEndDate } = useMemo(
-    () => getProjectRangePadded(items, timescale, timelineAutoBarWidth),
+  const resolvedTimescaleRange = useMemo(
+    () => resolveTimescaleRange(items, timescale, timelineAutoBarWidth),
     [items, timescale, timelineAutoBarWidth],
   );
+  const { origin, totalDays, rangeEndDate, resolvedUnits } = resolvedTimescaleRange;
 
   // Migrate legacy single-tier {unit:'month', format:'MMM'} to unit:'auto' for already-loaded projects
   useEffect(() => {
@@ -1351,16 +1352,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
   const totalWidth = timelineAutoBarWidth ?? Math.max(totalDays * 8, 200);
   const dayWidth = totalDays > 0 ? totalWidth / totalDays : 0;
-  const resolvedAutoUnitByWidth = useMemo(
-    () => resolveAutoUnitByFit(
-      parseISO(origin),
-      rangeEndDate,
-      timescale.fiscalYearStartMonth,
-      totalWidth,
-      timescale.tiers.find((tier) => tier.unit === 'auto'),
-    ),
-    [origin, rangeEndDate, timescale.fiscalYearStartMonth, totalWidth, timescale.tiers],
-  );
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -1385,10 +1376,10 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       totalDays,
       totalWidth,
       resolvedAutoUnit: resolveAutoUnit(totalDays),
-      resolvedAutoUnitByWidth,
+      resolvedAutoUnitByWidth: resolvedUnits.find((_, idx) => timescale.tiers.filter((tier) => tier.visible)[idx]?.unit === 'auto') ?? resolvedUnits[0] ?? 'year',
       diagnostics,
     };
-  }, [origin, totalDays, totalWidth, rangeEndDate, timescale.fiscalYearStartMonth, resolvedAutoUnitByWidth, timescale.tiers]);
+  }, [origin, totalDays, totalWidth, rangeEndDate, timescale.fiscalYearStartMonth, resolvedUnits, timescale.tiers]);
 
   // Reserve horizontal space for end cap labels so they don't get clipped
   const leftCapWidth = getReservedEndCapWidth(timescale.leftEndCap?.fontSize);
@@ -1455,8 +1446,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     return timescale.tiers
       .map((tier, idx) => ({ tier, storeIndex: idx }))
       .filter(({ tier }) => tier.visible)
-      .map(({ tier, storeIndex }) => {
-        const resolvedUnit = tier.unit === 'auto' ? resolvedAutoUnitByWidth : tier.unit;
+      .map(({ tier, storeIndex }, visibleIdx) => {
+        const resolvedUnit = tier.unit === 'auto' ? resolvedUnits[visibleIdx] ?? 'year' : tier.unit;
         const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
         return {
           tier: { ...tier, unit: resolvedUnit },
@@ -1464,7 +1455,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           labels: generateTierLabels(resolvedUnit, rangeStart, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat),
         };
       });
-  }, [origin, totalDays, rangeEndDate, timescale, resolvedAutoUnitByWidth]);
+  }, [origin, totalDays, rangeEndDate, timescale, resolvedUnits]);
 
   // Dependency lines SVG paths — orthogonal routing (right-angle segments only)
   const depPaths = useMemo(() => {
@@ -2125,15 +2116,15 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 <div className="border-b border-[var(--color-border)] overflow-hidden relative" style={getTimescaleBarShapeStyle(timescale.barShape)}>
                   {tierLabels.map(({ tier, storeIndex, labels }, tierIdx) => {
                     const originDate = parseISO(origin);
-                    const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth);
+                    const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth, timescale.tiers[storeIndex]?.unit !== 'auto');
                     const isSelected = selectedTierIndex === storeIndex;
 
-                    // Compute cell width in px — use the widest interior cell (first cell may be partial/degenerate)
-                    let representativeFrac = 0;
+                    // Compute cell width in px using the narrowest rendered cell to avoid browser-zoom overlap.
+                    let representativeFrac = Infinity;
                     for (const cell of cells) {
-                      if (cell.widthFrac > representativeFrac) representativeFrac = cell.widthFrac;
+                      if (cell.widthFrac > 0 && cell.widthFrac < representativeFrac) representativeFrac = cell.widthFrac;
                     }
-                    const cellWidthPx = representativeFrac * totalWidth;
+                    const cellWidthPx = (Number.isFinite(representativeFrac) ? representativeFrac : 1) * totalWidth;
 
                     // Auto font sizing: pick optimal size to fit the longest label (first cell with prefix)
                     const effectiveFontSize = (tier.fontSizeAuto ?? true)
@@ -2145,7 +2136,14 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                         key={tierIdx}
                         className={`flex h-7 relative cursor-pointer transition-shadow hover:outline hover:outline-1 hover:outline-red-400 ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
                         style={{ backgroundColor: tier.backgroundColor }}
-                        onClick={(e) => { e.stopPropagation(); setSelectedTierIndex(storeIndex); setStylePaneSection('scale'); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedItem(null);
+                          setSelectedSwimlane(null);
+                          setSelectedDepKey(null);
+                          setSelectedTierIndex(storeIndex);
+                          setStylePaneSection('scale');
+                        }}
                       >
                         {cells.map((cell, ci) => (
                           <div

@@ -40,7 +40,7 @@ import {
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, differenceInDays, format } from 'date-fns';
-import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getProjectRangePadded, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveAutoUnitByFit } from '@/utils';
+import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveTimescaleRange } from '@/utils';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 import { DialogButton, ModalCloseButton, ModalSurface } from '@/components/common/ModalPrimitives';
@@ -3303,16 +3303,31 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
       stored[2] ?? DEFAULT_3_TIERS[2],
     ];
   });
+  const previewBarRef = useRef<HTMLDivElement>(null);
+  const [previewBarWidth, setPreviewBarWidth] = useState(920);
+
+  useEffect(() => {
+    const el = previewBarRef.current;
+    if (!el) return;
+
+    const updateWidth = () => setPreviewBarWidth(el.clientWidth || 920);
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const updateTierDraft = (idx: number, updates: Partial<TimescaleTierConfig>) => {
     setTiers((prev) => prev.map((t, i) => (i === idx ? { ...t, ...updates } : t)));
   };
 
   // Project range — same padded computation as main TimelineView
-  const { origin, totalDays, rangeEndDate } = useMemo(
-    () => getProjectRangePadded(items, timescale, 920),
-    [items, timescale],
+  const resolvedTimescaleRange = useMemo(
+    () => resolveTimescaleRange(items, timescale, previewBarWidth),
+    [items, timescale, previewBarWidth],
   );
+  const { origin, totalDays, rangeEndDate, resolvedUnits } = resolvedTimescaleRange;
 
   // Today position as fraction (0-1)
   const todayFraction = useMemo(() => {
@@ -3324,30 +3339,19 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
 
   const visibleTiers = useMemo(() => tiers.filter((t) => t.visible), [tiers]);
   const visibleCount = visibleTiers.length;
-  const previewAutoUnit = useMemo(
-    () => resolveAutoUnitByFit(
-      parseISO(origin),
-      rangeEndDate,
-      timescale.fiscalYearStartMonth,
-      920,
-      tiers.find((tier) => tier.unit === 'auto'),
-    ),
-    [origin, rangeEndDate, timescale.fiscalYearStartMonth, tiers],
-  );
-
   // Generate labels using shared buildVisibleTierCells utility
   const previewTierLabels = useMemo(() => {
     const originDate = parseISO(origin);
-    const BAR_WIDTH_PX = 920;
+    const BAR_WIDTH_PX = previewBarWidth;
 
-    return visibleTiers.map((tier) => {
-      const resolvedUnit = tier.unit === 'auto' ? previewAutoUnit : tier.unit;
+    return visibleTiers.map((tier, visibleIdx) => {
+      const resolvedUnit = tier.unit === 'auto' ? resolvedUnits[visibleIdx] ?? 'year' : tier.unit;
       const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
       const labels = generateTierLabels(resolvedUnit, originDate, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat);
-      const cells = buildVisibleTierCells(labels, resolvedUnit, originDate, totalDays, BAR_WIDTH_PX);
+      const cells = buildVisibleTierCells(labels, resolvedUnit, originDate, totalDays, BAR_WIDTH_PX, tier.unit !== 'auto');
       return { tier: { ...tier, unit: resolvedUnit }, cells };
     });
-  }, [visibleTiers, origin, totalDays, rangeEndDate, timescale.fiscalYearStartMonth, previewAutoUnit]);
+  }, [visibleTiers, origin, totalDays, rangeEndDate, timescale.fiscalYearStartMonth, resolvedUnits, previewBarWidth]);
 
   const handleSave = () => {
     updateTimescale({ tiers: tiers });
@@ -3390,14 +3394,13 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
               )}
 
               {/* Bar — uses timescale.barShape */}
-              <div className="relative">
+              <div className="relative" ref={previewBarRef}>
                 <div className="border-b border-[var(--color-border)] overflow-hidden relative" style={getTimescaleBarShapeStyle(timescale.barShape)}>
                   {previewTierLabels.map(({ tier, cells }, tierIdx) => {
                     // Compute cell width for auto font sizing (preview uses percentage-based layout)
-                    const previewBarWidth = 920; // matches BAR_WIDTH_PX used in previewTierLabels
-                    let repFrac = 0;
-                    for (const cell of cells) { if (cell.widthFrac > repFrac) repFrac = cell.widthFrac; }
-                    const cellWidthPx = repFrac * previewBarWidth;
+                    let repFrac = Infinity;
+                    for (const cell of cells) { if (cell.widthFrac > 0 && cell.widthFrac < repFrac) repFrac = cell.widthFrac; }
+                    const cellWidthPx = (Number.isFinite(repFrac) ? repFrac : 1) * previewBarWidth;
                     const effectiveFontSize = (tier.fontSizeAuto ?? true)
                       ? Math.min(computeAutoFontSize(cells, tier.fontFamily, tier.fontWeight, tier.fontStyle, cellWidthPx, 12), 12)
                       : Math.min(tier.fontSize, 12);

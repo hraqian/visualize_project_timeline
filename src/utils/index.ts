@@ -63,63 +63,104 @@ export function getDuration(item: ProjectItem): number {
  * Compute padded project range with origin and end aligned to full unit
  * boundaries across all visible timescale tiers, so no tier shows partial cells.
  */
+type ResolvedTimescaleRange = {
+  origin: string;
+  totalDays: number;
+  rangeEndDate: Date;
+  resolvedUnits: Exclude<TimescaleTier, 'auto'>[];
+};
+
+function alignStartForUnit(date: Date, unit: Exclude<TimescaleTier, 'auto'>): Date {
+  switch (unit) {
+    case 'week':
+      return startOfWeek(date, { weekStartsOn: 1 });
+    case 'month':
+      return startOfMonth(date);
+    case 'quarter':
+      return startOfQuarter(date);
+    case 'year':
+      return startOfYear(date);
+    default:
+      return date;
+  }
+}
+
+function alignEndForUnitExclusive(date: Date, unit: Exclude<TimescaleTier, 'auto'>): Date {
+  switch (unit) {
+    case 'week':
+      return addDays(startOfWeek(date, { weekStartsOn: 1 }), 7);
+    case 'month':
+      return addMonths(startOfMonth(date), 1);
+    case 'quarter':
+      return addMonths(startOfQuarter(date), 3);
+    case 'year':
+      return addMonths(startOfYear(date), 12);
+    default:
+      return addDays(date, 1);
+  }
+}
+
+export function resolveTimescaleRange(
+  items: ProjectItem[],
+  timescale: TimescaleConfig,
+  autoBarWidthPx?: number,
+): ResolvedTimescaleRange {
+  const range = getProjectRange(items);
+  const scheduleStart = parseISO(range.start);
+  const scheduleEnd = parseISO(range.end);
+  const scheduleTotalDays = differenceInDays(addDays(scheduleEnd, 1), scheduleStart);
+
+  const visibleTiers = timescale.tiers.filter((t) => t.visible);
+  const resolvedUnits = visibleTiers.map((tier) => {
+    if (tier.unit !== 'auto') return tier.unit;
+    if (!autoBarWidthPx) return resolveAutoUnit(scheduleTotalDays);
+
+    const startUnit = resolveAutoUnit(scheduleTotalDays);
+    const startIdx = AUTO_UNIT_ORDER.indexOf(startUnit);
+    for (const unit of AUTO_UNIT_ORDER.slice(startIdx)) {
+      const alignedStart = alignStartForUnit(scheduleStart, unit);
+      const alignedEnd = alignEndForUnitExclusive(scheduleEnd, unit);
+      const diagnostics = getTimescaleFitDiagnostics(
+        alignedStart,
+        subDays(alignedEnd, 1),
+        timescale.fiscalYearStartMonth,
+        autoBarWidthPx,
+        tier,
+      );
+      const match = diagnostics.find((entry) => entry.unit === unit);
+      if (match?.fitsPrefixedFirstCell) return unit;
+    }
+    return 'year';
+  });
+
+  let padStart = scheduleStart;
+  let padEnd = addDays(scheduleEnd, 1);
+  for (const unit of resolvedUnits) {
+    const alignedStart = alignStartForUnit(scheduleStart, unit);
+    if (alignedStart < padStart) padStart = alignedStart;
+    const alignedEnd = alignEndForUnitExclusive(scheduleEnd, unit);
+    if (alignedEnd > padEnd) padEnd = alignedEnd;
+  }
+
+  const total = differenceInDays(padEnd, padStart);
+  return {
+    origin: padStart.toISOString().split('T')[0],
+    totalDays: total,
+    rangeEndDate: subDays(padEnd, 1),
+    resolvedUnits,
+  };
+}
+
 export function getProjectRangePadded(
   items: ProjectItem[],
   timescale: TimescaleConfig,
   autoBarWidthPx?: number,
 ): { origin: string; totalDays: number; rangeEndDate: Date } {
   const range = getProjectRange(items);
+  const resolved = resolveTimescaleRange(items, timescale, autoBarWidthPx);
   const scheduleStart = parseISO(range.start);
   const scheduleEnd = parseISO(range.end);
-  let padStart = scheduleStart;
-  let padEnd = addDays(scheduleEnd, 1);
-  const scheduleTotalDays = differenceInDays(padEnd, padStart);
-
-  // Resolve visible tier units using the padded span (same as TimelineView)
-  const visibleUnits = timescale.tiers
-    .filter((t) => t.visible)
-    .map((t) => t.unit === 'auto'
-      ? (autoBarWidthPx
-          ? resolveAutoUnitByFit(scheduleStart, scheduleEnd, timescale.fiscalYearStartMonth, autoBarWidthPx)
-          : resolveAutoUnit(scheduleTotalDays))
-      : t.unit);
-
-  const alignStartForUnit = (date: Date, unit: Exclude<TimescaleTier, 'auto'>): Date => {
-    switch (unit) {
-      case 'week':
-        return startOfWeek(date, { weekStartsOn: 1 });
-      case 'month':
-        return startOfMonth(date);
-      case 'quarter':
-        return startOfQuarter(date);
-      case 'year':
-        return startOfYear(date);
-      default:
-        return date;
-    }
-  };
-
-  const alignEndForUnitExclusive = (date: Date, unit: Exclude<TimescaleTier, 'auto'>): Date => {
-    switch (unit) {
-      case 'week':
-        return addDays(startOfWeek(date, { weekStartsOn: 1 }), 7);
-      case 'month':
-        return addMonths(startOfMonth(date), 1);
-      case 'quarter':
-        return addMonths(startOfQuarter(date), 3);
-      case 'year':
-        return addMonths(startOfYear(date), 12);
-      default:
-        return addDays(date, 1);
-    }
-  };
-
-  for (const unit of visibleUnits) {
-    const alignedStart = alignStartForUnit(scheduleStart, unit);
-    if (alignedStart < padStart) padStart = alignedStart;
-    const alignedEnd = alignEndForUnitExclusive(scheduleEnd, unit);
-    if (alignedEnd > padEnd) padEnd = alignedEnd;
-  }
+  const scheduleTotalDays = differenceInDays(addDays(scheduleEnd, 1), scheduleStart);
 
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     (window as Window & {
@@ -144,10 +185,10 @@ export function getProjectRangePadded(
         roughPadEnd: scheduleEnd.toISOString().split('T')[0],
         roughTotalDays: scheduleTotalDays,
         autoBarWidthPx,
-        visibleUnits,
-        origin: '',
-        rangeEndDate: '',
-        totalDays: 0,
+        visibleUnits: resolved.resolvedUnits,
+        origin: resolved.origin,
+        rangeEndDate: resolved.rangeEndDate.toISOString().split('T')[0],
+        totalDays: resolved.totalDays,
       },
     ] as Array<{
       inputStart: string;
@@ -163,31 +204,7 @@ export function getProjectRangePadded(
     }>;
   }
 
-  const total = differenceInDays(padEnd, padStart);
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
-    const win = window as Window & {
-      __PADDED_RANGE_DEBUG__?: Array<{
-        inputStart: string;
-        inputEnd: string;
-        padStartInitial: string;
-        roughPadEnd: string;
-        roughTotalDays: number;
-        autoBarWidthPx?: number;
-        visibleUnits: string[];
-        origin: string;
-        rangeEndDate: string;
-        totalDays: number;
-      }>;
-    };
-    const entries = win.__PADDED_RANGE_DEBUG__ ?? [];
-    const last = entries[entries.length - 1];
-    if (last) {
-      last.origin = padStart.toISOString().split('T')[0];
-      last.rangeEndDate = subDays(padEnd, 1).toISOString().split('T')[0];
-      last.totalDays = total;
-    }
-  }
-  return { origin: padStart.toISOString().split('T')[0], totalDays: total, rangeEndDate: subDays(padEnd, 1) };
+  return { origin: resolved.origin, totalDays: resolved.totalDays, rangeEndDate: resolved.rangeEndDate };
 }
 
 // ─── Timescale Generators ────────────────────────────────────────────────────
@@ -412,6 +429,7 @@ export function buildVisibleTierCells(
   originDate: Date,
   totalDays: number,
   barWidthPx: number,
+  allowSkip = true,
 ): TierCell[] {
   if (labels.length === 0) return [];
 
@@ -420,7 +438,7 @@ export function buildVisibleTierCells(
 
   // Calculate skip factor using a full interior cell
   let skipFactor = 1;
-  if (labels.length > 1) {
+  if (allowSkip && labels.length > 1) {
     const refIdx = Math.min(1, labels.length - 1);
     const refStartFrac = differenceInDays(labels[refIdx].startDate, originDate) / totalDays;
     const refEndFrac = (differenceInDays(labels[refIdx].endDate, originDate) + 1) / totalDays;

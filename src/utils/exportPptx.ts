@@ -410,7 +410,7 @@ function drawTimescale(
   tierLabels.forEach(({ tier, labels }, tierIdx) => {
     const tierY = ctx.timescaleY + tierIdx * tierHeight;
     const originDate = parseISO(origin);
-    const cells = buildVisibleTierCells(labels, tier.unit, originDate, ctx.totalDays, ctx.totalWidth);
+    const cells = buildVisibleTierCells(labels, tier.unit, originDate, ctx.totalDays, ctx.totalWidth, false);
 
     // Background bar
     slide.addShape('rect', {
@@ -423,9 +423,9 @@ function drawTimescale(
     });
 
     // Cell labels
-    let repFrac = 0;
-    for (const cell of cells) { if (cell.widthFrac > repFrac) repFrac = cell.widthFrac; }
-    const cellWidthPx = repFrac * ctx.totalWidth;
+    let repFrac = Infinity;
+    for (const cell of cells) { if (cell.widthFrac > 0 && cell.widthFrac < repFrac) repFrac = cell.widthFrac; }
+    const cellWidthPx = (Number.isFinite(repFrac) ? repFrac : 1) * ctx.totalWidth;
     const baseFontSize = (tier.fontSizeAuto ?? true)
       ? computeAutoFontSize(cells, tier.fontFamily, tier.fontWeight, tier.fontStyle, cellWidthPx, 12)
       : tier.fontSize;
