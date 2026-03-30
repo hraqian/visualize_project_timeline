@@ -51,6 +51,7 @@ function App() {
   const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
   const isDirty = useProjectStore((s) => s.isDirty);
+  const lastModified = useProjectStore((s) => s.lastModified);
   const saveProject = useProjectStore((s) => s.saveProject);
   const canUndo = useProjectStore((s) => s.canUndo);
   const canRedo = useProjectStore((s) => s.canRedo);
@@ -245,9 +246,11 @@ function App() {
             className="group flex items-center gap-2 text-sm font-semibold text-white hover:text-white/90 transition-colors"
           >
             <span>{projectName}</span>
-            <span className="text-xs font-normal text-white/60">
-              {saveFlash ? '- Saved!' : isDirty ? '- Unsaved changes' : '- Saved'}
-            </span>
+            {(saveFlash || isDirty || lastModified) && (
+              <span className="text-xs font-normal text-white/60">
+                {saveFlash ? '- Saved!' : isDirty ? '- Unsaved changes' : '- Saved'}
+              </span>
+            )}
             <Pencil
               size={12}
               className="opacity-0 group-hover:opacity-60 transition-opacity text-white"
