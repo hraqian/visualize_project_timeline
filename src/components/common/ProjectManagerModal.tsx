@@ -61,20 +61,16 @@ export function ProjectManagerModal({ onClose }: Props) {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirmDeleteId === id) {
-      await deleteProjectFile(id);
-      setConfirmDeleteId(null);
-      setLoading(true);
-      const entries = await listProjects();
-      setProjects(entries);
-      setLoading(false);
-      // If we deleted the current project, create a new one
-      if (id === currentProjectId) {
-        newProject();
-        onClose();
-      }
-    } else {
-      setConfirmDeleteId(id);
+    await deleteProjectFile(id);
+    setConfirmDeleteId(null);
+    setLoading(true);
+    const entries = await listProjects();
+    setProjects(entries);
+    setLoading(false);
+    // If we deleted the current project, create a new one
+    if (id === currentProjectId) {
+      newProject();
+      onClose();
     }
   };
 
@@ -162,33 +158,59 @@ export function ProjectManagerModal({ onClose }: Props) {
                           Last saved: {formatDate(p.lastModified)}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {!isCurrent && (
-                          <button
-                            onClick={() => handleLoad(p.id)}
-                            className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
-                            style={{ color: uiColor.text }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'rgba(30, 41, 59, 0.08)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent';
-                            }}
-                          >
-                            Open
-                          </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {confirmDeleteId === p.id ? (
+                          <>
+                            <span className="text-xs font-medium text-red-600">
+                              Delete permanently?
+                            </span>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                              style={{ color: uiColor.text }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = 'rgba(30, 41, 59, 0.08)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleDelete(p.id)}
+                              className="px-2.5 py-1 rounded text-xs font-medium text-white bg-red-600 hover:bg-red-700 transition-colors"
+                              title="Delete project permanently"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {!isCurrent && (
+                              <button
+                                onClick={() => handleLoad(p.id)}
+                                className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                                style={{ color: uiColor.text }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(30, 41, 59, 0.08)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'transparent';
+                                }}
+                              >
+                                Open
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setConfirmDeleteId(p.id)}
+                              className="p-1.5 rounded transition-colors text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-50"
+                              title="Delete project"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
                         )}
-                        <button
-                          onClick={() => handleDelete(p.id)}
-                          className={`p-1.5 rounded transition-colors ${
-                            confirmDeleteId === p.id
-                              ? 'text-red-600 bg-red-50 hover:bg-red-100'
-                              : 'text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-50'
-                          }`}
-                          title={confirmDeleteId === p.id ? 'Click again to confirm delete' : 'Delete project'}
-                        >
-                          <Trash2 size={14} />
-                        </button>
                       </div>
                     </div>
                   );
