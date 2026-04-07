@@ -16,6 +16,8 @@ import type {
   StatusLabel,
   OptionalColumn,
   StylePaneSection,
+  StylePaneMainTab,
+  StylePaneItemSubTab,
   TaskLayout,
   DependencyConflictMode,
   DependencyLagAdjustment,
@@ -46,6 +48,8 @@ interface ProjectActions {
   setSelectedItem: (id: string | null) => void;
   setSelectedSwimlane: (id: string | null) => void;
   setSelectedDepKey: (key: string | null) => void;
+  setStylePaneMainTab: (tab: StylePaneMainTab) => void;
+  setStylePaneItemSubTab: (tab: StylePaneItemSubTab | null) => void;
   setStylePaneSection: (section: StylePaneSection | null) => void;
   setTaskLayout: (layout: TaskLayout) => void;
   setSwimlaneSpacing: (spacing: number) => void;
@@ -244,6 +248,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   selectedItemId: null,
   selectedSwimlaneId: null,
   selectedDepKey: null,
+  stylePaneMainTab: 'items',
+  stylePaneItemSubTab: null,
   stylePaneSection: null,
   showCriticalPath: false,
   criticalPathStyle: { ...DEFAULT_CRITICAL_PATH_STYLE },
@@ -257,13 +263,49 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
 
   // ─── View ────────────────────────────────────────────────────────────
   setActiveView: (view) => set({ activeView: view }),
-  setSelectedItem: (id) => set({ selectedItemId: id, selectedSwimlaneId: null, selectedDepKey: null }),
-  setSelectedSwimlane: (id) => set({ selectedSwimlaneId: id, selectedItemId: null, selectedDepKey: null, stylePaneSection: 'swimlaneTitle' }),
-  setSelectedDepKey: (key) => set({ selectedDepKey: key, selectedItemId: null, selectedSwimlaneId: null, stylePaneSection: null }),
+  setSelectedItem: (id) => set((state) => ({
+    selectedItemId: id,
+    selectedSwimlaneId: null,
+    selectedDepKey: null,
+    selectedTierIndex: null,
+    stylePaneMainTab: 'items',
+    stylePaneItemSubTab: id
+      ? (state.items.find((item) => item.id === id)?.type === 'milestone' ? 'milestone' : 'task')
+      : state.stylePaneItemSubTab,
+  })),
+  setSelectedSwimlane: (id) => set({
+    selectedSwimlaneId: id,
+    selectedItemId: null,
+    selectedDepKey: null,
+    selectedTierIndex: null,
+    stylePaneMainTab: 'items',
+    stylePaneItemSubTab: id ? 'swimlane' : null,
+    stylePaneSection: id ? 'swimlaneTitle' : null,
+  }),
+  setSelectedDepKey: (key) => set({
+    selectedDepKey: key,
+    selectedItemId: null,
+    selectedSwimlaneId: null,
+    selectedTierIndex: null,
+    stylePaneMainTab: 'items',
+    stylePaneItemSubTab: key ? 'dependency' : null,
+    stylePaneSection: null,
+  }),
+  setStylePaneMainTab: (tab) => set({
+    stylePaneMainTab: tab,
+    stylePaneItemSubTab: tab === 'items' ? get().stylePaneItemSubTab : null,
+  }),
+  setStylePaneItemSubTab: (tab) => set({
+    stylePaneMainTab: 'items',
+    stylePaneItemSubTab: tab,
+  }),
   setStylePaneSection: (section) => set({ stylePaneSection: section }),
   setTaskLayout: (layout) => set({ taskLayout: layout }),
   setSwimlaneSpacing: (spacing) => set({ swimlaneSpacing: Math.max(0, Math.min(40, spacing)) }),
-  setSelectedTierIndex: (index) => set({ selectedTierIndex: index }),
+  setSelectedTierIndex: (index) => set({
+    selectedTierIndex: index,
+    stylePaneMainTab: index !== null ? 'timescale' : get().stylePaneMainTab,
+  }),
 
   // ─── Project Persistence ─────────────────────────────────────────────
   saveProject: async () => {
@@ -318,6 +360,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       selectedItemId: null,
       selectedSwimlaneId: null,
       selectedDepKey: null,
+      stylePaneMainTab: 'items',
+      stylePaneItemSubTab: null,
       stylePaneSection: null,
       checkedItemIds: [],
       selectedTierIndex: null,
@@ -349,6 +393,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       selectedItemId: null,
       selectedSwimlaneId: null,
       selectedDepKey: null,
+      stylePaneMainTab: 'items',
+      stylePaneItemSubTab: null,
       stylePaneSection: null,
       showCriticalPath: false,
       criticalPathStyle: { ...DEFAULT_CRITICAL_PATH_STYLE },
@@ -495,6 +541,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       items: state.items.filter((i) => i.id !== id),
       dependencies: state.dependencies.filter((d) => d.fromId !== id && d.toId !== id),
       selectedItemId: state.selectedItemId === id ? null : state.selectedItemId,
+      stylePaneItemSubTab: state.selectedItemId === id ? null : state.stylePaneItemSubTab,
     })),
 
   toggleVisibility: (id) =>
@@ -726,6 +773,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       swimlanes: state.swimlanes.filter((s) => s.id !== id),
       items: state.items.filter((i) => i.swimlaneId !== id),
       selectedSwimlaneId: state.selectedSwimlaneId === id ? null : state.selectedSwimlaneId,
+      stylePaneItemSubTab: state.selectedSwimlaneId === id ? null : state.stylePaneItemSubTab,
+      stylePaneSection: state.selectedSwimlaneId === id ? null : state.stylePaneSection,
     })),
 
   reorderSwimlane: (id, newOrder) =>
@@ -1194,6 +1243,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
         ),
         checkedItemIds: [],
         selectedItemId: idsToDelete.has(state.selectedItemId ?? '') ? null : state.selectedItemId,
+        stylePaneItemSubTab: idsToDelete.has(state.selectedItemId ?? '') ? null : state.stylePaneItemSubTab,
       };
     }),
 

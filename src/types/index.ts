@@ -395,6 +395,9 @@ export interface DependencySettings {
   conflictMode: DependencyConflictMode; // only applies when schedulingMode === 'automatic-flexible'
 }
 
+export type StylePaneMainTab = 'items' | 'timescale' | 'design';
+export type StylePaneItemSubTab = 'task' | 'milestone' | 'swimlane' | 'dependency';
+
 export const DEFAULT_DEPENDENCY_SETTINGS: DependencySettings = {
   enabled: false,
   schedulingMode: 'manual',
@@ -420,6 +423,8 @@ export interface ProjectState {
   selectedItemId: string | null;
   selectedSwimlaneId: string | null;
   selectedDepKey: string | null; // selected dependency link key ("fromId-toId")
+  stylePaneMainTab: StylePaneMainTab;
+  stylePaneItemSubTab: StylePaneItemSubTab | null;
   stylePaneSection: StylePaneSection | null; // which collapsible section is expanded in StylePane
   showCriticalPath: boolean;
   criticalPathStyle: CriticalPathStyle;
