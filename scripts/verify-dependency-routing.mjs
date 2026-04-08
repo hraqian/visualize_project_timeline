@@ -196,6 +196,84 @@ const titleAlignmentMeasurements = await page.evaluate(async ({ taskId }) => {
   return { above, below };
 }, { taskId: titleAlignmentResults.taskId });
 
+const wrappedTitleLayoutResults = await page.evaluate(async () => {
+  const store = window.__PROJECT_STORE__;
+  if (!store) {
+    return { available: false };
+  }
+
+  store.getState().newProject();
+  const milestoneId = store.getState().addItem({
+    name: 'Wrapped milestone title should use measured height',
+    type: 'milestone',
+    startDate: '2026-03-25',
+    endDate: '2026-03-25',
+    row: 0,
+  });
+  const taskId = store.getState().addItem({
+    name: 'Task below',
+    type: 'task',
+    startDate: '2026-03-25',
+    endDate: '2026-03-29',
+    row: 1,
+  });
+
+  store.setState((s) => ({
+    ...s,
+    activeView: 'timeline',
+    items: s.items.map((item) => {
+      if (item.id === milestoneId) {
+        return {
+          ...item,
+          milestoneStyle: {
+            ...item.milestoneStyle,
+            showTitle: true,
+            showDate: true,
+            labelPosition: 'below',
+            dateLabelPosition: 'below',
+            titleOverflowMode: 'wrap',
+            titleMaxLines: 3,
+            fontSize: 14,
+          },
+        };
+      }
+      if (item.id === taskId) {
+        return {
+          ...item,
+          taskStyle: {
+            ...item.taskStyle,
+            showTitle: true,
+            labelPosition: 'center',
+          },
+        };
+      }
+      return item;
+    }),
+  }));
+
+  await new Promise((resolve) => setTimeout(resolve, 250));
+
+  const titleEl = document.querySelector(`[data-testid="milestone-title-label-${milestoneId}"]`);
+  const taskEl = document.querySelector(`[data-testid="task-title-label-${taskId}"]`);
+  if (!(titleEl instanceof HTMLElement) || !(taskEl instanceof HTMLElement)) {
+    return { available: false, reason: 'Missing wrapped title or task label elements' };
+  }
+
+  const titleRect = titleEl.getBoundingClientRect();
+  const taskRect = taskEl.getBoundingClientRect();
+  const debug = window.__TIMELINE_GEOMETRY_DEBUG__;
+  const measuredTitle = debug?.measured?.find((node) => node.id === `milestone-title-label-${milestoneId}`) ?? null;
+
+  return {
+    available: true,
+    titleHeight: titleRect.height,
+    taskTop: taskRect.top,
+    titleBottom: titleRect.bottom,
+    verticalGap: taskRect.top - titleRect.bottom,
+    measuredTitleHeight: measuredTitle ? measuredTitle.bottomY - measuredTitle.topY : null,
+  };
+});
+
 const exportResults = await page.evaluate(async () => {
   const store = window.__PROJECT_STORE__;
   if (!store || !window.__EXPORT_TEST_API__) {
@@ -596,6 +674,7 @@ const persistenceFailures = (
 const timescaleFailures = [];
 const escapeFailures = [];
 const titleAlignmentFailures = [];
+const wrappedTitleLayoutFailures = [];
 const exportFailures = [];
 if (!regressionResults.timescale.tierClickSwitches) {
   timescaleFailures.push({ kind: 'tier-click-switch', ...regressionResults.timescale.tierClickState });
@@ -622,6 +701,20 @@ for (const [position, measurement] of Object.entries(titleAlignmentMeasurements)
   }
 }
 
+if (!wrappedTitleLayoutResults.available) {
+  wrappedTitleLayoutFailures.push(wrappedTitleLayoutResults);
+} else {
+  if (!(wrappedTitleLayoutResults.titleHeight > 20)) {
+    wrappedTitleLayoutFailures.push({ reason: 'Wrapped title did not grow taller', ...wrappedTitleLayoutResults });
+  }
+  if (!(wrappedTitleLayoutResults.verticalGap >= 0)) {
+    wrappedTitleLayoutFailures.push({ reason: 'Wrapped title overlapped next row content', ...wrappedTitleLayoutResults });
+  }
+  if (wrappedTitleLayoutResults.measuredTitleHeight !== null && Math.abs(wrappedTitleLayoutResults.measuredTitleHeight - wrappedTitleLayoutResults.titleHeight) > 2) {
+    wrappedTitleLayoutFailures.push({ reason: 'Measured title height diverged from DOM height', ...wrappedTitleLayoutResults });
+  }
+}
+
 if (!exportResults.available) {
   exportFailures.push({ kind: 'unavailable' });
 } else {
@@ -636,7 +729,7 @@ if (!exportResults.available) {
   }
 }
 
-const totalFailures = routingFailures.length + styleRoutingFailures.length + sameDayMilestoneTaskFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + exportFailures.length;
+const totalFailures = routingFailures.length + styleRoutingFailures.length + sameDayMilestoneTaskFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + wrappedTitleLayoutFailures.length + exportFailures.length;
 
 console.log(JSON.stringify({
   routing: {
@@ -680,6 +773,10 @@ console.log(JSON.stringify({
   titleAlignment: {
     failures: titleAlignmentFailures.length,
     details: titleAlignmentFailures,
+  },
+  wrappedTitleLayout: {
+    failures: wrappedTitleLayoutFailures.length,
+    details: wrappedTitleLayoutFailures,
   },
   exports: {
     failures: exportFailures.length,

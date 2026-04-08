@@ -193,6 +193,10 @@ function estimateTitleHeight(text: string, fontSize: number, overflowMode: Title
   return lineHeight * estimateWrappedTextLineCount(text, fontSize, TITLE_LABEL_MAX_WIDTH, getResolvedTitleMaxLines(overflowMode, maxLines));
 }
 
+function resolveMeasuredHeight(measuredHeight: number | undefined, estimatedHeight: number) {
+  return measuredHeight && measuredHeight > 0 ? Math.ceil(measuredHeight) : estimatedHeight;
+}
+
 function getTitleLabelTextStyle(
   overflowMode: TitleOverflowMode,
   isEditing: boolean,
@@ -267,76 +271,76 @@ function getMilestoneCenterX(date: string, dayWidth: number, itemToX: (date: str
   return itemToX(date) + dayWidth / 2;
 }
 
-function estimateTaskBelowFootprint(item: ProjectItem) {
+function estimateTaskBelowFootprint(item: ProjectItem, measuredTitleHeight?: number) {
   const style = item.taskStyle;
   let bottom = 0;
   if (style.showDate && style.dateLabelPosition === 'below') {
     const titleHeight = style.showTitle && style.labelPosition === 'below'
-      ? estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines)
+      ? resolveMeasuredHeight(measuredTitleHeight, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines))
       : 0;
     bottom = Math.max(bottom, Math.ceil(style.dateFontSize * 1.25) + (titleHeight > 0 ? titleHeight + 2 : 2));
   }
   if (style.showTitle && style.labelPosition === 'below') {
-    const titleHeight = estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines);
+    const titleHeight = resolveMeasuredHeight(measuredTitleHeight, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines));
     bottom = Math.max(bottom, titleHeight + (style.showDate && style.dateLabelPosition === 'below' ? Math.ceil(style.dateFontSize * 1.25) + 2 : 2));
   }
   return bottom;
 }
 
-function estimateTaskAboveFootprint(item: ProjectItem) {
+function estimateTaskAboveFootprint(item: ProjectItem, measuredTitleHeight?: number) {
   const style = item.taskStyle;
   let top = 0;
   if (style.showDate && style.dateLabelPosition === 'above') {
     const titleHeight = style.showTitle && style.labelPosition === 'above'
-      ? estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines)
+      ? resolveMeasuredHeight(measuredTitleHeight, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines))
       : 0;
     top = Math.max(top, Math.ceil(style.dateFontSize * 1.25) + (titleHeight > 0 ? titleHeight + 2 : 2));
   }
   if (style.showTitle && style.labelPosition === 'above') {
-    const titleHeight = estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines);
+    const titleHeight = resolveMeasuredHeight(measuredTitleHeight, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines));
     top = Math.max(top, titleHeight + (style.showDate && style.dateLabelPosition === 'above' ? Math.ceil(style.dateFontSize * 1.25) + 2 : 2));
   }
   return top;
 }
 
-function estimateMilestoneBelowFootprint(item: ProjectItem) {
+function estimateMilestoneBelowFootprint(item: ProjectItem, measuredTitleHeight?: number) {
   const style = item.milestoneStyle;
   if (item.swimlaneId === null) {
     let bottom = 0;
     if (style.position === 'below') {
       if (style.showDate) bottom += Math.ceil(style.dateFontSize * 1.25) + 1;
-      if (style.showTitle) bottom += estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines) + 1;
+      if (style.showTitle) bottom += resolveMeasuredHeight(measuredTitleHeight, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines)) + 1;
     }
     return bottom;
   }
   let bottom = 0;
   if (style.showDate && style.dateLabelPosition === 'below') bottom = Math.max(bottom, Math.ceil(style.dateFontSize * 1.25) + 2);
-  if (style.showTitle && style.labelPosition === 'below') bottom = Math.max(bottom, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines) + 2);
+  if (style.showTitle && style.labelPosition === 'below') bottom = Math.max(bottom, resolveMeasuredHeight(measuredTitleHeight, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines)) + 2);
   return bottom;
 }
 
-function estimateMilestoneAboveFootprint(item: ProjectItem) {
+function estimateMilestoneAboveFootprint(item: ProjectItem, measuredTitleHeight?: number) {
   const style = item.milestoneStyle;
   if (item.swimlaneId === null) {
     let top = 0;
     if (style.position === 'above') {
-      if (style.showTitle) top += estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines) + 1;
+      if (style.showTitle) top += resolveMeasuredHeight(measuredTitleHeight, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines)) + 1;
       if (style.showDate) top += Math.ceil(style.dateFontSize * 1.25) + 1;
     }
     return top;
   }
   let top = 0;
   if (style.showDate && style.dateLabelPosition === 'above') top = Math.max(top, Math.ceil(style.dateFontSize * 1.25) + 2);
-  if (style.showTitle && style.labelPosition === 'above') top = Math.max(top, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines) + 2);
+  if (style.showTitle && style.labelPosition === 'above') top = Math.max(top, resolveMeasuredHeight(measuredTitleHeight, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines)) + 2);
   return top;
 }
 
-function estimateBelowFootprint(item: ProjectItem) {
-  return item.type === 'task' ? estimateTaskBelowFootprint(item) : estimateMilestoneBelowFootprint(item);
+function estimateBelowFootprint(item: ProjectItem, measuredTitleHeight?: number) {
+  return item.type === 'task' ? estimateTaskBelowFootprint(item, measuredTitleHeight) : estimateMilestoneBelowFootprint(item, measuredTitleHeight);
 }
 
-function estimateAboveFootprint(item: ProjectItem) {
-  return item.type === 'task' ? estimateTaskAboveFootprint(item) : estimateMilestoneAboveFootprint(item);
+function estimateAboveFootprint(item: ProjectItem, measuredTitleHeight?: number) {
+  return item.type === 'task' ? estimateTaskAboveFootprint(item, measuredTitleHeight) : estimateMilestoneAboveFootprint(item, measuredTitleHeight);
 }
 
 function getItemCenterX(item: ProjectItem, dayWidth: number, itemToX: (date: string) => number) {
@@ -1534,6 +1538,16 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     ),
     [independentItems]
   );
+
+  const measuredTitleHeightByItemId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const node of measuredGeometryNodes) {
+      if ((node.kind === 'task-title-label' || node.kind === 'milestone-title-label') && node.sourceId) {
+        map.set(node.sourceId, node.bottomY - node.topY);
+      }
+    }
+    return map;
+  }, [measuredGeometryNodes]);
   const belowIndependentItems = useMemo(
     () => independentItems.filter(
       (i) => !(i.type === 'milestone' && i.swimlaneId === null && i.milestoneStyle.position === 'above')
@@ -1619,20 +1633,22 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const rowH = ROW_BASE + maxSpacing;
 
         const currentRowTopExtent = Math.min(...items.map((it) => {
+          const measuredTitleHeight = measuredTitleHeightByItemId.get(it.id);
           const coreTop = it.type === 'task'
             ? (ROW_BASE - getEffectiveTaskThickness(it)) / 2
             : (ROW_BASE - getEffectiveMilestoneSize(it)) / 2;
-          return coreTop - estimateAboveFootprint(it);
+          return coreTop - estimateAboveFootprint(it, measuredTitleHeight);
         }));
 
         const currentRowBottomExtent = Math.max(
           rowH,
           ...items.map((it) => {
+            const measuredTitleHeight = measuredTitleHeightByItemId.get(it.id);
             const coreTop = it.type === 'task'
               ? (ROW_BASE - getEffectiveTaskThickness(it)) / 2
               : (ROW_BASE - getEffectiveMilestoneSize(it)) / 2;
             const coreBottom = coreTop + (it.type === 'task' ? getEffectiveTaskThickness(it) : getEffectiveMilestoneSize(it));
-            return coreBottom + estimateBelowFootprint(it);
+            return coreBottom + estimateBelowFootprint(it, measuredTitleHeight);
           }),
         );
 
@@ -1664,7 +1680,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       getRowH: (item: ProjectItem) => rowHMap.get(item.id) ?? ROW_HEIGHT,
       getGroupHeight: (groupKey: string) => groupHeightMap.get(groupKey) ?? 0,
     };
-  }, [getRow, belowIndependentItems, swimlanedItems, sortedSwimlanes, getEffectiveRowSpacing, getEffectiveTaskThickness, getEffectiveMilestoneSize, rowClearanceBuffer]);
+  }, [getRow, belowIndependentItems, swimlanedItems, sortedSwimlanes, getEffectiveRowSpacing, getEffectiveTaskThickness, getEffectiveMilestoneSize, rowClearanceBuffer, measuredTitleHeightByItemId]);
 
   // Compute project range with padding — origin aligned to unit boundaries
   useEffect(() => {
@@ -1766,12 +1782,15 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     const maxStack = Math.max(...aboveMilestones.map((i) => {
       const s = i.milestoneStyle;
       let h = s.size; // shape
-      if (s.showTitle) h += Math.ceil(s.fontSize * 1.25) + 1; // title + gap-px
+      if (s.showTitle) {
+        const measuredTitleHeight = measuredTitleHeightByItemId.get(i.id);
+        h += resolveMeasuredHeight(measuredTitleHeight, estimateTitleHeight(i.name, s.fontSize, s.titleOverflowMode, s.titleMaxLines)) + 1;
+      }
       if (s.showDate) h += Math.ceil(s.dateFontSize * 1.25) + 1; // date + gap-px
       return h;
     }), 20);
     return maxStack + aboveRowGap * 2;
-  }, [aboveMilestones]);
+  }, [aboveMilestones, measuredTitleHeightByItemId]);
 
   // Independent items section height (only "below" items — those in the canvas)
   const independentHeight = useMemo(() => {
