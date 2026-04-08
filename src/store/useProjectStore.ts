@@ -47,6 +47,7 @@ interface ProjectActions {
   // View
   setActiveView: (view: ActiveView) => void;
   setSelectedItem: (id: string | null) => void;
+  setSelectedItemWithSection: (id: string | null, section: StylePaneSection | null) => void;
   setSelectedSwimlane: (id: string | null) => void;
   setSelectedDepKey: (key: string | null) => void;
   setStylePaneMainTab: (tab: StylePaneMainTab) => void;
@@ -275,6 +276,17 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     stylePaneItemSubTab: id
       ? (state.items.find((item) => item.id === id)?.type === 'milestone' ? 'milestone' : 'task')
       : state.stylePaneItemSubTab,
+  })),
+  setSelectedItemWithSection: (id, section) => set((state) => ({
+    selectedItemId: id,
+    selectedSwimlaneId: null,
+    selectedDepKey: null,
+    selectedTierIndex: null,
+    stylePaneMainTab: 'items',
+    stylePaneItemSubTab: id
+      ? (state.items.find((item) => item.id === id)?.type === 'milestone' ? 'milestone' : 'task')
+      : state.stylePaneItemSubTab,
+    stylePaneSection: section,
   })),
   setSelectedSwimlane: (id) => set({
     selectedSwimlaneId: id,

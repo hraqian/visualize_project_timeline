@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useRef, useState, useCallback, useMemo, useEffect, forwardRef, useImperativeHandle, memo } from 'react';
 import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, addDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
@@ -131,6 +131,44 @@ type DependencyRoutingDebugEntry = {
   endRect: ObstacleRect;
   measuredLabels: TimelineGeometryNode[];
 };
+
+type DependencyOverlayEntry = {
+  dep: {
+    key: string;
+    isHidden: boolean;
+  };
+  isDepSelected: boolean;
+  stroke: string;
+  strokeOpacity: number;
+  strokeWidth: number;
+  dasharray: string | undefined;
+  linePath: string;
+  head: ReturnType<typeof buildDependencyRenderGeometry>['head'];
+};
+
+function approxGeometryEqual(a: number, b: number) {
+  return Math.abs(a - b) <= 0.5;
+}
+
+function areGeometryNodeListsEqual(a: TimelineGeometryNode[], b: TimelineGeometryNode[]) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const left = a[i];
+    const right = b[i];
+    if (
+      left.id !== right.id ||
+      left.kind !== right.kind ||
+      left.sourceId !== right.sourceId ||
+      !approxGeometryEqual(left.leftX, right.leftX) ||
+      !approxGeometryEqual(left.rightX, right.rightX) ||
+      !approxGeometryEqual(left.topY, right.topY) ||
+      !approxGeometryEqual(left.bottomY, right.bottomY)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 type AnchorDir = 'right' | 'left' | 'top' | 'bottom';
 
@@ -396,6 +434,54 @@ function renderDependencyHead(
   );
 }
 
+const DependencyOverlay = memo(function DependencyOverlay({
+  entries,
+  totalWidth,
+  canvasHeight,
+  onSelectDependency,
+}: {
+  entries: DependencyOverlayEntry[];
+  totalWidth: number;
+  canvasHeight: number;
+  onSelectDependency: (key: string) => void;
+}) {
+  if (entries.length === 0) return null;
+
+  return (
+    <>
+      <svg className="absolute top-0 left-0 pointer-events-none z-[40]" width={totalWidth} height={canvasHeight}>
+        {entries.map(({ dep, isDepSelected, stroke, strokeOpacity, strokeWidth, dasharray, linePath }) => (
+          <g key={dep.key} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
+            {isDepSelected && (
+              <path d={linePath} fill="none" stroke="#3b82f6" strokeOpacity={0.28} strokeWidth={strokeWidth + 4} strokeLinecap="round" strokeLinejoin="round" />
+            )}
+            <path d={linePath} fill="none" stroke={stroke} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth} strokeDasharray={dasharray} strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              data-testid={`dependency-hit-${dep.key}`}
+              d={linePath}
+              fill="none"
+              stroke="transparent"
+              strokeWidth={12}
+              style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                onSelectDependency(dep.key);
+              }}
+            />
+          </g>
+        ))}
+      </svg>
+      <svg className="absolute top-0 left-0 pointer-events-none z-[45]" width={totalWidth} height={canvasHeight}>
+        {entries.map(({ dep, isDepSelected, stroke, strokeOpacity, strokeWidth, head }) => (
+          <g key={`${dep.key}-head`} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
+            {head ? renderDependencyHead(head, stroke, strokeOpacity, strokeWidth, isDepSelected) : null}
+          </g>
+        ))}
+      </svg>
+    </>
+  );
+});
+
 function resolveAutoDependencyAnchorPoints(
   from: ProjectItem,
   to: ProjectItem,
@@ -439,6 +525,7 @@ function routeDepLink(
   fromX: number, fromY: number,
   toX: number, toY: number,
   allObjects: ObstacleRect[],
+  softObjects: ObstacleRect[],
   startObj: ObstacleRect,
   endObj: ObstacleRect,
   fromDir: AnchorDir = 'right',
@@ -487,6 +574,7 @@ function routeDepLink(
   });
 
   const objects = allObjects.map(normalizeRect);
+  const softRects = softObjects.map(normalizeRect);
   const startRect = normalizeRect(startObj);
   const endRect = normalizeRect(endObj);
 
@@ -605,7 +693,6 @@ function routeDepLink(
       const minX = Math.min((obj.leftX + obj.rightX) / 2, obj.leftX + insetX);
       const maxX = Math.max((obj.leftX + obj.rightX) / 2, obj.rightX - insetX);
       const midX = (obj.leftX + obj.rightX) / 2;
-
       addPoint(clamp(preferredX, minX, maxX), y);
       addPoint(clamp(oppositeX, minX, maxX), y);
       addPoint(midX, y);
@@ -855,6 +942,14 @@ function routeDepLink(
       const dist = segmentMinDist(ax, ay, bx, by, rect);
       if (dist < SOFT_ZONE) {
         proxPenalty += (SOFT_ZONE - dist) * PROXIMITY_WEIGHT * (len / SOFT_ZONE);
+      }
+    }
+    for (const rect of softRects) {
+      const dist = segmentMinDist(ax, ay, bx, by, rect);
+      if (dist <= GEOM_EPS) {
+        proxPenalty += 220;
+      } else if (dist < SOFT_ZONE) {
+        proxPenalty += (SOFT_ZONE - dist) * 6;
       }
     }
     return len + proxPenalty;
@@ -1209,6 +1304,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const timescale = useProjectStore((s) => s.timescale);
   const selectedItemId = useProjectStore((s) => s.selectedItemId);
   const setSelectedItem = useProjectStore((s) => s.setSelectedItem);
+  const setSelectedItemWithSection = useProjectStore((s) => s.setSelectedItemWithSection);
   const selectedSwimlaneId = useProjectStore((s) => s.selectedSwimlaneId);
   const setSelectedSwimlane = useProjectStore((s) => s.setSelectedSwimlane);
   const setStylePaneSection = useProjectStore((s) => s.setStylePaneSection);
@@ -1721,49 +1817,9 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const fp = autoAnchorOverride.fromPoint;
         const tp = autoAnchorOverride.toPoint;
 
-        // Compute from anchor
-        let fromX: number;
-        let fromY: number;
-        if (fp === 'top') {
-          fromX = from.type === 'milestone'
-            ? getMilestoneCenterX(from.startDate, dayWidth, itemToX)
-            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * dayWidth + dayWidth) / 2;
-          fromY = fromBarTop;
-        } else if (fp === 'bottom') {
-          fromX = from.type === 'milestone'
-            ? getMilestoneCenterX(from.startDate, dayWidth, itemToX)
-            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * dayWidth + dayWidth) / 2;
-          fromY = fromBarBottom;
-        } else {
-          fromX = getItemHorizontalAnchor(from, depSides.fromSide, dayWidth, itemToX);
-          fromY = fromRowTop + ROW_BASE / 2;
-        }
-
         const arrowType = dep.arrowType ?? 'standard';
         const arrowSize = dep.arrowSize ?? 4;
         const lineWidth = dep.lineWidth ?? 1.5;
-
-        // Compute to anchor
-        let toX: number;
-        let toY: number;
-        if (tp === 'top') {
-          toX = to.type === 'milestone'
-            ? getMilestoneCenterX(to.startDate, dayWidth, itemToX)
-            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * dayWidth + dayWidth) / 2;
-          toY = toBarTop;
-        } else if (tp === 'bottom') {
-          toX = to.type === 'milestone'
-            ? getMilestoneCenterX(to.startDate, dayWidth, itemToX)
-            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * dayWidth + dayWidth) / 2;
-          toY = toBarBottom;
-        } else {
-          toX = getItemHorizontalAnchor(to, depSides.toSide, dayWidth, itemToX);
-          toY = toRowTop + ROW_BASE / 2;
-        }
-
-        // Determine anchor directions for routing
-        const fromDir: AnchorDir = (fp === 'top') ? 'top' : (fp === 'bottom') ? 'bottom' : (depSides.fromSide === 'start' ? 'left' : 'right');
-        const toDir: AnchorDir = (tp === 'top') ? 'top' : (tp === 'bottom') ? 'bottom' : (depSides.toSide === 'start' ? 'left' : 'right');
         const isCritical = showCriticalPath && from.isCriticalPath && to.isCriticalPath;
 
         // Pass all obstacles + source/target object rects to the router
@@ -1773,11 +1829,63 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         const endObsIdx = allObstacles.findIndex((o) => o.id === to.id);
         if (startObsIdx < 0 || endObsIdx < 0) return null;
         const allObjRects: ObstacleRect[] = allObstacles.map(({ leftX, rightX, topY, bottomY }) => ({ leftX, rightX, topY, bottomY }));
+        const softObjRects: ObstacleRect[] = measuredGeometryNodes
+          .filter((node) => node.kind !== 'dependency-segment' && node.sourceId !== from.id && node.sourceId !== to.id)
+          .map(({ leftX, rightX, topY, bottomY }) => ({ leftX, rightX, topY, bottomY }));
         const startObjRect = allObjRects[startObsIdx];
         const endObjRect = allObjRects[endObsIdx];
         const visualClearance = dependencyArrowVisualClearance(lineWidth, arrowSize);
-        const endInset = dependencyArrowEndInset(arrowType, arrowSize, lineWidth, toDir);
-        const path = routeDepLink(fromX, fromY, toX, toY, allObjRects, startObjRect, endObjRect, fromDir, toDir, visualClearance, endInset);
+        let resolvedFromX: number;
+        let resolvedFromY: number;
+        if (fp === 'top') {
+          resolvedFromX = from.type === 'milestone'
+            ? getMilestoneCenterX(from.startDate, dayWidth, itemToX)
+            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * dayWidth + dayWidth) / 2;
+          resolvedFromY = fromBarTop;
+        } else if (fp === 'bottom') {
+          resolvedFromX = from.type === 'milestone'
+            ? getMilestoneCenterX(from.startDate, dayWidth, itemToX)
+            : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * dayWidth + dayWidth) / 2;
+          resolvedFromY = fromBarBottom;
+        } else {
+          resolvedFromX = getItemHorizontalAnchor(from, depSides.fromSide, dayWidth, itemToX);
+          resolvedFromY = fromRowTop + ROW_BASE / 2;
+        }
+
+        let resolvedToX: number;
+        let resolvedToY: number;
+        if (tp === 'top') {
+          resolvedToX = to.type === 'milestone'
+            ? getMilestoneCenterX(to.startDate, dayWidth, itemToX)
+            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * dayWidth + dayWidth) / 2;
+          resolvedToY = toBarTop;
+        } else if (tp === 'bottom') {
+          resolvedToX = to.type === 'milestone'
+            ? getMilestoneCenterX(to.startDate, dayWidth, itemToX)
+            : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * dayWidth + dayWidth) / 2;
+          resolvedToY = toBarBottom;
+        } else {
+          resolvedToX = getItemHorizontalAnchor(to, depSides.toSide, dayWidth, itemToX);
+          resolvedToY = toRowTop + ROW_BASE / 2;
+        }
+
+        const resolvedFromDir: AnchorDir = (fp === 'top') ? 'top' : (fp === 'bottom') ? 'bottom' : (depSides.fromSide === 'start' ? 'left' : 'right');
+        const resolvedToDir: AnchorDir = (tp === 'top') ? 'top' : (tp === 'bottom') ? 'bottom' : (depSides.toSide === 'start' ? 'left' : 'right');
+        const endInset = dependencyArrowEndInset(arrowType, arrowSize, lineWidth, resolvedToDir);
+        const path = routeDepLink(
+          resolvedFromX,
+          resolvedFromY,
+          resolvedToX,
+          resolvedToY,
+          allObjRects,
+          softObjRects,
+          startObjRect,
+          endObjRect,
+          resolvedFromDir,
+          resolvedToDir,
+          visualClearance,
+          endInset,
+        );
 
         const result = {
           path,
@@ -1792,8 +1900,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           arrowSize,
           lineDash: dep.lineDash,
           lineWidth,
-          targetX: toX,
-          targetY: toY,
+          targetX: resolvedToX,
+          targetY: resolvedToY,
           debug: {
             key: `${dep.fromId}-${dep.toId}`,
             path,
@@ -1801,12 +1909,12 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
             toId: dep.toId,
             fromName: from.name,
             toName: to.name,
-            fromPoint: fp,
-            toPoint: tp,
-            fromDir,
-            toDir,
-            fromAnchor: { x: fromX, y: fromY },
-            toAnchor: { x: toX, y: toY },
+            fromPoint: fp === 'auto' ? 'side' : fp,
+            toPoint: tp === 'auto' ? 'side' : tp,
+            fromDir: resolvedFromDir,
+            toDir: resolvedToDir,
+            fromAnchor: { x: resolvedFromX, y: resolvedFromY },
+            toAnchor: { x: resolvedToX, y: resolvedToY },
             startRect: startObjRect,
             endRect: endObjRect,
             measuredLabels: [],
@@ -1816,7 +1924,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       })
       .filter((d): d is NonNullable<typeof d> => Boolean(d));
     return entries;
-  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, dayWidth, getEffectiveTaskThickness, getEffectiveMilestoneSize]);
+  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, dayWidth, getEffectiveTaskThickness, getEffectiveMilestoneSize, measuredGeometryNodes]);
 
   const computedGeometryNodes = useMemo<TimelineGeometryNode[]>(() => {
     const getItemRowTopY = (item: ProjectItem) => {
@@ -1884,9 +1992,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       canvasEl.querySelectorAll('[data-testid^="task-date-label-"]').forEach((el) => pushRect(el, 'task-date-label'));
       canvasEl.querySelectorAll('[data-testid^="milestone-title-label-"]').forEach((el) => pushRect(el, 'milestone-title-label'));
       canvasEl.querySelectorAll('[data-testid^="milestone-date-label-"]').forEach((el) => pushRect(el, 'milestone-date-label'));
-      canvasEl.querySelectorAll('[data-testid^="dependency-hit-"]').forEach((el) => pushRect(el, 'dependency-segment'));
 
-      setMeasuredGeometryNodes(nodes);
+      setMeasuredGeometryNodes((prev) => areGeometryNodeListsEqual(prev, nodes) ? prev : nodes);
     };
 
     measure();
@@ -1925,6 +2032,48 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       ],
     }));
   }, [computedGeometryNodes, measuredGeometryNodes, depPaths]);
+
+  const dependencyOverlay = useMemo(() => {
+    if (!showDependencies) return [];
+    return depPaths.map((dep) => {
+      if (!dep) return null;
+      const isDepSelected = selectedDepKey === dep.key;
+      const baseColor = dep.color ?? DEFAULT_DEPENDENCY_COLOR;
+      const alpha = dependencyStrokeOpacity(dep.transparency);
+      const effectiveDash = dep.isCritical && criticalPathStyle.dependencyDash.enabled
+        ? criticalPathStyle.dependencyDash.dash
+        : dep.lineDash ?? 'solid';
+      const criticalStroke = criticalPathStyle.dependencyColor.enabled
+        ? criticalPathStyle.dependencyColor.color
+        : baseColor;
+      const stroke = dep.isHidden
+        ? '#94a3b8'
+        : dep.isCritical
+          ? criticalStroke
+          : baseColor;
+      const strokeWidth = dep.lineWidth ?? (dep.isCritical ? 2 : 1.5);
+      const dasharray = dep.isHidden ? '4 3' : DEPENDENCY_DASH_MAP[effectiveDash];
+      const renderGeometry = buildDependencyRenderGeometry(dep.path, dep.arrowType ?? 'standard', dep.arrowSize, strokeWidth);
+      return {
+        dep,
+        isDepSelected,
+        stroke,
+        strokeOpacity: alpha,
+        strokeWidth,
+        dasharray,
+        linePath: renderGeometry.linePath,
+        head: renderGeometry.head,
+      };
+    }).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+  }, [showDependencies, depPaths, selectedDepKey, criticalPathStyle]);
+
+  const handleSelectDependency = useCallback((key: string) => {
+    setSelectedDepKey(key);
+    setSelectedItem(null);
+    setSelectedSwimlane(null);
+    setSelectedTierIndex(null);
+    setStylePaneSection(null);
+  }, [setSelectedDepKey, setSelectedItem, setSelectedSwimlane, setSelectedTierIndex, setStylePaneSection]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
   const verticalConnectors = useMemo(() => {
@@ -2291,9 +2440,9 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           isDragging={isDragging}
           isHovered={isHovered}
           onMouseDown={(e) => handleMouseDown(e, item.id)}
-          onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
-          onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
-          onClickDate={() => { setSelectedItem(item.id); setStylePaneSection('milestoneDate'); }}
+          onClickIcon={() => { setSelectedItemWithSection(item.id, 'milestoneShape'); }}
+          onClickLabel={() => { setSelectedItemWithSection(item.id, 'milestoneTitle'); }}
+          onClickDate={() => { setSelectedItemWithSection(item.id, 'milestoneDate'); }}
           editingField={editingField}
           onStartEdit={(field) => startEditing(item.id, field)}
           onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
@@ -2324,8 +2473,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         isDragging={isDragging}
         isHovered={isHovered}
         onMouseDown={(e) => handleMouseDown(e, item.id)}
-        onClickBar={() => { setSelectedItem(item.id); setStylePaneSection('bar'); }}
-        onClickSection={(section) => { setSelectedItem(item.id); setStylePaneSection(section); }}
+        onClickBar={() => { setSelectedItemWithSection(item.id, 'bar'); }}
+        onClickSection={(section) => { setSelectedItemWithSection(item.id, section); }}
         editingField={editingField}
         onStartEdit={(field) => startEditing(item.id, field)}
         onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
@@ -2395,9 +2544,9 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     isDragging={isDraggingItem}
                     isHovered={hoveredItemId === item.id}
                     onMouseDown={(e) => handleMouseDown(e, item.id)}
-                    onClickIcon={() => { setSelectedItem(item.id); setStylePaneSection('milestoneShape'); }}
-                    onClickLabel={() => { setSelectedItem(item.id); setStylePaneSection('milestoneTitle'); }}
-                    onClickDate={() => { setSelectedItem(item.id); setStylePaneSection('milestoneDate'); }}
+                    onClickIcon={() => { setSelectedItemWithSection(item.id, 'milestoneShape'); }}
+                    onClickLabel={() => { setSelectedItemWithSection(item.id, 'milestoneTitle'); }}
+                    onClickDate={() => { setSelectedItemWithSection(item.id, 'milestoneDate'); }}
                     editingField={editingField}
                     onStartEdit={(field) => startEditing(item.id, field)}
                     onCommitEdit={(field, value) => commitEdit(item.id, field, value)}
@@ -2676,71 +2825,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                   strokeDasharray="4 3"
                 />
               ))}
-              {/* Dependency lines — orthogonal paths with click-to-select */}
-              {depPaths.map(
-                (dep) => {
-                  if (!dep) return null;
-                  const isDepSelected = selectedDepKey === dep.key;
-                  const baseColor = dep.color ?? DEFAULT_DEPENDENCY_COLOR;
-                  const alpha = dependencyStrokeOpacity(dep.transparency);
-                  const criticalStroke = criticalPathStyle.dependencyColor.enabled
-                    ? criticalPathStyle.dependencyColor.color
-                    : baseColor;
-                  const stroke = dep.isHidden
-                    ? '#94a3b8'
-                    : dep.isCritical
-                      ? criticalStroke
-                      : baseColor;
-                  const arrowType = dep.arrowType ?? 'standard';
-                  const strokeOpacity = alpha;
-                  const strokeWidth = dep.lineWidth ?? 1.5;
-                  const effectiveDash = dep.isCritical && criticalPathStyle.dependencyDash.enabled
-                    ? criticalPathStyle.dependencyDash.dash
-                    : dep.lineDash ?? 'solid';
-                  const dasharray = dep.isHidden ? '4 3' : DEPENDENCY_DASH_MAP[effectiveDash];
-                  const renderGeometry = buildDependencyRenderGeometry(dep.path, arrowType, dep.arrowSize, strokeWidth);
-                  const linePath = renderGeometry.linePath;
-                  return (
-                    <g key={dep.key} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
-                      {/* Invisible fat hit area for clicking */}
-                      <path
-                        data-testid={`dependency-hit-${dep.key}`}
-                        d={linePath}
-                        fill="none"
-                        stroke="transparent"
-                        strokeWidth={12}
-                        style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedDepKey(dep.key);
-                        }}
-                      />
-                      {isDepSelected && (
-                        <path
-                          d={linePath}
-                          fill="none"
-                          stroke="#3b82f6"
-                          strokeOpacity={0.28}
-                          strokeWidth={strokeWidth + 4}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      )}
-                      {/* Visible path */}
-                      <path
-                        d={linePath}
-                        fill="none"
-                        stroke={stroke}
-                        strokeOpacity={strokeOpacity}
-                        strokeWidth={strokeWidth}
-                        strokeDasharray={dasharray}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </g>
-                  );
-                }
-              )}
               {/* Temporary dependency drag line */}
               {depDrag && (() => {
                 const TEMP_OFFSET = 12;
@@ -2782,7 +2866,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                   const targetObjRect = allObjRects[targetIdx >= 0 ? targetIdx : 0];
                   const fromDir: AnchorDir = depDrag.sourceSide === 'start' ? 'left' : 'right';
                   const toDir: AnchorDir = depDrag.targetSide === 'end' ? 'right' : 'left';
-                  path = routeDepLink(fromX, fromY, endX, endY, allObjRects, sourceObjRect, targetObjRect, fromDir, toDir, dependencyArrowVisualClearance(1.5, 4), dependencyArrowEndInset('standard', 4, 1.5, toDir));
+                  path = routeDepLink(fromX, fromY, endX, endY, allObjRects, [], sourceObjRect, targetObjRect, fromDir, toDir, dependencyArrowVisualClearance(1.5, 4), dependencyArrowEndInset('standard', 4, 1.5, toDir));
                 } else {
                   // Free-dragging — simple orthogonal routing
                   const gap = endX - fromX;
@@ -2815,34 +2899,12 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
               })()}
             </svg>
 
-            {/* Dependency arrowheads above items */}
-            <svg
-              className="absolute top-0 left-0 pointer-events-none z-[45]"
-              width={totalWidth}
-              height={canvasHeight}
-            >
-              {depPaths.map((dep) => {
-                if (!dep) return null;
-                const isDepSelected = selectedDepKey === dep.key;
-                const baseColor = dep.color ?? DEFAULT_DEPENDENCY_COLOR;
-                const alpha = dependencyStrokeOpacity(dep.transparency);
-                const stroke = dep.isHidden
-                  ? '#94a3b8'
-                  : dep.isCritical
-                    ? '#ef4444'
-                    : baseColor;
-                const arrowType = dep.arrowType ?? 'standard';
-                const strokeOpacity = alpha;
-                const strokeWidth = dep.lineWidth ?? (dep.isCritical ? 2 : 1.5);
-                const renderGeometry = buildDependencyRenderGeometry(dep.path, arrowType, dep.arrowSize, strokeWidth);
-                if (!renderGeometry.head) return null;
-                return (
-                  <g key={`${dep.key}-head`} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
-                    {renderDependencyHead(renderGeometry.head, stroke, strokeOpacity, strokeWidth, isDepSelected)}
-                  </g>
-                );
-              })}
-            </svg>
+            <DependencyOverlay
+              entries={dependencyOverlay}
+              totalWidth={totalWidth}
+              canvasHeight={canvasHeight}
+              onSelectDependency={handleSelectDependency}
+            />
 
             {/* ─── Render independent items (below timescale only) ─── */}
             {belowIndependentItems.map((item) =>
