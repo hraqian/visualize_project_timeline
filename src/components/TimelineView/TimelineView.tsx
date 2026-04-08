@@ -99,6 +99,39 @@ const SWIMLANE_PADDING_BOTTOM = 10;
 //   SOFT_ZONE – proximity penalty zone (soft preference only)
 interface ObstacleRect { leftX: number; rightX: number; topY: number; bottomY: number }
 
+type TimelineGeometryNodeKind =
+  | 'task-bar'
+  | 'milestone-icon'
+  | 'task-title-label'
+  | 'task-date-label'
+  | 'milestone-title-label'
+  | 'milestone-date-label'
+  | 'dependency-segment';
+
+type TimelineGeometryNode = ObstacleRect & {
+  id: string;
+  kind: TimelineGeometryNodeKind;
+  sourceId?: string;
+};
+
+type DependencyRoutingDebugEntry = {
+  key: string;
+  path: string;
+  fromId: string;
+  toId: string;
+  fromName: string;
+  toName: string;
+  fromPoint: 'auto' | 'side' | 'top' | 'bottom';
+  toPoint: 'auto' | 'side' | 'top' | 'bottom';
+  fromDir: AnchorDir;
+  toDir: AnchorDir;
+  fromAnchor: { x: number; y: number };
+  toAnchor: { x: number; y: number };
+  startRect: ObstacleRect;
+  endRect: ObstacleRect;
+  measuredLabels: TimelineGeometryNode[];
+};
+
 type AnchorDir = 'right' | 'left' | 'top' | 'bottom';
 
 function dependencyTypeToSides(type: DependencyType): { fromSide: 'start' | 'end'; toSide: 'start' | 'end' } {
@@ -124,7 +157,7 @@ function dependencySidesToType(fromSide: 'start' | 'end', toSide: 'start' | 'end
 
 function getItemHorizontalAnchor(item: ProjectItem, side: 'start' | 'end', dayWidth: number, itemToX: (date: string) => number) {
   if (item.type === 'milestone') {
-    const centerX = itemToX(item.startDate);
+    const centerX = getMilestoneCenterX(item.startDate, dayWidth, itemToX);
     return side === 'start'
       ? centerX - item.milestoneStyle.size / 2
       : centerX + item.milestoneStyle.size / 2;
@@ -133,6 +166,84 @@ function getItemHorizontalAnchor(item: ProjectItem, side: 'start' | 'end', dayWi
   const startX = itemToX(item.startDate);
   const endX = startX + differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
   return side === 'start' ? startX : endX;
+}
+
+function getMilestoneCenterX(date: string, dayWidth: number, itemToX: (date: string) => number) {
+  return itemToX(date) + dayWidth / 2;
+}
+
+function estimateTaskBelowFootprint(item: ProjectItem) {
+  const style = item.taskStyle;
+  let bottom = 0;
+  if (style.showDate && style.dateLabelPosition === 'below') {
+    bottom = Math.max(bottom, Math.ceil(style.dateFontSize * 1.25) + (style.showTitle && style.labelPosition === 'below' ? 16 : 2));
+  }
+  if (style.showTitle && style.labelPosition === 'below') {
+    bottom = Math.max(bottom, Math.ceil(style.fontSize * 1.25) + (style.showDate && style.dateLabelPosition === 'below' ? 16 : 2));
+  }
+  return bottom;
+}
+
+function estimateTaskAboveFootprint(item: ProjectItem) {
+  const style = item.taskStyle;
+  let top = 0;
+  if (style.showDate && style.dateLabelPosition === 'above') {
+    top = Math.max(top, Math.ceil(style.dateFontSize * 1.25) + (style.showTitle && style.labelPosition === 'above' ? 16 : 2));
+  }
+  if (style.showTitle && style.labelPosition === 'above') {
+    top = Math.max(top, Math.ceil(style.fontSize * 1.25) + (style.showDate && style.dateLabelPosition === 'above' ? 16 : 2));
+  }
+  return top;
+}
+
+function estimateMilestoneBelowFootprint(item: ProjectItem) {
+  const style = item.milestoneStyle;
+  if (item.swimlaneId === null) {
+    let bottom = 0;
+    if (style.position === 'below') {
+      if (style.showDate) bottom += Math.ceil(style.dateFontSize * 1.25) + 1;
+      if (style.showTitle) bottom += Math.ceil(style.fontSize * 1.25) + 1;
+    }
+    return bottom;
+  }
+  let bottom = 0;
+  if (style.showDate && style.dateLabelPosition === 'below') bottom = Math.max(bottom, Math.ceil(style.dateFontSize * 1.25) + 2);
+  if (style.showTitle && style.labelPosition === 'below') bottom = Math.max(bottom, Math.ceil(style.fontSize * 1.25) + 2);
+  return bottom;
+}
+
+function estimateMilestoneAboveFootprint(item: ProjectItem) {
+  const style = item.milestoneStyle;
+  if (item.swimlaneId === null) {
+    let top = 0;
+    if (style.position === 'above') {
+      if (style.showTitle) top += Math.ceil(style.fontSize * 1.25) + 1;
+      if (style.showDate) top += Math.ceil(style.dateFontSize * 1.25) + 1;
+    }
+    return top;
+  }
+  let top = 0;
+  if (style.showDate && style.dateLabelPosition === 'above') top = Math.max(top, Math.ceil(style.dateFontSize * 1.25) + 2);
+  if (style.showTitle && style.labelPosition === 'above') top = Math.max(top, Math.ceil(style.fontSize * 1.25) + 2);
+  return top;
+}
+
+function estimateBelowFootprint(item: ProjectItem) {
+  return item.type === 'task' ? estimateTaskBelowFootprint(item) : estimateMilestoneBelowFootprint(item);
+}
+
+function estimateAboveFootprint(item: ProjectItem) {
+  return item.type === 'task' ? estimateTaskAboveFootprint(item) : estimateMilestoneAboveFootprint(item);
+}
+
+function getItemCenterX(item: ProjectItem, dayWidth: number, itemToX: (date: string) => number) {
+  if (item.type === 'milestone') {
+    return getMilestoneCenterX(item.startDate, dayWidth, itemToX);
+  }
+
+  const startX = itemToX(item.startDate);
+  const width = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
+  return startX + width / 2;
 }
 
 function getDependencyPreviewOffset(type: DependencyType, predecessor: ProjectItem, successor: ProjectItem) {
@@ -283,6 +394,45 @@ function renderDependencyHead(
       />
     </>
   );
+}
+
+function resolveAutoDependencyAnchorPoints(
+  from: ProjectItem,
+  to: ProjectItem,
+  depType: DependencyType,
+  dayWidth: number,
+  itemToX: (date: string) => number,
+  fromBarTop: number,
+  fromBarBottom: number,
+  toBarTop: number,
+  toBarBottom: number,
+): { fromPoint: 'auto' | 'side' | 'top' | 'bottom'; toPoint: 'auto' | 'side' | 'top' | 'bottom' } {
+  const fromSide = dependencyTypeToSides(depType).fromSide;
+  const toSide = dependencyTypeToSides(depType).toSide;
+  const fromSideX = getItemHorizontalAnchor(from, fromSide, dayWidth, itemToX);
+  const toSideX = getItemHorizontalAnchor(to, toSide, dayWidth, itemToX);
+
+  // Same-column milestone -> task finish-to-start links can look wrong with
+  // default side anchors because the milestone sits inside the task's width.
+  // In that case, pick a vertical entry/exit pair based on their row ordering
+  // instead of letting the router escape horizontally.
+  if (depType === 'finish-to-start' && from.type === 'milestone' && to.type === 'task' && fromSideX > toSideX) {
+    const fromCenterX = getItemCenterX(from, dayWidth, itemToX);
+    const toStartX = getItemHorizontalAnchor(to, 'start', dayWidth, itemToX);
+    const toEndX = getItemHorizontalAnchor(to, 'end', dayWidth, itemToX);
+    const overlapsTargetColumn = fromCenterX >= Math.min(toStartX, toEndX) && fromCenterX <= Math.max(toStartX, toEndX);
+    if (overlapsTargetColumn) {
+      if (fromBarBottom <= toBarTop) {
+        return { fromPoint: 'bottom', toPoint: 'top' };
+      }
+      if (toBarBottom <= fromBarTop) {
+        return { fromPoint: 'top', toPoint: 'bottom' };
+      }
+      return { fromPoint: 'top', toPoint: 'top' };
+    }
+  }
+
+  return { fromPoint: 'auto', toPoint: 'auto' };
 }
 
 function routeDepLink(
@@ -1068,7 +1218,21 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const criticalPathStyle = useProjectStore((s) => s.criticalPathStyle);
   const showDependencies = useProjectStore((s) => s.showDependencies);
   const swimlaneSpacing = useProjectStore((s) => s.swimlaneSpacing);
-  const taskLayout = useProjectStore((s) => s.taskLayout);
+  const rowArrangement = useProjectStore((s) => s.rowArrangement);
+  const densityMode = useProjectStore((s) => s.densityMode);
+  const densityScale = densityMode === 'compact' ? 0.82 : 1;
+  const getEffectiveTaskThickness = useCallback(
+    (item: ProjectItem) => item.type === 'task' ? Math.max(10, Math.round(item.taskStyle.thickness * densityScale)) : 0,
+    [densityScale],
+  );
+  const getEffectiveMilestoneSize = useCallback(
+    (item: ProjectItem) => item.type === 'milestone' ? Math.max(12, Math.round(item.milestoneStyle.size * densityScale)) : 0,
+    [densityScale],
+  );
+  const getEffectiveRowSpacing = useCallback(
+    (item: ProjectItem) => Math.max(0, Math.round(item.taskStyle.spacing * densityScale)),
+    [densityScale],
+  );
   const selectedTierIndex = useProjectStore((s) => s.selectedTierIndex);
   const setSelectedTierIndex = useProjectStore((s) => s.setSelectedTierIndex);
   const updateTier = useProjectStore((s) => s.updateTier);
@@ -1146,6 +1310,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const exportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const [timelineContainerWidth, setTimelineContainerWidth] = useState(0);
+  const [measuredGeometryNodes, setMeasuredGeometryNodes] = useState<TimelineGeometryNode[]>([]);
   useImperativeHandle(ref, () => ({
     getExportElement: () => exportRef.current,
   }));
@@ -1214,38 +1379,44 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     [independentItems]
   );
 
-  // Compute layout rows based on taskLayout mode
+  // Compute layout rows based on rowArrangement mode
   const getRow = useMemo(() => {
-    if (taskLayout === 'single-row') {
-      return (item: ProjectItem) => item.row;
-    }
-    // Build row assignments for packed or one-per-row modes
     const rowMap = new Map<string, number>();
 
     const assignRows = (groupItems: ProjectItem[]) => {
       const sorted = [...groupItems].sort((a, b) => a.row - b.row || a.startDate.localeCompare(b.startDate));
-      if (taskLayout === 'one-per-row') {
+      if (rowArrangement === 'one-per-row') {
         sorted.forEach((it, idx) => rowMap.set(it.id, idx));
-      } else {
-        // packed: assign to first row where item doesn't overlap
-        const rowEnds: number[] = []; // end day per row (exclusive)
-        for (const it of sorted) {
-          const start = parseISO(it.startDate).getTime();
-          const end = parseISO(it.endDate).getTime();
-          let placed = false;
-          for (let r = 0; r < rowEnds.length; r++) {
-            if (start >= rowEnds[r]) {
-              rowMap.set(it.id, r);
-              rowEnds[r] = end + 1; // +1 to avoid same-day overlap
-              placed = true;
+        return;
+      }
+
+      const rowEnds = new Map<number, number>();
+      for (const it of sorted) {
+        const start = parseISO(it.startDate).getTime();
+        const endExclusive = parseISO(it.endDate).getTime() + 1;
+        const preferredRow = it.row;
+        let assignedRow: number | null = null;
+
+        if (start >= (rowEnds.get(preferredRow) ?? Number.NEGATIVE_INFINITY)) {
+          assignedRow = preferredRow;
+        } else {
+          for (let offset = 1; offset <= sorted.length; offset += 1) {
+            const lower = preferredRow - offset;
+            if (lower >= 0 && start >= (rowEnds.get(lower) ?? Number.NEGATIVE_INFINITY)) {
+              assignedRow = lower;
+              break;
+            }
+            const upper = preferredRow + offset;
+            if (start >= (rowEnds.get(upper) ?? Number.NEGATIVE_INFINITY)) {
+              assignedRow = upper;
               break;
             }
           }
-          if (!placed) {
-            rowMap.set(it.id, rowEnds.length);
-            rowEnds.push(end + 1);
-          }
         }
+
+        const finalRow = assignedRow ?? preferredRow;
+        rowMap.set(it.id, finalRow);
+        rowEnds.set(finalRow, endExclusive);
       }
     };
 
@@ -1257,7 +1428,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     }
 
     return (item: ProjectItem) => rowMap.get(item.id) ?? item.row;
-  }, [taskLayout, belowIndependentItems, swimlanedItems, sortedSwimlanes]);
+  }, [rowArrangement, belowIndependentItems, swimlanedItems, sortedSwimlanes]);
 
   // ─── Per-row layout: cumulative Y positions accounting for per-item spacing ──
   // Spacing = gap below each row. Row height = ROW_BASE + max(spacing of items in row).
@@ -1279,15 +1450,25 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       // Sort rows
       const sortedRows = [...rowItems.keys()].sort((a, b) => a - b);
       let cumY = 0;
+      let prevItems: ProjectItem[] | null = null;
+      let prevRowH = 0;
       for (const r of sortedRows) {
         const items = rowItems.get(r)!;
+        if (prevItems) {
+          const prevBelow = Math.max(0, ...prevItems.map((it) => estimateBelowFootprint(it)));
+          const currentAbove = Math.max(0, ...items.map((it) => estimateAboveFootprint(it)));
+          const minGap = Math.max(0, prevBelow + currentAbove + 4 - prevRowH);
+          cumY += minGap;
+        }
         // Max spacing in this row
-        const maxSpacing = Math.max(...items.map((it) => it.taskStyle.spacing));
+        const maxSpacing = Math.max(...items.map((it) => getEffectiveRowSpacing(it)));
         const rowH = ROW_BASE + maxSpacing;
         for (const it of items) {
           rowYMap.set(it.id, cumY);
           rowHMap.set(it.id, rowH);
         }
+        prevItems = items;
+        prevRowH = rowH;
         cumY += rowH;
       }
       return cumY;
@@ -1306,7 +1487,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       getRowH: (item: ProjectItem) => rowHMap.get(item.id) ?? ROW_HEIGHT,
       getGroupHeight: (groupKey: string) => groupHeightMap.get(groupKey) ?? 0,
     };
-  }, [getRow, belowIndependentItems, swimlanedItems, sortedSwimlanes]);
+  }, [getRow, belowIndependentItems, swimlanedItems, sortedSwimlanes, getEffectiveRowSpacing]);
 
   // Compute project range with padding — origin aligned to unit boundaries
   useEffect(() => {
@@ -1481,12 +1662,13 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       if (item.type === 'task') {
         const xStart = itemToX(item.startDate);
         const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
-        const barTop = rowTop + (ROW_BASE - item.taskStyle.thickness) / 2;
-        const barBottom = barTop + item.taskStyle.thickness;
+        const barThickness = getEffectiveTaskThickness(item);
+        const barTop = rowTop + (ROW_BASE - barThickness) / 2;
+        const barBottom = barTop + barThickness;
         allObstacles.push({ id: item.id, leftX: xStart, rightX: xStart + barWidth, topY: barTop, bottomY: barBottom });
       } else {
-        const cx = itemToX(item.startDate);
-        const sz = item.milestoneStyle.size;
+        const cx = getMilestoneCenterX(item.startDate, dayWidth, itemToX);
+        const sz = getEffectiveMilestoneSize(item);
         const barTop = rowTop + (ROW_BASE - sz) / 2;
         const barBottom = barTop + sz;
         allObstacles.push({ id: item.id, leftX: cx - sz / 2, rightX: cx + sz / 2, topY: barTop, bottomY: barBottom });
@@ -1502,35 +1684,38 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
         const fromRowTop = getItemRowTopY(from);
         const toRowTop = getItemRowTopY(to);
-        const fp = dep.fromPoint ?? 'auto';
-        const tp = dep.toPoint ?? 'auto';
         const depSides = dependencyTypeToSides(dep.type ?? 'finish-to-start');
 
         // Compute actual bar/milestone vertical bounds within the row
         const fromBarTop = from.type === 'task'
-          ? fromRowTop + (ROW_BASE - from.taskStyle.thickness) / 2
-          : fromRowTop + (ROW_BASE - from.milestoneStyle.size) / 2;
+          ? fromRowTop + (ROW_BASE - getEffectiveTaskThickness(from)) / 2
+          : fromRowTop + (ROW_BASE - getEffectiveMilestoneSize(from)) / 2;
         const fromBarBottom = from.type === 'task'
-          ? fromBarTop + from.taskStyle.thickness
-          : fromBarTop + from.milestoneStyle.size;
+          ? fromBarTop + getEffectiveTaskThickness(from)
+          : fromBarTop + getEffectiveMilestoneSize(from);
         const toBarTop = to.type === 'task'
-          ? toRowTop + (ROW_BASE - to.taskStyle.thickness) / 2
-          : toRowTop + (ROW_BASE - to.milestoneStyle.size) / 2;
+          ? toRowTop + (ROW_BASE - getEffectiveTaskThickness(to)) / 2
+          : toRowTop + (ROW_BASE - getEffectiveMilestoneSize(to)) / 2;
         const toBarBottom = to.type === 'task'
-          ? toBarTop + to.taskStyle.thickness
-          : toBarTop + to.milestoneStyle.size;
+          ? toBarTop + getEffectiveTaskThickness(to)
+          : toBarTop + getEffectiveMilestoneSize(to);
+        const autoAnchorOverride = (dep.fromPoint ?? 'auto') === 'auto' && (dep.toPoint ?? 'auto') === 'auto'
+          ? resolveAutoDependencyAnchorPoints(from, to, dep.type ?? 'finish-to-start', dayWidth, itemToX, fromBarTop, fromBarBottom, toBarTop, toBarBottom)
+          : { fromPoint: dep.fromPoint ?? 'auto', toPoint: dep.toPoint ?? 'auto' };
+        const fp = autoAnchorOverride.fromPoint;
+        const tp = autoAnchorOverride.toPoint;
 
         // Compute from anchor
         let fromX: number;
         let fromY: number;
         if (fp === 'top') {
           fromX = from.type === 'milestone'
-            ? itemToX(from.startDate)
+            ? getMilestoneCenterX(from.startDate, dayWidth, itemToX)
             : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * dayWidth + dayWidth) / 2;
           fromY = fromBarTop;
         } else if (fp === 'bottom') {
           fromX = from.type === 'milestone'
-            ? itemToX(from.startDate)
+            ? getMilestoneCenterX(from.startDate, dayWidth, itemToX)
             : itemToX(from.startDate) + (differenceInDays(parseISO(from.endDate), parseISO(from.startDate)) * dayWidth + dayWidth) / 2;
           fromY = fromBarBottom;
         } else {
@@ -1547,12 +1732,12 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         let toY: number;
         if (tp === 'top') {
           toX = to.type === 'milestone'
-            ? itemToX(to.startDate)
+            ? getMilestoneCenterX(to.startDate, dayWidth, itemToX)
             : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * dayWidth + dayWidth) / 2;
           toY = toBarTop;
         } else if (tp === 'bottom') {
           toX = to.type === 'milestone'
-            ? itemToX(to.startDate)
+            ? getMilestoneCenterX(to.startDate, dayWidth, itemToX)
             : itemToX(to.startDate) + (differenceInDays(parseISO(to.endDate), parseISO(to.startDate)) * dayWidth + dayWidth) / 2;
           toY = toBarBottom;
         } else {
@@ -1593,12 +1778,137 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           lineWidth,
           targetX: toX,
           targetY: toY,
+          debug: {
+            key: `${dep.fromId}-${dep.toId}`,
+            path,
+            fromId: dep.fromId,
+            toId: dep.toId,
+            fromName: from.name,
+            toName: to.name,
+            fromPoint: fp,
+            toPoint: tp,
+            fromDir,
+            toDir,
+            fromAnchor: { x: fromX, y: fromY },
+            toAnchor: { x: toX, y: toY },
+            startRect: startObjRect,
+            endRect: endObjRect,
+            measuredLabels: [],
+          } satisfies DependencyRoutingDebugEntry,
         };
         return result;
       })
       .filter((d): d is NonNullable<typeof d> => Boolean(d));
     return entries;
-  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, dayWidth]);
+  }, [showDependencies, dependencies, visibleItems, swimlaneLayout, swimlaneIds, itemToX, showCriticalPath, getRowY, dayWidth, getEffectiveTaskThickness, getEffectiveMilestoneSize]);
+
+  const computedGeometryNodes = useMemo<TimelineGeometryNode[]>(() => {
+    const getItemRowTopY = (item: ProjectItem) => {
+      if (item.type === 'milestone' && item.swimlaneId === null && item.milestoneStyle.position === 'above') {
+        return 0;
+      }
+      if (item.swimlaneId === null || !swimlaneIds.has(item.swimlaneId)) {
+        return INDEPENDENT_SECTION_PADDING + getRowY(item);
+      }
+      const sl = swimlaneLayout.find((s) => s.swimlane.id === item.swimlaneId);
+      if (!sl) return 0;
+      return sl.contentY + getRowY(item);
+    };
+
+    const nodes: TimelineGeometryNode[] = [];
+    for (const item of visibleItems) {
+      const rowTop = getItemRowTopY(item);
+      if (item.type === 'task') {
+        const xStart = itemToX(item.startDate);
+        const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
+        const barThickness = getEffectiveTaskThickness(item);
+        const barTop = rowTop + (ROW_BASE - barThickness) / 2;
+        const barBottom = barTop + barThickness;
+        nodes.push({ id: item.id, kind: 'task-bar', leftX: xStart, rightX: xStart + barWidth, topY: barTop, bottomY: barBottom, sourceId: item.id });
+      } else {
+        const cx = getMilestoneCenterX(item.startDate, dayWidth, itemToX);
+        const sz = getEffectiveMilestoneSize(item);
+        const iconTop = rowTop + (ROW_BASE - sz) / 2;
+        nodes.push({ id: item.id, kind: 'milestone-icon', leftX: cx - sz / 2, rightX: cx + sz / 2, topY: iconTop, bottomY: iconTop + sz, sourceId: item.id });
+      }
+    }
+    return nodes;
+  }, [visibleItems, swimlaneIds, swimlaneLayout, itemToX, getRowY, dayWidth, getEffectiveTaskThickness, getEffectiveMilestoneSize]);
+
+  useEffect(() => {
+    const canvasEl = canvasRef.current;
+    if (!canvasEl) return;
+
+    const measure = () => {
+      const canvasRect = canvasEl.getBoundingClientRect();
+      const nodes: TimelineGeometryNode[] = [];
+
+      const pushRect = (el: Element, kind: TimelineGeometryNodeKind) => {
+        const r = (el as HTMLElement).getBoundingClientRect();
+        const testId = (el as HTMLElement).dataset.testid ?? '';
+        const sourceId =
+          kind === 'task-title-label' ? testId.replace(/^task-title-label-/, '')
+          : kind === 'task-date-label' ? testId.replace(/^task-date-label-/, '')
+          : kind === 'milestone-title-label' ? testId.replace(/^milestone-title-label-/, '')
+          : kind === 'milestone-date-label' ? testId.replace(/^milestone-date-label-/, '')
+          : kind === 'dependency-segment' ? testId.replace(/^dependency-hit-/, '')
+          : testId;
+        nodes.push({
+          id: testId,
+          kind,
+          sourceId,
+          leftX: r.left - canvasRect.left,
+          rightX: r.right - canvasRect.left,
+          topY: r.top - canvasRect.top,
+          bottomY: r.bottom - canvasRect.top,
+        });
+      };
+
+      canvasEl.querySelectorAll('[data-testid^="task-title-label-"]').forEach((el) => pushRect(el, 'task-title-label'));
+      canvasEl.querySelectorAll('[data-testid^="task-date-label-"]').forEach((el) => pushRect(el, 'task-date-label'));
+      canvasEl.querySelectorAll('[data-testid^="milestone-title-label-"]').forEach((el) => pushRect(el, 'milestone-title-label'));
+      canvasEl.querySelectorAll('[data-testid^="milestone-date-label-"]').forEach((el) => pushRect(el, 'milestone-date-label'));
+      canvasEl.querySelectorAll('[data-testid^="dependency-hit-"]').forEach((el) => pushRect(el, 'dependency-segment'));
+
+      setMeasuredGeometryNodes(nodes);
+    };
+
+    measure();
+    const raf = requestAnimationFrame(measure);
+    window.addEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', measure);
+    };
+  }, [depPaths, visibleItems, editingField, timelineContainerWidth, canvasHeight]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    (window as Window & {
+      __TIMELINE_GEOMETRY_DEBUG__?: { computed: TimelineGeometryNode[]; measured: TimelineGeometryNode[] };
+      __TIMELINE_DEPENDENCY_ROUTING_DEBUG__?: DependencyRoutingDebugEntry[];
+    }).__TIMELINE_GEOMETRY_DEBUG__ = {
+      computed: computedGeometryNodes,
+      measured: measuredGeometryNodes,
+    };
+    const measuredBySourceId = new Map<string, TimelineGeometryNode[]>();
+    for (const node of measuredGeometryNodes) {
+      if (node.kind === 'dependency-segment' || !node.sourceId) continue;
+      const list = measuredBySourceId.get(node.sourceId) ?? [];
+      list.push(node);
+      measuredBySourceId.set(node.sourceId, list);
+    }
+    (window as Window & {
+      __TIMELINE_GEOMETRY_DEBUG__?: { computed: TimelineGeometryNode[]; measured: TimelineGeometryNode[] };
+      __TIMELINE_DEPENDENCY_ROUTING_DEBUG__?: DependencyRoutingDebugEntry[];
+    }).__TIMELINE_DEPENDENCY_ROUTING_DEBUG__ = depPaths.map((dep) => ({
+      ...dep.debug,
+      measuredLabels: [
+        ...(measuredBySourceId.get(dep.fromId) ?? []),
+        ...(measuredBySourceId.get(dep.toId) ?? []),
+      ],
+    }));
+  }, [computedGeometryNodes, measuredGeometryNodes, depPaths]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
   const verticalConnectors = useMemo(() => {
@@ -1723,7 +2033,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       if (item.type === 'task') {
         const xStart = itemToX(item.startDate);
         const barWidth = differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth;
-        const bh = item.taskStyle.thickness;
+        const bh = getEffectiveTaskThickness(item);
         const barY = yBase + (ROW_BASE - bh) / 2;
         positions.push({
           id: item.id,
@@ -1734,8 +2044,8 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           barHeight: bh,
         });
       } else {
-        const cx = itemToX(item.startDate);
-        const sz = item.milestoneStyle.size;
+        const cx = getMilestoneCenterX(item.startDate, dayWidth, itemToX);
+        const sz = getEffectiveMilestoneSize(item);
         positions.push({
           id: item.id,
           type: 'milestone',
@@ -1747,7 +2057,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       }
     }
     return positions;
-  }, [visibleItems, swimlaneIds, swimlaneLayout, getRowY, itemToX, dayWidth]);
+  }, [visibleItems, swimlaneIds, swimlaneLayout, getRowY, itemToX, dayWidth, getEffectiveTaskThickness, getEffectiveMilestoneSize]);
   getItemPositionsRef.current = getItemPositions;
 
   const handleDepHandleMouseDown = useCallback(
@@ -1907,8 +2217,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
   // ─── Render helpers ────────────────────────────────────────────────
 
-  const belowMilestoneGap = 4; // px between timescale bar bottom edge and milestone top edge
-
   // Drag guide: compute snapped position and new dates
   const dragGuide = useMemo(() => {
     if (!draggingId || dragOffset === 0) return null;
@@ -1937,7 +2245,9 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   }, [depDrag, visibleItems, dayWidth]);
 
   const renderItem = (item: ProjectItem, yBase: number) => {
-    const x = itemToX(item.startDate);
+    const x = item.type === 'milestone'
+      ? getMilestoneCenterX(item.startDate, dayWidth, itemToX)
+      : itemToX(item.startDate);
     const y = yBase + getRowY(item);
     const isDragging = draggingId === item.id;
     // Snap to day grid during drag so the bar doesn't jump on drop
@@ -1952,9 +2262,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     const depDragTargetSide = isDepDragTarget ? depDrag?.targetSide ?? null : null;
 
     if (item.type === 'milestone') {
-      // For "below" independent milestones, place icon tight against the timescale bar
-      const isBelow = item.swimlaneId === null && item.milestoneStyle.position === 'below';
-      const belowOverride = isBelow ? belowMilestoneGap : undefined;
       return (
         <MilestoneItem
           key={item.id}
@@ -1962,7 +2269,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           x={x}
           y={y}
           rowHeight={getRowH(item)}
-          iconTopOverride={belowOverride}
+          iconSize={getEffectiveMilestoneSize(item)}
           translateX={translateX}
           isSelected={isSelected}
           isDragging={isDragging}
@@ -1995,6 +2302,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
         y={y}
         rowHeight={getRowH(item)}
         width={width}
+        barThickness={getEffectiveTaskThickness(item)}
         translateX={translateX}
         isSelected={isSelected}
         isDragging={isDragging}
@@ -2046,10 +2354,10 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           {aboveHeight > 0 && (
             <div className="relative" style={{ height: aboveHeight }}>
               {aboveMilestones.map((item) => {
-                const ax = itemToX(item.startDate);
+                const ax = getMilestoneCenterX(item.startDate, dayWidth, itemToX);
                 // Position whole stack so its bottom edge is aboveRowGap from the row bottom (timescale bar top)
                 const s = item.milestoneStyle;
-                let stackH = s.size;
+                let stackH = getEffectiveMilestoneSize(item);
                 if (s.showTitle) stackH += Math.ceil(s.fontSize * 1.25) + 1;
                 if (s.showDate) stackH += Math.ceil(s.dateFontSize * 1.25) + 1;
                 const ay = aboveHeight - stackH - aboveRowGap;
@@ -2064,6 +2372,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     x={ax}
                     y={0}
                     rowHeight={ROW_HEIGHT}
+                    iconSize={getEffectiveMilestoneSize(item)}
                     iconTopOverride={ay}
                     translateX={txl}
                     isSelected={isSel}
@@ -2534,7 +2843,9 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
             {/* ─── Drag guide (ghost + dashed outline + vertical guidelines + date tooltip) ─── */}
             {dragGuide && (() => {
               const { item, snappedOffsetPx, newStart, newEnd } = dragGuide;
-              const gx = itemToX(item.startDate);
+              const gx = item.type === 'milestone'
+                ? getMilestoneCenterX(item.startDate, dayWidth, itemToX)
+                : itemToX(item.startDate);
               // Find yBase
               let yBase = INDEPENDENT_SECTION_PADDING;
               if (item.swimlaneId && swimlaneIds.has(item.swimlaneId)) {
@@ -2543,7 +2854,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
               }
 
               if (item.type === 'milestone') {
-                const iconSize = item.milestoneStyle.size;
+                const iconSize = getEffectiveMilestoneSize(item);
                 const cx = gx + snappedOffsetPx;
                 const origCx = gx;
                 const cy = yBase + getRowY(item) + (getRowH(item) - iconSize) / 2;
@@ -2615,7 +2926,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 );
               }
 
-              const barHeight = item.taskStyle.thickness;
+              const barHeight = getEffectiveTaskThickness(item);
               const width = Math.max(differenceInDays(parseISO(item.endDate), parseISO(item.startDate)) * dayWidth + dayWidth, 8);
               const gy = yBase + getRowY(item) + (getRowH(item) - barHeight) / 2;
               const snapLeft = gx + snappedOffsetPx;
@@ -2736,6 +3047,7 @@ interface TaskBarProps {
   y: number;
   rowHeight: number;
   width: number;
+  barThickness?: number;
   translateX: number;
   isSelected: boolean;
   isDragging: boolean;
@@ -2755,13 +3067,13 @@ interface TaskBarProps {
   depDragTargetSide: 'start' | 'end' | null;
 }
 
-function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: TaskBarProps) {
+function TaskBar({ item, x, y, width, barThickness, translateX, isSelected, isDragging, onMouseDown, onClickBar, onClickSection, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget, depDragTargetSide }: TaskBarProps) {
   const isEditing = (field: string) => editingField?.itemId === item.id && editingField?.field === field;
   const style = item.taskStyle;
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
   const criticalPathStyle = useProjectStore((s) => s.criticalPathStyle);
   const isCritical = showCriticalPath && item.isCriticalPath;
-  const barHeight = style.thickness;
+  const barHeight = barThickness ?? style.thickness;
   const barY = y + (ROW_BASE - barHeight) / 2;
   const w = Math.max(width, 8);
 
@@ -2865,6 +3177,54 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
   const titleColor = isCritical && criticalPathStyle.titleColor.enabled
     ? criticalPathStyle.titleColor.color
     : style.fontColor;
+  const getAnchoredTaskLabelStyle = (
+    position: 'left' | 'center' | 'right' | 'far-left' | 'above' | 'below',
+    textAlign: 'left' | 'center' | 'right' | undefined,
+    sideMargin: number,
+    verticalMargin: number,
+    verticalPlacement: 'top' | 'bottom' | 'middle',
+  ): React.CSSProperties => {
+    if (position === 'far-left') {
+      return { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 24 };
+    }
+    if (position === 'left') {
+      return { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: sideMargin };
+    }
+    if (position === 'right') {
+      return { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: sideMargin };
+    }
+
+    const resolvedAlign = textAlign ?? 'left';
+    const horizontalAnchor = resolvedAlign === 'center'
+      ? { left: '50%', transform: verticalPlacement === 'middle' ? 'translate(-50%, -50%)' : 'translateX(-50%)' }
+      : resolvedAlign === 'right'
+        ? { right: 0, transform: verticalPlacement === 'middle' ? 'translateY(-50%)' : undefined }
+        : { left: 0, transform: verticalPlacement === 'middle' ? 'translateY(-50%)' : undefined };
+
+    if (position === 'center') {
+      return {
+        ...horizontalAnchor,
+        top: '50%',
+        textAlign: resolvedAlign,
+      };
+    }
+
+    if (position === 'above') {
+      return {
+        ...horizontalAnchor,
+        bottom: '100%',
+        marginBottom: verticalMargin,
+        textAlign: resolvedAlign,
+      };
+    }
+
+    return {
+      ...horizontalAnchor,
+      top: '100%',
+      marginTop: verticalMargin,
+      textAlign: resolvedAlign,
+    };
+  };
 
   return (
     <div
@@ -3020,11 +3380,17 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               : style.labelPosition === 'left'
               ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
               : style.labelPosition === 'center'
-              ? { left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: style.textAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
+              ? getAnchoredTaskLabelStyle('center', style.textAlign, 8, 2, 'middle')
               : style.labelPosition === 'above'
-              ? { left: 0, right: 0, bottom: '100%', marginBottom: 2, textAlign: style.textAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
+              ? getAnchoredTaskLabelStyle('above', style.textAlign, 8, 2, 'top')
               : style.labelPosition === 'below'
-              ? { left: 0, right: 0, top: '100%', marginTop: 2, textAlign: style.textAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
+              ? getAnchoredTaskLabelStyle(
+                  'below',
+                  style.textAlign,
+                  8,
+                  style.showDate && style.dateLabelPosition === 'below' ? 16 : 2,
+                  'bottom',
+                )
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
           }}
           onClick={(e) => { e.stopPropagation(); onClickSection('title'); }}
@@ -3063,29 +3429,11 @@ function TaskBar({ item, x, y, width, translateX, isSelected, isDragging, onMous
               : style.dateLabelPosition === 'left'
               ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 8 }
               : style.dateLabelPosition === 'center'
-              ? { left: 0, right: 0, top: '50%', transform: 'translateY(-50%)', textAlign: style.dateTextAlign ?? 'left', maxWidth: 'none', paddingLeft: 4, paddingRight: 4 }
+              ? getAnchoredTaskLabelStyle('center', style.dateTextAlign, 8, 2, 'middle')
               : style.dateLabelPosition === 'above'
-              ? {
-                  left: 0,
-                  right: 0,
-                  bottom: '100%',
-                  marginBottom: style.showTitle && style.labelPosition === 'above' ? 16 : 2,
-                  textAlign: style.dateTextAlign ?? 'left',
-                  maxWidth: 'none',
-                  paddingLeft: 4,
-                  paddingRight: 4,
-                }
+              ? getAnchoredTaskLabelStyle('above', style.dateTextAlign, 8, style.showTitle && style.labelPosition === 'above' ? 16 : 2, 'top')
               : style.dateLabelPosition === 'below'
-              ? {
-                  left: 0,
-                  right: 0,
-                  top: '100%',
-                  marginTop: style.showTitle && style.labelPosition === 'below' ? 16 : 2,
-                  textAlign: style.dateTextAlign ?? 'left',
-                  maxWidth: 'none',
-                  paddingLeft: 4,
-                  paddingRight: 4,
-                }
+              ? getAnchoredTaskLabelStyle('below', style.dateTextAlign, 8, 2, 'bottom')
               : { left: '100%', top: '50%', transform: 'translateY(-50%)', marginLeft: 8 }),
           }}
           onClick={(e) => { e.stopPropagation(); onClickSection('date'); }}
@@ -3228,6 +3576,7 @@ interface MilestoneItemProps {
   x: number;
   y: number;
   rowHeight: number;
+  iconSize?: number;
   iconTopOverride?: number;
   translateX: number;
   isSelected: boolean;
@@ -3249,7 +3598,7 @@ interface MilestoneItemProps {
   depDragTargetSide: 'start' | 'end' | null;
 }
 
-function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget }: MilestoneItemProps) {
+function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSelected, isDragging, onMouseDown, onClickIcon, onClickLabel, onClickDate, editingField, onStartEdit, onCommitEdit, onCancelEdit, onOpenDatePicker, onMouseEnter, onMouseLeave, onHandleMouseDown, isDepDragTarget }: MilestoneItemProps) {
   const isEditingTitle = editingField?.itemId === item.id && editingField?.field === 'milestoneTitle';
   const style = item.milestoneStyle;
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
@@ -3266,16 +3615,18 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         ? 1.5
         : 0;
   const isIndependent = item.swimlaneId === null;
+  const effectiveIconSize = iconSize ?? style.size;
 
   // ─── Independent milestones: vertical stack layout ───
   // "above" position: title → date → shape (top to bottom)
   // "below" position: shape → date → title (top to bottom)
   if (isIndependent) {
-    const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_BASE / 2 - style.size / 2;
+    const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_BASE / 2 - effectiveIconSize / 2;
 
     // Build the title element
     const titleEl = style.showTitle ? (
       <div
+        data-testid={`milestone-title-label-${item.id}`}
         className={`whitespace-nowrap cursor-pointer text-center ${isEditingTitle ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
         style={{
           fontSize: style.fontSize,
@@ -3333,7 +3684,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         }}
         onClick={(e) => { e.stopPropagation(); onClickIcon(); }}
       >
-        <MilestoneIconComponent icon={style.icon} size={style.size} color={style.color} />
+        <MilestoneIconComponent icon={style.icon} size={effectiveIconSize} color={style.color} />
         {isCritical && criticalPathStyle.itemOutline.enabled && outlineThickness > 0 && (
           <div className="absolute inset-0 rounded-full" style={{ border: `${outlineThickness}px solid ${criticalPathStyle.itemOutline.color}` }} />
         )}
@@ -3348,11 +3699,12 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
       <div
         className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30' : 'z-10'}`}
         style={{
-          left: x - style.size / 2,
+          left: x - effectiveIconSize / 2,
           top: iconTop,
-        transform: `translateX(${translateX}px)`,
-        transition: isDepDragTarget && translateX !== 0 ? 'transform 150ms ease-out' : undefined,
-      }}
+          width: effectiveIconSize,
+          transform: `translateX(${translateX}px)`,
+          transition: isDepDragTarget && translateX !== 0 ? 'transform 150ms ease-out' : undefined,
+        }}
         onMouseDown={onMouseDown}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
@@ -3366,8 +3718,8 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
               right: -3,
               top: isAbove ? undefined : -3,
               bottom: isAbove ? -3 : undefined,
-              width: style.size + 6,
-              height: style.size + 6,
+                width: effectiveIconSize + 6,
+                height: effectiveIconSize + 6,
               border: '2px dashed #475569',
               borderRadius: 4,
               pointerEvents: 'none',
@@ -3387,8 +3739,8 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
               style={{
                 position: 'absolute',
                 left: -18,
-                top: isAbove ? undefined : style.size / 2 - 5,
-                bottom: isAbove ? style.size / 2 - 5 : undefined,
+                top: isAbove ? undefined : effectiveIconSize / 2 - 5,
+                bottom: isAbove ? effectiveIconSize / 2 - 5 : undefined,
                 width: 10,
                 height: 10,
                 borderRadius: '50%',
@@ -3406,8 +3758,8 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
               style={{
                 position: 'absolute',
                 right: -18,
-                top: isAbove ? undefined : style.size / 2 - 5,
-                bottom: isAbove ? style.size / 2 - 5 : undefined,
+                top: isAbove ? undefined : effectiveIconSize / 2 - 5,
+                bottom: isAbove ? effectiveIconSize / 2 - 5 : undefined,
                 width: 10,
                 height: 10,
                 borderRadius: '50%',
@@ -3438,7 +3790,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
   }
 
   // ─── Swimlaned milestones: position-based layout ───
-  const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_BASE / 2 - style.size / 2;
+  const iconTop = iconTopOverride !== undefined ? iconTopOverride : y + ROW_BASE / 2 - effectiveIconSize / 2;
 
   // Determine if title and date are on the same side
   const titlePos = style.labelPosition;
@@ -3464,7 +3816,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
     <div
       className={`absolute cursor-grab select-none ${isDragging ? 'cursor-grabbing z-30' : 'z-10'}`}
       style={{
-        left: x - style.size / 2,
+        left: x - effectiveIconSize / 2,
         top: iconTop,
         transform: `translateX(${translateX}px)`,
         transition: isDepDragTarget && translateX !== 0 ? 'transform 150ms ease-out' : undefined,
@@ -3479,8 +3831,8 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           style={{
             position: 'absolute',
             inset: -3,
-            width: style.size + 6,
-            height: style.size + 6,
+            width: effectiveIconSize + 6,
+            height: effectiveIconSize + 6,
             border: '2px dashed #475569',
             borderRadius: 4,
             pointerEvents: 'none',
@@ -3500,7 +3852,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
             style={{
               position: 'absolute',
               left: -18,
-              top: style.size / 2 - 5,
+              top: effectiveIconSize / 2 - 5,
               width: 10,
               height: 10,
               borderRadius: '50%',
@@ -3518,7 +3870,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
             style={{
               position: 'absolute',
               right: -18,
-              top: style.size / 2 - 5,
+              top: effectiveIconSize / 2 - 5,
               width: 10,
               height: 10,
               borderRadius: '50%',
@@ -3536,7 +3888,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
         }}
         onClick={(e) => { e.stopPropagation(); onClickIcon(); }}
       >
-        <MilestoneIconComponent icon={style.icon} size={style.size} color={style.color} />
+        <MilestoneIconComponent icon={style.icon} size={effectiveIconSize} color={style.color} />
         {isCritical && criticalPathStyle.itemOutline.enabled && outlineThickness > 0 && (
           <div className="absolute inset-0 rounded-full" style={{ border: `${outlineThickness}px solid ${criticalPathStyle.itemOutline.color}` }} />
         )}
@@ -3552,6 +3904,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           }}
         >
           <div
+            data-testid={`milestone-title-label-${item.id}`}
             className={`cursor-pointer ${isEditingTitle ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
             style={{
               fontSize: style.fontSize,
@@ -3600,6 +3953,7 @@ function MilestoneItem({ item, x, y, iconTopOverride, translateX, isSelected, is
           {/* Title label */}
           {style.showTitle && (
             <div
+              data-testid={`milestone-title-label-${item.id}`}
               className={`absolute whitespace-nowrap cursor-pointer ${isEditingTitle ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
               style={{
                 fontSize: style.fontSize,

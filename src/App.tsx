@@ -159,7 +159,8 @@ function App() {
       store.swimlanes,
       store.dependencies,
       store.timescale,
-      store.taskLayout,
+      store.rowArrangement,
+      store.densityMode,
       store.swimlaneSpacing,
     );
   }, []);

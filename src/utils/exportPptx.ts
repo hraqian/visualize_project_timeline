@@ -8,11 +8,12 @@ import {
   format,
 } from 'date-fns';
 import type {
+  DensityMode,
   ProjectItem,
+  RowArrangement,
   Swimlane,
   Dependency,
   TimescaleConfig,
-  TaskLayout,
   DurationFormat,
   LabelPosition,
 } from '@/types';
@@ -152,7 +153,8 @@ function computeLayout(
   items: ProjectItem[],
   swimlanes: Swimlane[],
   timescale: TimescaleConfig,
-  taskLayout: TaskLayout,
+  rowArrangement: RowArrangement,
+  _densityMode: DensityMode,
   swimlaneSpacing: number,
 ): {
   ctx: LayoutContext;
@@ -184,7 +186,7 @@ function computeLayout(
   );
 
   // Row assignment
-  const getRow = buildGetRow(taskLayout, belowIndependentItems, swimlanedItemsList, sortedSwimlanes);
+  const getRow = buildGetRow(rowArrangement, belowIndependentItems, swimlanedItemsList, sortedSwimlanes);
 
   // Per-item row layout (spacing-aware)
   const indepLayout = buildGroupRowLayout(belowIndependentItems, getRow);
@@ -301,38 +303,46 @@ function computeLayout(
 }
 
 function buildGetRow(
-  taskLayout: TaskLayout,
+  rowArrangement: RowArrangement,
   belowIndependentItems: ProjectItem[],
   swimlanedItems: ProjectItem[],
   sortedSwimlanes: Swimlane[],
 ): (item: ProjectItem) => number {
-  if (taskLayout === 'single-row') {
-    return (item) => item.row;
-  }
   const rowMap = new Map<string, number>();
   const assignRows = (groupItems: ProjectItem[]) => {
     const sorted = [...groupItems].sort((a, b) => a.row - b.row || a.startDate.localeCompare(b.startDate));
-    if (taskLayout === 'one-per-row') {
+    if (rowArrangement === 'one-per-row') {
       sorted.forEach((it, idx) => rowMap.set(it.id, idx));
-    } else {
-      const rowEnds: number[] = [];
-      for (const it of sorted) {
-        const start = parseISO(it.startDate).getTime();
-        const end = parseISO(it.endDate).getTime();
-        let placed = false;
-        for (let r = 0; r < rowEnds.length; r++) {
-          if (start >= rowEnds[r]) {
-            rowMap.set(it.id, r);
-            rowEnds[r] = end + 1;
-            placed = true;
+      return;
+    }
+
+    const rowEnds = new Map<number, number>();
+    for (const it of sorted) {
+      const start = parseISO(it.startDate).getTime();
+      const endExclusive = parseISO(it.endDate).getTime() + 1;
+      const preferredRow = it.row;
+      let assignedRow: number | null = null;
+
+      if (start >= (rowEnds.get(preferredRow) ?? Number.NEGATIVE_INFINITY)) {
+        assignedRow = preferredRow;
+      } else {
+        for (let offset = 1; offset <= sorted.length; offset += 1) {
+          const lower = preferredRow - offset;
+          if (lower >= 0 && start >= (rowEnds.get(lower) ?? Number.NEGATIVE_INFINITY)) {
+            assignedRow = lower;
+            break;
+          }
+          const upper = preferredRow + offset;
+          if (start >= (rowEnds.get(upper) ?? Number.NEGATIVE_INFINITY)) {
+            assignedRow = upper;
             break;
           }
         }
-        if (!placed) {
-          rowMap.set(it.id, rowEnds.length);
-          rowEnds.push(end + 1);
-        }
       }
+
+      const finalRow = assignedRow ?? preferredRow;
+      rowMap.set(it.id, finalRow);
+      rowEnds.set(finalRow, endExclusive);
     }
   };
   assignRows(belowIndependentItems);
@@ -960,7 +970,8 @@ export async function exportNativePptx(
   swimlanes: Swimlane[],
   dependencies: Dependency[],
   timescale: TimescaleConfig,
-  taskLayout: TaskLayout,
+  rowArrangement: RowArrangement,
+  densityMode: DensityMode,
   swimlaneSpacing: number,
 ): Promise<void> {
   const {
@@ -973,7 +984,7 @@ export async function exportNativePptx(
     canvasHeight,
     tierLabels,
     rangeEndDate,
-  } = computeLayout(items, swimlanes, timescale, taskLayout, swimlaneSpacing);
+  } = computeLayout(items, swimlanes, timescale, rowArrangement, densityMode, swimlaneSpacing);
 
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: 'WIDE', width: SLIDE_W, height: SLIDE_H });

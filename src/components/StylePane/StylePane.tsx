@@ -33,7 +33,8 @@ import {
   type TierFormat,
   type ElapsedTimeThickness,
   type EndCapConfig,
-  type TaskLayout,
+  type RowArrangement,
+  type DensityMode,
   type StylePaneSection,
   type DateFormat,
 } from '@/types';
@@ -167,8 +168,10 @@ export function StylePane() {
   const timescale = useProjectStore((s) => s.timescale);
   const updateTimescale = useProjectStore((s) => s.updateTimescale);
   const stylePaneSection = useProjectStore((s) => s.stylePaneSection);
-  const taskLayout = useProjectStore((s) => s.taskLayout);
-  const setTaskLayout = useProjectStore((s) => s.setTaskLayout);
+  const rowArrangement = useProjectStore((s) => s.rowArrangement);
+  const setRowArrangement = useProjectStore((s) => s.setRowArrangement);
+  const densityMode = useProjectStore((s) => s.densityMode);
+  const setDensityMode = useProjectStore((s) => s.setDensityMode);
 
   const [mainTab, setMainTab] = useState<MainTab>('items');
   const [forcedMainTab, setForcedMainTab] = useState<MainTab | null>(null);
@@ -333,8 +336,10 @@ export function StylePane() {
           />
         ) : (
           <DesignTabContent
-            taskLayout={taskLayout}
-            setTaskLayout={setTaskLayout}
+            rowArrangement={rowArrangement}
+            setRowArrangement={setRowArrangement}
+            densityMode={densityMode}
+            setDensityMode={setDensityMode}
           />
         )}
       </div>
@@ -4738,38 +4743,73 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ─── Design Tab Content ──────────────────────────────────────────────────────
 
-const TASK_LAYOUT_OPTIONS: { value: TaskLayout; label: string; description: string }[] = [
-  { value: 'single-row', label: 'Single row', description: 'All tasks on the same row' },
-  { value: 'packed', label: 'Compact', description: 'Tasks stack to avoid overlaps' },
-  { value: 'one-per-row', label: 'One per row', description: 'Each task on its own row' },
+const ROW_ARRANGEMENT_OPTIONS: { value: RowArrangement; label: string; description: string }[] = [
+  { value: 'grouped', label: 'Grouped', description: 'Keep items on their chosen rows so non-overlapping work can share a line' },
+  { value: 'one-per-row', label: 'One per row', description: 'Each item on its own row' },
+];
+
+const DENSITY_MODE_OPTIONS: { value: DensityMode; label: string; description: string }[] = [
+  { value: 'comfortable', label: 'Comfortable', description: 'Standard spacing and thickness' },
+  { value: 'compact', label: 'Compact', description: 'Narrow spacing and thinner bars without changing row membership' },
 ];
 
 function DesignTabContent({
-  taskLayout,
-  setTaskLayout,
+  rowArrangement,
+  setRowArrangement,
+  densityMode,
+  setDensityMode,
 }: {
-  taskLayout: TaskLayout;
-  setTaskLayout: (layout: TaskLayout) => void;
+  rowArrangement: RowArrangement;
+  setRowArrangement: (arrangement: RowArrangement) => void;
+  densityMode: DensityMode;
+  setDensityMode: (mode: DensityMode) => void;
 }) {
   return (
     <div>
-      <Section title="Task Layout">
+      <Section title="Row Arrangement">
         <div className="space-y-1.5">
-          {TASK_LAYOUT_OPTIONS.map((opt) => (
+          {ROW_ARRANGEMENT_OPTIONS.map((opt) => (
             <label
               key={opt.value}
               className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
-                taskLayout === opt.value
+                rowArrangement === opt.value
                   ? 'border-slate-400 bg-slate-700/5'
                   : 'border-[var(--color-border)] hover:border-[var(--color-text-muted)]'
               }`}
             >
               <input
                 type="radio"
-                name="taskLayout"
+                name="rowArrangement"
                 value={opt.value}
-                checked={taskLayout === opt.value}
-                onChange={() => setTaskLayout(opt.value)}
+                checked={rowArrangement === opt.value}
+                onChange={() => setRowArrangement(opt.value)}
+                className="mt-0.5 accent-slate-700"
+              />
+              <div>
+                <div className="text-xs font-medium text-[var(--color-text)]">{opt.label}</div>
+                <div className="text-[11px] text-[var(--color-text-muted)] leading-tight mt-0.5">{opt.description}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+      </Section>
+      <Section title="Density">
+        <div className="space-y-1.5">
+          {DENSITY_MODE_OPTIONS.map((opt) => (
+            <label
+              key={opt.value}
+              className={`flex items-start gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                densityMode === opt.value
+                  ? 'border-slate-400 bg-slate-700/5'
+                  : 'border-[var(--color-border)] hover:border-[var(--color-text-muted)]'
+              }`}
+            >
+              <input
+                type="radio"
+                name="densityMode"
+                value={opt.value}
+                checked={densityMode === opt.value}
+                onChange={() => setDensityMode(opt.value)}
                 className="mt-0.5 accent-slate-700"
               />
               <div>

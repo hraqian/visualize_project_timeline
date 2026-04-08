@@ -342,7 +342,8 @@ export interface TimescaleConfig {
 
 export type ActiveView = 'data' | 'timeline';
 
-export type TaskLayout = 'single-row' | 'packed' | 'one-per-row';
+export type RowArrangement = 'grouped' | 'one-per-row';
+export type DensityMode = 'comfortable' | 'compact';
 
 export type StylePaneSection = 'bar' | 'title' | 'date' | 'duration' | 'percentComplete' | 'verticalConnector' | 'milestoneShape' | 'milestoneTitle' | 'milestoneDate' | 'milestoneConnector' | 'swimlaneTitle' | 'swimlaneBackground' | 'swimlaneSpacing' | 'scale' | 'todayMarker' | 'elapsedTime' | 'leftEndCap' | 'rightEndCap';
 
@@ -430,7 +431,8 @@ export interface ProjectState {
   criticalPathStyle: CriticalPathStyle;
   showDependencies: boolean; // master toggle — controls dep lines on timeline + Predecessors column in DataView
   dependencySettings: DependencySettings; // scheduling mode config (per-project)
-  taskLayout: TaskLayout; // how tasks are arranged vertically in swimlanes
+  rowArrangement: RowArrangement; // how items are arranged vertically in groups
+  densityMode: DensityMode; // compactness styling without changing row membership
   swimlaneSpacing: number; // px gap between swimlane bands
   selectedTierIndex: number | null; // which tier row is selected for Scale section editing
   pendingConflicts: SchedulingConflict[]; // conflicts awaiting user resolution (for 'ask' mode)

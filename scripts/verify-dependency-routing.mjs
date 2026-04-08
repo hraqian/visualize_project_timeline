@@ -425,6 +425,40 @@ const regressionResults = await page.evaluate(async () => {
   }
 
   store.getState().newProject();
+  const addSameDay = (partial) => store.getState().addItem(partial);
+  const sameDayMilestoneId = addSameDay({ name: 'M Same Day', type: 'milestone', startDate: '2026-03-25', endDate: '2026-03-25', row: 0 });
+  const sameDayTaskId = addSameDay({ name: 'T Same Day', type: 'task', startDate: '2026-03-25', endDate: '2026-03-25', row: 1 });
+  store.getState().addDependency(sameDayMilestoneId, sameDayTaskId, {
+    type: 'finish-to-start',
+    fromPoint: 'auto',
+    toPoint: 'auto',
+    forceSchedule: false,
+  });
+  store.setState((s) => ({
+    ...s,
+    activeView: 'timeline',
+    showDependencies: true,
+  }));
+  const sameDayMilestoneTaskPaths = await waitForDependencyPaths();
+  const sameDayMilestoneTaskMetrics = sameDayMilestoneTaskPaths.map((d) => {
+    const pts = parsePath(d);
+    const xs = pts.map((p) => p[0]);
+    return {
+      d,
+      firstX: xs[0],
+      lastX: xs[xs.length - 1],
+      minX: Math.min(...xs),
+      bends: countBends(pts),
+    };
+  });
+  const sameDayMilestoneTaskRouting = {
+    hasPath: sameDayMilestoneTaskMetrics.length > 0,
+    routesBackward: sameDayMilestoneTaskMetrics.some((m) => m.minX < Math.min(m.firstX, m.lastX) - 1),
+    excessiveBends: sameDayMilestoneTaskMetrics.some((m) => m.bends > 4),
+    sample: sameDayMilestoneTaskMetrics[0] ?? null,
+  };
+
+  store.getState().newProject();
   store.setState((s) => ({ ...s, activeView: 'data' }));
   const beforeView = store.getState().activeView;
   store.getState().setActiveView('timeline');
@@ -508,6 +542,7 @@ const regressionResults = await page.evaluate(async () => {
   return {
     routingResults,
     styleRoutingResults,
+    sameDayMilestoneTaskRouting,
     views: {
       switchedToTimeline: beforeView === 'data' && afterView === 'timeline',
     },
@@ -546,6 +581,9 @@ const regressionResults = await page.evaluate(async () => {
 
 const routingFailures = regressionResults.routingResults.filter((r) => r.pathCount === 0 || r.invalid || r.negativeY || r.oversizedWidth || r.excessiveBends);
 const styleRoutingFailures = regressionResults.styleRoutingResults.filter((r) => !r.hasPath || r.negativeY || r.oversizedWidth || r.bends > 4);
+const sameDayMilestoneTaskFailures = regressionResults.sameDayMilestoneTaskRouting.hasPath && !regressionResults.sameDayMilestoneTaskRouting.routesBackward && !regressionResults.sameDayMilestoneTaskRouting.excessiveBends
+  ? []
+  : [regressionResults.sameDayMilestoneTaskRouting];
 const viewFailures = regressionResults.views.switchedToTimeline ? [] : [regressionResults.views];
 const schedulingFailures = regressionResults.scheduling.successorMoved ? [] : [regressionResults.scheduling];
 const dependencyFailures = regressionResults.dependencyOps.updated && regressionResults.dependencyOps.removed ? [] : [regressionResults.dependencyOps];
@@ -598,7 +636,7 @@ if (!exportResults.available) {
   }
 }
 
-const totalFailures = routingFailures.length + styleRoutingFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + exportFailures.length;
+const totalFailures = routingFailures.length + styleRoutingFailures.length + sameDayMilestoneTaskFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + exportFailures.length;
 
 console.log(JSON.stringify({
   routing: {
@@ -610,6 +648,10 @@ console.log(JSON.stringify({
     total: regressionResults.styleRoutingResults.length,
     failures: styleRoutingFailures.length,
     failingCases: styleRoutingFailures,
+  },
+  sameDayMilestoneTaskRouting: {
+    failures: sameDayMilestoneTaskFailures.length,
+    details: sameDayMilestoneTaskFailures,
   },
   views: {
     failures: viewFailures.length,

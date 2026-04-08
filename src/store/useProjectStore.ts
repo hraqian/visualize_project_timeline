@@ -18,7 +18,8 @@ import type {
   StylePaneSection,
   StylePaneMainTab,
   StylePaneItemSubTab,
-  TaskLayout,
+  RowArrangement,
+  DensityMode,
   DependencyConflictMode,
   DependencyLagAdjustment,
   RescheduledItemChange,
@@ -51,7 +52,8 @@ interface ProjectActions {
   setStylePaneMainTab: (tab: StylePaneMainTab) => void;
   setStylePaneItemSubTab: (tab: StylePaneItemSubTab | null) => void;
   setStylePaneSection: (section: StylePaneSection | null) => void;
-  setTaskLayout: (layout: TaskLayout) => void;
+  setRowArrangement: (arrangement: RowArrangement) => void;
+  setDensityMode: (mode: DensityMode) => void;
   setSwimlaneSpacing: (spacing: number) => void;
   setSelectedTierIndex: (index: number | null) => void;
 
@@ -162,7 +164,7 @@ type DependencyStyleKey = keyof Pick<Dependency, 'visible' | 'fromPoint' | 'toPo
 // Keys that mark the project dirty (all saveable project data + settings)
 const SAVEABLE_KEYS: Set<string> = new Set([
   'projectName', 'timelineTitle', 'items', 'swimlanes', 'dependencies',
-  'statusLabels', 'columnVisibility', 'timescale', 'swimlaneSpacing', 'showCriticalPath', 'criticalPathStyle', 'taskLayout',
+  'statusLabels', 'columnVisibility', 'timescale', 'swimlaneSpacing', 'showCriticalPath', 'criticalPathStyle', 'rowArrangement', 'densityMode',
   'showDependencies', 'dependencySettings',
 ]);
 
@@ -255,7 +257,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   criticalPathStyle: { ...DEFAULT_CRITICAL_PATH_STYLE },
   showDependencies: false,
   dependencySettings: { ...DEFAULT_DEPENDENCY_SETTINGS },
-  taskLayout: 'single-row',
+  rowArrangement: 'grouped',
+  densityMode: 'comfortable',
   swimlaneSpacing: 5,
   selectedTierIndex: null,
   pendingConflicts: [],
@@ -300,7 +303,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     stylePaneItemSubTab: tab,
   }),
   setStylePaneSection: (section) => set({ stylePaneSection: section }),
-  setTaskLayout: (layout) => set({ taskLayout: layout }),
+  setRowArrangement: (arrangement) => set({ rowArrangement: arrangement }),
+  setDensityMode: (mode) => set({ densityMode: mode }),
   setSwimlaneSpacing: (spacing) => set({ swimlaneSpacing: Math.max(0, Math.min(40, spacing)) }),
   setSelectedTierIndex: (index) => set({
     selectedTierIndex: index,
@@ -325,6 +329,16 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     // Migrate: upgrade legacy default timescale tier from 'month' to 'auto'
     if (data.timescale?.tiers?.length === 1 && data.timescale.tiers[0].unit === 'month' && data.timescale.tiers[0].format === 'MMM') {
       data.timescale.tiers[0].unit = 'auto';
+    }
+    const legacyTaskLayout = (data as Partial<ProjectState> & { taskLayout?: 'single-row' | 'preferred-rows' | 'packed' | 'one-per-row' }).taskLayout;
+    if (!data.rowArrangement || !data.densityMode) {
+      const migrated = legacyTaskLayout === 'one-per-row'
+        ? { rowArrangement: 'one-per-row' as const, densityMode: 'comfortable' as const }
+        : legacyTaskLayout === 'packed'
+          ? { rowArrangement: 'grouped' as const, densityMode: 'compact' as const }
+          : { rowArrangement: 'grouped' as const, densityMode: 'comfortable' as const };
+      data.rowArrangement = data.rowArrangement ?? migrated.rowArrangement;
+      data.densityMode = data.densityMode ?? migrated.densityMode;
     }
     data.criticalPathStyle = {
       ...DEFAULT_CRITICAL_PATH_STYLE,
@@ -400,7 +414,8 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
       criticalPathStyle: { ...DEFAULT_CRITICAL_PATH_STYLE },
       showDependencies: depDefaults.enabled,
       dependencySettings: { ...depDefaults },
-      taskLayout: 'single-row',
+      rowArrangement: 'grouped',
+      densityMode: 'comfortable',
       swimlaneSpacing: 5,
       selectedTierIndex: null,
       pendingConflicts: [],
