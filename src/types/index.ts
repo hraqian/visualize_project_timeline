@@ -78,6 +78,7 @@ export type DurationFormat =
   | 'y' | 'yrs' | 'years';            // Years
 
 export type ConnectorThickness = 'thin' | 'medium' | 'thick';
+export type TitleOverflowMode = 'truncate' | 'wrap';
 
 export interface TaskStyle {
   barShape: BarShape;
@@ -99,6 +100,8 @@ export interface TaskStyle {
   fontStyle: 'normal' | 'italic';
   textDecoration: 'none' | 'underline';
   textAlign: TextAlign;
+  titleOverflowMode: TitleOverflowMode;
+  titleMaxLines: number;
   // Date label styling
   dateFormat: DateFormat;
   dateLabelPosition: LabelPosition;
@@ -148,6 +151,8 @@ export interface MilestoneStyle {
   fontStyle: 'normal' | 'italic';
   textDecoration: 'none' | 'underline';
   textAlign: 'left' | 'center' | 'right';
+  titleOverflowMode: TitleOverflowMode;
+  titleMaxLines: number;
   // Date
   showDate: boolean;
   dateFontSize: number;
@@ -481,6 +486,8 @@ export const DEFAULT_TASK_STYLE: TaskStyle = {
   fontStyle: 'normal',
   textDecoration: 'none',
   textAlign: 'left',
+  titleOverflowMode: 'truncate',
+  titleMaxLines: 2,
   // Date label defaults
   dateFormat: 'MMM d',
   dateLabelPosition: 'left',
@@ -554,6 +561,8 @@ export const DEFAULT_MILESTONE_STYLE: MilestoneStyle = {
   fontStyle: 'normal',
   textDecoration: 'none',
   textAlign: 'left',
+  titleOverflowMode: 'truncate',
+  titleMaxLines: 2,
   // Date
   showDate: true,
   dateFontSize: 11,

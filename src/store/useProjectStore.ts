@@ -378,6 +378,11 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
     };
     set({
       ...data,
+      items: (data.items ?? []).map((item) => ({
+        ...item,
+        taskStyle: { ...DEFAULT_TASK_STYLE, ...(item.taskStyle ?? {}) },
+        milestoneStyle: { ...DEFAULT_MILESTONE_STYLE, ...(item.milestoneStyle ?? {}) },
+      })),
       isDirty: false,
       canUndo: false,
       canRedo: false,

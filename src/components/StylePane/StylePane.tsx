@@ -37,6 +37,7 @@ import {
   type DensityMode,
   type StylePaneSection,
   type DateFormat,
+  type TitleOverflowMode,
 } from '@/types';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
@@ -121,6 +122,11 @@ const SECONDARY_LABEL_POSITIONS: { id: LabelPosition; label: string }[] = [
   { id: 'right', label: 'Right' },
   { id: 'above', label: 'Above' },
   { id: 'below', label: 'Below' },
+];
+
+const TITLE_OVERFLOW_OPTIONS: { id: TitleOverflowMode; label: string }[] = [
+  { id: 'truncate', label: 'Truncate' },
+  { id: 'wrap', label: 'Wrap' },
 ];
 
 // Milestone date positions: above/below/left/right relative to shape
@@ -1420,6 +1426,50 @@ function TaskStyleControls({
             </div>
           </div>
 
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Overflow
+            </label>
+            <div className="flex gap-1">
+              {TITLE_OVERFLOW_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => updateTaskStyle(item.id, { titleOverflowMode: option.id })}
+                  className={`flex-1 px-3 h-9 rounded border text-sm font-medium transition-colors ${
+                    style.titleOverflowMode === option.id
+                      ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)] text-[var(--color-text)]'
+                      : 'border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {style.titleOverflowMode === 'wrap' && (
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Max lines
+              </label>
+              <div className="flex gap-1">
+                {[2, 3, 4].map((lineCount) => (
+                  <button
+                    key={lineCount}
+                    onClick={() => updateTaskStyle(item.id, { titleMaxLines: lineCount })}
+                    className={`flex-1 h-9 rounded border text-sm font-medium transition-colors ${
+                      style.titleMaxLines === lineCount
+                        ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)] text-[var(--color-text)]'
+                        : 'border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
+                    }`}
+                  >
+                    {lineCount}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Row 4: Apply to all tasks */}
           <TaskTitleApplyToAll item={item} />
         </div>
@@ -2281,6 +2331,50 @@ function MilestoneStyleControls({
                     title={pos.label}
                   >
                     <MilestonePositionIcon position={pos.id} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+              Overflow
+            </label>
+            <div className="flex gap-1">
+              {TITLE_OVERFLOW_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => updateMilestoneStyle(item.id, { titleOverflowMode: option.id })}
+                  className={`flex-1 px-3 h-9 rounded border text-sm font-medium transition-colors ${
+                    style.titleOverflowMode === option.id
+                      ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)] text-[var(--color-text)]'
+                      : 'border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {style.titleOverflowMode === 'wrap' && (
+            <div>
+              <label className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider font-medium block mb-1.5">
+                Max lines
+              </label>
+              <div className="flex gap-1">
+                {[2, 3, 4].map((lineCount) => (
+                  <button
+                    key={lineCount}
+                    onClick={() => updateMilestoneStyle(item.id, { titleMaxLines: lineCount })}
+                    className={`flex-1 h-9 rounded border text-sm font-medium transition-colors ${
+                      style.titleMaxLines === lineCount
+                        ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)] text-[var(--color-text)]'
+                        : 'border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-secondary)]'
+                    }`}
+                  >
+                    {lineCount}
                   </button>
                 ))}
               </div>
@@ -4118,6 +4212,7 @@ function TaskTitleApplyToAll({ item }: { item: ItemType }) {
     fontColor: true,
     text: true,
     labelPosition: true,
+    overflow: true,
   });
 
   const handleApply = () => {
@@ -4126,6 +4221,7 @@ function TaskTitleApplyToAll({ item }: { item: ItemType }) {
     if (applyProps.fontColor) keys.push('fontColor');
     if (applyProps.text) keys.push('fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'textDecoration');
     if (applyProps.labelPosition) keys.push('labelPosition', 'textAlign');
+    if (applyProps.overflow) keys.push('titleOverflowMode', 'titleMaxLines');
     if (keys.length === 0) return;
     applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
@@ -4147,6 +4243,9 @@ function TaskTitleApplyToAll({ item }: { item: ItemType }) {
       </PropertyCard>
       <PropertyCard label="Position" checked={applyProps.labelPosition} onChange={(v) => setApplyProps((p) => ({ ...p, labelPosition: v }))}>
         <PositionIcon5Dot />
+      </PropertyCard>
+      <PropertyCard label="Overflow" checked={applyProps.overflow} onChange={(v) => setApplyProps((p) => ({ ...p, overflow: v }))}>
+        <TextIcon />
       </PropertyCard>
     </ApplyToAllBox>
   );
@@ -4486,6 +4585,7 @@ function MilestoneTitleApplyToAll({ item }: { item: ItemType }) {
     fontColor: true,
     text: true,
     labelPosition: true,
+    overflow: true,
   });
 
   const handleApply = () => {
@@ -4495,6 +4595,7 @@ function MilestoneTitleApplyToAll({ item }: { item: ItemType }) {
     if (applyProps.text) keys.push('fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'textDecoration');
     // Position card only exists for swimlaned milestones
     if (applyProps.labelPosition && isInSwimlane) keys.push('labelPosition', 'textAlign');
+    if (applyProps.overflow) keys.push('titleOverflowMode', 'titleMaxLines');
     if (keys.length === 0) return;
     applyPartialStyleToAll(item.id, keys, excludeSwimlanes, onlyInSwimlane);
     setApplied(true);
@@ -4526,6 +4627,9 @@ function MilestoneTitleApplyToAll({ item }: { item: ItemType }) {
           <PositionIcon5Dot />
         </PropertyCard>
       )}
+      <PropertyCard label="Overflow" checked={applyProps.overflow} onChange={(v) => setApplyProps((p) => ({ ...p, overflow: v }))}>
+        <TextIcon />
+      </PropertyCard>
     </ApplyToAllBox>
   );
 }

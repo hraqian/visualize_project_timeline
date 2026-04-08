@@ -5,7 +5,7 @@ import { MilestoneIconComponent } from '@/components/common/MilestoneIconCompone
 import { buildDependencyRenderGeometry, dependencyArrowEndInset, dependencyArrowVisualClearance } from '@/components/common/dependencyArrowGeometry';
 import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getTimescaleFitDiagnostics, resolveAutoUnit, resolveTimescaleRange } from '@/utils';
 import { DatePickerPopover } from './DatePickerPopover';
-import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyType, TimescaleTier } from '@/types';
+import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyType, TimescaleTier, TitleOverflowMode } from '@/types';
 
 // ─── Types for inline editing ────────────────────────────────────────────────
 
@@ -170,6 +170,63 @@ function areGeometryNodeListsEqual(a: TimelineGeometryNode[], b: TimelineGeometr
   return true;
 }
 
+const TITLE_LABEL_MAX_WIDTH = 200;
+
+function getTitleLineHeight(fontSize: number) {
+  return Math.ceil(fontSize * 1.25);
+}
+
+function getResolvedTitleMaxLines(overflowMode: TitleOverflowMode, maxLines: number) {
+  return overflowMode === 'wrap' ? Math.max(2, maxLines || 2) : 1;
+}
+
+function estimateWrappedTextLineCount(text: string, fontSize: number, maxWidth: number, maxLines: number) {
+  if (!text) return 1;
+  const estimatedCharWidth = fontSize * 0.58;
+  const charsPerLine = Math.max(6, Math.floor(maxWidth / estimatedCharWidth));
+  return Math.min(maxLines, Math.max(1, Math.ceil(text.length / charsPerLine)));
+}
+
+function estimateTitleHeight(text: string, fontSize: number, overflowMode: TitleOverflowMode, maxLines: number) {
+  const lineHeight = getTitleLineHeight(fontSize);
+  if (overflowMode !== 'wrap') return lineHeight;
+  return lineHeight * estimateWrappedTextLineCount(text, fontSize, TITLE_LABEL_MAX_WIDTH, getResolvedTitleMaxLines(overflowMode, maxLines));
+}
+
+function getTitleLabelTextStyle(
+  overflowMode: TitleOverflowMode,
+  isEditing: boolean,
+  maxLines: number,
+): React.CSSProperties {
+  if (isEditing) {
+    return {
+      maxWidth: 'none',
+      overflow: 'visible',
+      whiteSpace: 'nowrap',
+    };
+  }
+
+  if (overflowMode === 'wrap') {
+    return {
+      width: TITLE_LABEL_MAX_WIDTH,
+      maxWidth: TITLE_LABEL_MAX_WIDTH,
+      whiteSpace: 'normal',
+      overflow: 'hidden',
+      wordBreak: 'break-word',
+      display: '-webkit-box',
+      WebkitLineClamp: getResolvedTitleMaxLines(overflowMode, maxLines),
+      WebkitBoxOrient: 'vertical',
+    };
+  }
+
+  return {
+    maxWidth: TITLE_LABEL_MAX_WIDTH,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  };
+}
+
 type AnchorDir = 'right' | 'left' | 'top' | 'bottom';
 
 function dependencyTypeToSides(type: DependencyType): { fromSide: 'start' | 'end'; toSide: 'start' | 'end' } {
@@ -214,10 +271,14 @@ function estimateTaskBelowFootprint(item: ProjectItem) {
   const style = item.taskStyle;
   let bottom = 0;
   if (style.showDate && style.dateLabelPosition === 'below') {
-    bottom = Math.max(bottom, Math.ceil(style.dateFontSize * 1.25) + (style.showTitle && style.labelPosition === 'below' ? 16 : 2));
+    const titleHeight = style.showTitle && style.labelPosition === 'below'
+      ? estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines)
+      : 0;
+    bottom = Math.max(bottom, Math.ceil(style.dateFontSize * 1.25) + (titleHeight > 0 ? titleHeight + 2 : 2));
   }
   if (style.showTitle && style.labelPosition === 'below') {
-    bottom = Math.max(bottom, Math.ceil(style.fontSize * 1.25) + (style.showDate && style.dateLabelPosition === 'below' ? 16 : 2));
+    const titleHeight = estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines);
+    bottom = Math.max(bottom, titleHeight + (style.showDate && style.dateLabelPosition === 'below' ? Math.ceil(style.dateFontSize * 1.25) + 2 : 2));
   }
   return bottom;
 }
@@ -226,10 +287,14 @@ function estimateTaskAboveFootprint(item: ProjectItem) {
   const style = item.taskStyle;
   let top = 0;
   if (style.showDate && style.dateLabelPosition === 'above') {
-    top = Math.max(top, Math.ceil(style.dateFontSize * 1.25) + (style.showTitle && style.labelPosition === 'above' ? 16 : 2));
+    const titleHeight = style.showTitle && style.labelPosition === 'above'
+      ? estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines)
+      : 0;
+    top = Math.max(top, Math.ceil(style.dateFontSize * 1.25) + (titleHeight > 0 ? titleHeight + 2 : 2));
   }
   if (style.showTitle && style.labelPosition === 'above') {
-    top = Math.max(top, Math.ceil(style.fontSize * 1.25) + (style.showDate && style.dateLabelPosition === 'above' ? 16 : 2));
+    const titleHeight = estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines);
+    top = Math.max(top, titleHeight + (style.showDate && style.dateLabelPosition === 'above' ? Math.ceil(style.dateFontSize * 1.25) + 2 : 2));
   }
   return top;
 }
@@ -240,13 +305,13 @@ function estimateMilestoneBelowFootprint(item: ProjectItem) {
     let bottom = 0;
     if (style.position === 'below') {
       if (style.showDate) bottom += Math.ceil(style.dateFontSize * 1.25) + 1;
-      if (style.showTitle) bottom += Math.ceil(style.fontSize * 1.25) + 1;
+      if (style.showTitle) bottom += estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines) + 1;
     }
     return bottom;
   }
   let bottom = 0;
   if (style.showDate && style.dateLabelPosition === 'below') bottom = Math.max(bottom, Math.ceil(style.dateFontSize * 1.25) + 2);
-  if (style.showTitle && style.labelPosition === 'below') bottom = Math.max(bottom, Math.ceil(style.fontSize * 1.25) + 2);
+  if (style.showTitle && style.labelPosition === 'below') bottom = Math.max(bottom, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines) + 2);
   return bottom;
 }
 
@@ -255,14 +320,14 @@ function estimateMilestoneAboveFootprint(item: ProjectItem) {
   if (item.swimlaneId === null) {
     let top = 0;
     if (style.position === 'above') {
-      if (style.showTitle) top += Math.ceil(style.fontSize * 1.25) + 1;
+      if (style.showTitle) top += estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines) + 1;
       if (style.showDate) top += Math.ceil(style.dateFontSize * 1.25) + 1;
     }
     return top;
   }
   let top = 0;
   if (style.showDate && style.dateLabelPosition === 'above') top = Math.max(top, Math.ceil(style.dateFontSize * 1.25) + 2);
-  if (style.showTitle && style.labelPosition === 'above') top = Math.max(top, Math.ceil(style.fontSize * 1.25) + 2);
+  if (style.showTitle && style.labelPosition === 'above') top = Math.max(top, estimateTitleHeight(item.name, style.fontSize, style.titleOverflowMode, style.titleMaxLines) + 2);
   return top;
 }
 
@@ -3442,7 +3507,7 @@ function TaskBar({ item, x, y, width, barThickness, translateX, isSelected, isDr
       {style.showTitle && (
         <div
           data-testid={`task-title-label-${item.id}`}
-          className={`absolute whitespace-nowrap cursor-pointer ${isEditing('title') ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
+          className={`absolute cursor-pointer ${isEditing('title') ? '' : 'hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
           style={{
             fontSize: style.fontSize,
             fontFamily: style.fontFamily,
@@ -3450,9 +3515,8 @@ function TaskBar({ item, x, y, width, barThickness, translateX, isSelected, isDr
             fontStyle: style.fontStyle ?? 'normal',
             textDecoration: isEditing('title') ? 'none' : (style.textDecoration ?? 'none'),
             color: titleColor,
-            maxWidth: isEditing('title') ? 'none' : 200,
-            overflow: isEditing('title') ? 'visible' : 'hidden',
-            textOverflow: 'ellipsis',
+            lineHeight: `${getTitleLineHeight(style.fontSize)}px`,
+            ...getTitleLabelTextStyle(style.titleOverflowMode, isEditing('title'), style.titleMaxLines),
             ...(style.labelPosition === 'far-left'
               ? { right: '100%', top: '50%', transform: 'translateY(-50%)', marginRight: 24 }
               : style.labelPosition === 'left'
@@ -3705,7 +3769,7 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
     const titleEl = style.showTitle ? (
       <div
         data-testid={`milestone-title-label-${item.id}`}
-        className={`whitespace-nowrap cursor-pointer text-center ${isEditingTitle ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
+        className={`cursor-pointer text-center ${isEditingTitle ? '' : 'hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
         style={{
           fontSize: style.fontSize,
           fontFamily: style.fontFamily,
@@ -3713,9 +3777,8 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
           fontStyle: style.fontStyle ?? 'normal',
           textDecoration: isEditingTitle ? 'none' : (style.textDecoration ?? 'none'),
           color: titleColor,
-          maxWidth: isEditingTitle ? 'none' : 200,
-          overflow: isEditingTitle ? 'visible' : 'hidden',
-          textOverflow: 'ellipsis',
+          lineHeight: `${getTitleLineHeight(style.fontSize)}px`,
+          ...getTitleLabelTextStyle(style.titleOverflowMode, isEditingTitle, style.titleMaxLines),
         }}
         onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
         onDoubleClick={(e) => { e.stopPropagation(); onStartEdit('milestoneTitle'); }}
@@ -3975,7 +4038,7 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
       {sameSide ? (
         /* Title and date on the same side — stack them in a single container */
         <div
-          className="absolute whitespace-nowrap"
+          className="absolute"
           style={{
             ...sideStyle(titlePos),
             textAlign: textAlignForSide(titlePos),
@@ -3983,7 +4046,7 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
         >
           <div
             data-testid={`milestone-title-label-${item.id}`}
-            className={`cursor-pointer ${isEditingTitle ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
+            className={`cursor-pointer ${isEditingTitle ? '' : 'hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
             style={{
               fontSize: style.fontSize,
               fontFamily: style.fontFamily,
@@ -3991,9 +4054,8 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
               fontStyle: style.fontStyle ?? 'normal',
               textDecoration: isEditingTitle ? 'none' : (style.textDecoration ?? 'none'),
               color: titleColor,
-              maxWidth: isEditingTitle ? 'none' : 200,
-              overflow: isEditingTitle ? 'visible' : 'hidden',
-              textOverflow: 'ellipsis',
+              lineHeight: `${getTitleLineHeight(style.fontSize)}px`,
+              ...getTitleLabelTextStyle(style.titleOverflowMode, isEditingTitle, style.titleMaxLines),
             }}
             onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
             onDoubleClick={(e) => { e.stopPropagation(); onStartEdit('milestoneTitle'); }}
@@ -4032,7 +4094,7 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
           {style.showTitle && (
             <div
               data-testid={`milestone-title-label-${item.id}`}
-              className={`absolute whitespace-nowrap cursor-pointer ${isEditingTitle ? '' : 'truncate hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
+              className={`absolute cursor-pointer ${isEditingTitle ? '' : 'hover:outline hover:outline-1 hover:outline-red-400 hover:outline-offset-1'}`}
               style={{
                 fontSize: style.fontSize,
                 fontFamily: style.fontFamily,
@@ -4040,9 +4102,8 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
                 fontStyle: style.fontStyle ?? 'normal',
                 textDecoration: isEditingTitle ? 'none' : (style.textDecoration ?? 'none'),
                 color: style.fontColor,
-                maxWidth: isEditingTitle ? 'none' : 200,
-                overflow: isEditingTitle ? 'visible' : 'hidden',
-                textOverflow: 'ellipsis',
+                lineHeight: `${getTitleLineHeight(style.fontSize)}px`,
+                ...getTitleLabelTextStyle(style.titleOverflowMode, isEditingTitle, style.titleMaxLines),
                 ...sideStyle(titlePos),
               }}
               onClick={(e) => { e.stopPropagation(); onClickLabel(); }}
