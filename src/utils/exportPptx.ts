@@ -93,6 +93,70 @@ function textAlign(align: string): 'left' | 'center' | 'right' {
   return 'left';
 }
 
+function estimateTaskBelowFootprint(item: ProjectItem) {
+  const style = item.taskStyle;
+  let bottom = 0;
+  if (style.showDate && style.dateLabelPosition === 'below') {
+    bottom = Math.max(bottom, Math.ceil(style.dateFontSize * 1.25) + (style.showTitle && style.labelPosition === 'below' ? 16 : 2));
+  }
+  if (style.showTitle && style.labelPosition === 'below') {
+    bottom = Math.max(bottom, Math.ceil(style.fontSize * 1.25) + (style.showDate && style.dateLabelPosition === 'below' ? 16 : 2));
+  }
+  return bottom;
+}
+
+function estimateTaskAboveFootprint(item: ProjectItem) {
+  const style = item.taskStyle;
+  let top = 0;
+  if (style.showDate && style.dateLabelPosition === 'above') {
+    top = Math.max(top, Math.ceil(style.dateFontSize * 1.25) + (style.showTitle && style.labelPosition === 'above' ? 16 : 2));
+  }
+  if (style.showTitle && style.labelPosition === 'above') {
+    top = Math.max(top, Math.ceil(style.fontSize * 1.25) + (style.showDate && style.dateLabelPosition === 'above' ? 16 : 2));
+  }
+  return top;
+}
+
+function estimateMilestoneBelowFootprint(item: ProjectItem) {
+  const style = item.milestoneStyle;
+  if (item.swimlaneId === null) {
+    let bottom = 0;
+    if (style.position === 'below') {
+      if (style.showDate) bottom += Math.ceil(style.dateFontSize * 1.25) + 1;
+      if (style.showTitle) bottom += Math.ceil(style.fontSize * 1.25) + 1;
+    }
+    return bottom;
+  }
+  let bottom = 0;
+  if (style.showDate && style.dateLabelPosition === 'below') bottom = Math.max(bottom, Math.ceil(style.dateFontSize * 1.25) + 2);
+  if (style.showTitle && style.labelPosition === 'below') bottom = Math.max(bottom, Math.ceil(style.fontSize * 1.25) + 2);
+  return bottom;
+}
+
+function estimateMilestoneAboveFootprint(item: ProjectItem) {
+  const style = item.milestoneStyle;
+  if (item.swimlaneId === null) {
+    let top = 0;
+    if (style.position === 'above') {
+      if (style.showTitle) top += Math.ceil(style.fontSize * 1.25) + 1;
+      if (style.showDate) top += Math.ceil(style.dateFontSize * 1.25) + 1;
+    }
+    return top;
+  }
+  let top = 0;
+  if (style.showDate && style.dateLabelPosition === 'above') top = Math.max(top, Math.ceil(style.dateFontSize * 1.25) + 2);
+  if (style.showTitle && style.labelPosition === 'above') top = Math.max(top, Math.ceil(style.fontSize * 1.25) + 2);
+  return top;
+}
+
+function estimateBelowFootprint(item: ProjectItem) {
+  return item.type === 'task' ? estimateTaskBelowFootprint(item) : estimateMilestoneBelowFootprint(item);
+}
+
+function estimateAboveFootprint(item: ProjectItem) {
+  return item.type === 'task' ? estimateTaskAboveFootprint(item) : estimateMilestoneAboveFootprint(item);
+}
+
 // ─── Layout computation (mirrors TimelineView useMemo logic) ─────────────────
 
 interface LayoutContext {
@@ -118,7 +182,8 @@ interface SwimlaneLayout {
 /** Compute per-row cumulative Y positions accounting for per-item spacing. */
 function buildGroupRowLayout(
   groupItems: ProjectItem[],
-  getRow: (item: ProjectItem) => number
+  getRow: (item: ProjectItem) => number,
+  rowClearanceBuffer: number,
 ): { getRowY: (item: ProjectItem) => number; getRowH: (item: ProjectItem) => number; totalHeight: number } {
   const rowYMap = new Map<string, number>();
   const rowHMap = new Map<string, number>();
@@ -132,14 +197,40 @@ function buildGroupRowLayout(
   }
   const sortedRows = [...rowItems.keys()].sort((a, b) => a - b);
   let cumY = 0;
+  let prevRowBottomExtent = 0;
   for (const r of sortedRows) {
     const items = rowItems.get(r)!;
     const maxSpacing = Math.max(...items.map((it) => it.taskStyle.spacing));
     const rowH = ROW_BASE + maxSpacing;
+
+    const currentRowTopExtent = Math.min(...items.map((it) => {
+      const coreTop = it.type === 'task'
+        ? (ROW_BASE - it.taskStyle.thickness) / 2
+        : (ROW_BASE - it.milestoneStyle.size) / 2;
+      return coreTop - estimateAboveFootprint(it);
+    }));
+
+    const currentRowBottomExtent = Math.max(
+      rowH,
+      ...items.map((it) => {
+        const coreTop = it.type === 'task'
+          ? (ROW_BASE - it.taskStyle.thickness) / 2
+          : (ROW_BASE - it.milestoneStyle.size) / 2;
+        const coreBottom = coreTop + (it.type === 'task' ? it.taskStyle.thickness : it.milestoneStyle.size);
+        return coreBottom + estimateBelowFootprint(it);
+      }),
+    );
+
+    if (r !== sortedRows[0]) {
+      const minRowSeparation = prevRowBottomExtent + rowClearanceBuffer - currentRowTopExtent;
+      cumY = Math.max(cumY, minRowSeparation);
+    }
+
     for (const it of items) {
       rowYMap.set(it.id, cumY);
       rowHMap.set(it.id, rowH);
     }
+    prevRowBottomExtent = cumY + currentRowBottomExtent;
     cumY += rowH;
   }
   return {
@@ -187,13 +278,14 @@ function computeLayout(
 
   // Row assignment
   const getRow = buildGetRow(rowArrangement, belowIndependentItems, swimlanedItemsList, sortedSwimlanes);
+  const rowClearanceBuffer = _densityMode === 'compact' ? 4 : 10;
 
   // Per-item row layout (spacing-aware)
-  const indepLayout = buildGroupRowLayout(belowIndependentItems, getRow);
+  const indepLayout = buildGroupRowLayout(belowIndependentItems, getRow, rowClearanceBuffer);
   const swimlaneRowLayouts = new Map<string, ReturnType<typeof buildGroupRowLayout>>();
   for (const sl of sortedSwimlanes) {
     const slItems = swimlanedItemsList.filter((it) => it.swimlaneId === sl.id);
-    swimlaneRowLayouts.set(sl.id, buildGroupRowLayout(slItems, getRow));
+    swimlaneRowLayouts.set(sl.id, buildGroupRowLayout(slItems, getRow, rowClearanceBuffer));
   }
   const getRowY = (item: ProjectItem) => {
     if (item.swimlaneId === null || !swimlaneIds.has(item.swimlaneId)) return indepLayout.getRowY(item);

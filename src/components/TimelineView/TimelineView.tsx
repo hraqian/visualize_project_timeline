@@ -1221,6 +1221,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const rowArrangement = useProjectStore((s) => s.rowArrangement);
   const densityMode = useProjectStore((s) => s.densityMode);
   const densityScale = densityMode === 'compact' ? 0.82 : 1;
+  const rowClearanceBuffer = densityMode === 'compact' ? 4 : 10;
   const getEffectiveTaskThickness = useCallback(
     (item: ProjectItem) => item.type === 'task' ? Math.max(10, Math.round(item.taskStyle.thickness * densityScale)) : 0,
     [densityScale],
@@ -1450,25 +1451,40 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       // Sort rows
       const sortedRows = [...rowItems.keys()].sort((a, b) => a - b);
       let cumY = 0;
-      let prevItems: ProjectItem[] | null = null;
-      let prevRowH = 0;
+      let prevRowBottomExtent = 0;
       for (const r of sortedRows) {
         const items = rowItems.get(r)!;
-        if (prevItems) {
-          const prevBelow = Math.max(0, ...prevItems.map((it) => estimateBelowFootprint(it)));
-          const currentAbove = Math.max(0, ...items.map((it) => estimateAboveFootprint(it)));
-          const minGap = Math.max(0, prevBelow + currentAbove + 4 - prevRowH);
-          cumY += minGap;
-        }
-        // Max spacing in this row
         const maxSpacing = Math.max(...items.map((it) => getEffectiveRowSpacing(it)));
         const rowH = ROW_BASE + maxSpacing;
+
+        const currentRowTopExtent = Math.min(...items.map((it) => {
+          const coreTop = it.type === 'task'
+            ? (ROW_BASE - getEffectiveTaskThickness(it)) / 2
+            : (ROW_BASE - getEffectiveMilestoneSize(it)) / 2;
+          return coreTop - estimateAboveFootprint(it);
+        }));
+
+        const currentRowBottomExtent = Math.max(
+          rowH,
+          ...items.map((it) => {
+            const coreTop = it.type === 'task'
+              ? (ROW_BASE - getEffectiveTaskThickness(it)) / 2
+              : (ROW_BASE - getEffectiveMilestoneSize(it)) / 2;
+            const coreBottom = coreTop + (it.type === 'task' ? getEffectiveTaskThickness(it) : getEffectiveMilestoneSize(it));
+            return coreBottom + estimateBelowFootprint(it);
+          }),
+        );
+
+        if (r !== sortedRows[0]) {
+          const minRowSeparation = prevRowBottomExtent + rowClearanceBuffer - currentRowTopExtent;
+          cumY = Math.max(cumY, minRowSeparation);
+        }
+
         for (const it of items) {
           rowYMap.set(it.id, cumY);
           rowHMap.set(it.id, rowH);
         }
-        prevItems = items;
-        prevRowH = rowH;
+        prevRowBottomExtent = cumY + currentRowBottomExtent;
         cumY += rowH;
       }
       return cumY;
@@ -1487,7 +1503,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       getRowH: (item: ProjectItem) => rowHMap.get(item.id) ?? ROW_HEIGHT,
       getGroupHeight: (groupKey: string) => groupHeightMap.get(groupKey) ?? 0,
     };
-  }, [getRow, belowIndependentItems, swimlanedItems, sortedSwimlanes, getEffectiveRowSpacing]);
+  }, [getRow, belowIndependentItems, swimlanedItems, sortedSwimlanes, getEffectiveRowSpacing, getEffectiveTaskThickness, getEffectiveMilestoneSize, rowClearanceBuffer]);
 
   // Compute project range with padding — origin aligned to unit boundaries
   useEffect(() => {
