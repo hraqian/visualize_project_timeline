@@ -42,7 +42,7 @@ import {
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { parseISO, format } from 'date-fns';
-import { buildResolvedTimescaleModel, computeAutoFontSize, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
+import { buildResolvedTimescaleModel, computeAutoFontSize, getDefaultFormatForUnit, getFormatOptionsForUnit, getTimescaleSolveWidth } from '@/utils';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 import { DialogButton, ModalCloseButton, ModalSurface } from '@/components/common/ModalPrimitives';
@@ -3387,15 +3387,11 @@ const DEFAULT_3_TIERS: TimescaleTierConfig[] = [
 ];
 
 const TIER_LABELS = ['Top tier', 'Middle tier', 'Bottom tier'];
-const TIMESCALE_SIDE_MARGIN = 24;
-
-function getReservedEndCapWidth(fontSize?: number) {
-  return (fontSize ?? 16) * 3 + 16;
-}
 
 function TierSettingsModal({ onClose }: { onClose: () => void }) {
   const items = useProjectStore((s) => s.items);
   const timescale = useProjectStore((s) => s.timescale);
+  const timelineContainerWidth = useProjectStore((s) => s.timelineContainerWidth);
   const updateTimescale = useProjectStore((s) => s.updateTimescale);
 
   // Local draft state — initialize from store tiers, padded to 3
@@ -3409,7 +3405,6 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   });
   const previewBarRef = useRef<HTMLDivElement>(null);
   const [previewBarWidth, setPreviewBarWidth] = useState(920);
-  const [liveTimelineSolveWidth, setLiveTimelineSolveWidth] = useState<number | null>(null);
 
   useEffect(() => {
     const el = previewBarRef.current;
@@ -3423,16 +3418,6 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    const readLiveWidth = () => {
-      const el = document.querySelector('[data-timeline-solve-width]') as HTMLElement | null;
-      setLiveTimelineSolveWidth(el?.clientWidth ?? null);
-    };
-    readLiveWidth();
-    window.addEventListener('resize', readLiveWidth);
-    return () => window.removeEventListener('resize', readLiveWidth);
-  }, []);
-
   const updateTierDraft = (idx: number, updates: Partial<TimescaleTierConfig>) => {
     setTiers((prev) => prev.map((t, i) => (i === idx ? { ...t, ...updates } : t)));
   };
@@ -3443,12 +3428,17 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   }), [timescale, tiers]);
 
   const previewSolveWidth = useMemo(() => {
-    if (liveTimelineSolveWidth && liveTimelineSolveWidth > 0) return liveTimelineSolveWidth;
-    const reserved = (TIMESCALE_SIDE_MARGIN * 2)
-      + getReservedEndCapWidth(draftTimescale.leftEndCap?.fontSize)
-      + getReservedEndCapWidth(draftTimescale.rightEndCap?.fontSize);
-    return Math.max(previewBarWidth - reserved, 200);
-  }, [previewBarWidth, draftTimescale.leftEndCap?.fontSize, draftTimescale.rightEndCap?.fontSize]);
+    if (timelineContainerWidth > 0) {
+      return getTimescaleSolveWidth(timelineContainerWidth, {
+        left: draftTimescale.leftEndCap,
+        right: draftTimescale.rightEndCap,
+      });
+    }
+    return getTimescaleSolveWidth(previewBarWidth, {
+      left: draftTimescale.leftEndCap,
+      right: draftTimescale.rightEndCap,
+    });
+  }, [previewBarWidth, timelineContainerWidth, draftTimescale.leftEndCap, draftTimescale.rightEndCap]);
 
   // Project range — same padded computation as main TimelineView
   const resolvedTimescaleModel = useMemo(

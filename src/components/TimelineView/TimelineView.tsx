@@ -3,7 +3,7 @@ import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, addDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { buildDependencyRenderGeometry, dependencyArrowEndInset, dependencyArrowVisualClearance } from '@/components/common/dependencyArrowGeometry';
-import { buildResolvedTimescaleModel, computeAutoFontSize, getTimescaleFitDiagnostics, resolveAutoUnit } from '@/utils';
+import { buildResolvedTimescaleModel, computeAutoFontSize, getReservedEndCapWidth, getTimescaleFitDiagnostics, getTimescaleSolveWidth, resolveAutoUnit, TIMESCALE_SIDE_MARGIN } from '@/utils';
 import { DatePickerPopover } from './DatePickerPopover';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyType, TimescaleTier, TitleOverflowMode } from '@/types';
 
@@ -1385,6 +1385,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const showCriticalPath = useProjectStore((s) => s.showCriticalPath);
   const criticalPathStyle = useProjectStore((s) => s.criticalPathStyle);
   const showDependencies = useProjectStore((s) => s.showDependencies);
+  const setTimelineContainerWidthInStore = useProjectStore((s) => s.setTimelineContainerWidth);
   const swimlaneSpacing = useProjectStore((s) => s.swimlaneSpacing);
   const rowArrangement = useProjectStore((s) => s.rowArrangement);
   const densityMode = useProjectStore((s) => s.densityMode);
@@ -1690,23 +1691,27 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     const el = containerRef.current;
     if (!el) return;
 
-    const updateWidth = () => setTimelineContainerWidth(el.clientWidth);
+    const updateWidth = () => {
+      const nextWidth = el.clientWidth;
+      setTimelineContainerWidth(nextWidth);
+      setTimelineContainerWidthInStore(nextWidth);
+    };
     updateWidth();
 
     const observer = new ResizeObserver(updateWidth);
     observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const TIMESCALE_SIDE_MARGIN = 24;
-  const getReservedEndCapWidth = (fontSize?: number) => (fontSize ?? 16) * 3 + 16;
+    return () => {
+      observer.disconnect();
+      setTimelineContainerWidthInStore(0);
+    };
+  }, [setTimelineContainerWidthInStore]);
 
   const timelineAutoBarWidth = useMemo(() => {
     if (timelineContainerWidth <= 0) return undefined;
-    const reserved = (TIMESCALE_SIDE_MARGIN * 2)
-      + getReservedEndCapWidth(timescale.leftEndCap?.fontSize)
-      + getReservedEndCapWidth(timescale.rightEndCap?.fontSize);
-    return Math.max(timelineContainerWidth - reserved, 200);
+    return getTimescaleSolveWidth(timelineContainerWidth, {
+      left: timescale.leftEndCap,
+      right: timescale.rightEndCap,
+    });
   }, [timelineContainerWidth, timescale.leftEndCap?.fontSize, timescale.rightEndCap?.fontSize]);
 
   const resolvedTimescaleModel = useMemo(
@@ -2576,7 +2581,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           width: totalWidth + leftCapWidth + rightCapWidth + (TIMESCALE_SIDE_MARGIN * 2),
           margin: '12px auto 0',
         }}>
-        <div ref={exportRef} data-timeline-solve-width="true" style={{
+        <div ref={exportRef} style={{
           width: totalWidth,
           position: 'relative',
           marginLeft: leftCapWidth + TIMESCALE_SIDE_MARGIN,

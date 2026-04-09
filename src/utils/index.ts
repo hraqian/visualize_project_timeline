@@ -27,6 +27,7 @@ import type {
   LagUnit,
   TimescaleTier,
   TimescaleConfig,
+  EndCapConfig,
   TimescaleTierConfig,
   TierFormat,
   DependencyConflictMode,
@@ -53,6 +54,19 @@ export function getProjectRange(items: ProjectItem[]): { start: string; end: str
   const starts = visible.map((i) => i.startDate).sort();
   const ends = visible.map((i) => i.endDate).sort();
   return { start: starts[0], end: ends[ends.length - 1] };
+}
+
+export const TIMESCALE_SIDE_MARGIN = 24;
+
+export function getReservedEndCapWidth(fontSize?: number): number {
+  return (fontSize ?? 16) * 3 + 16;
+}
+
+export function getTimescaleSolveWidth(containerWidth: number, endCaps: { left?: EndCapConfig; right?: EndCapConfig }): number {
+  const reserved = (TIMESCALE_SIDE_MARGIN * 2)
+    + getReservedEndCapWidth(endCaps.left?.fontSize)
+    + getReservedEndCapWidth(endCaps.right?.fontSize);
+  return Math.max(containerWidth - reserved, 200);
 }
 
 export function getDuration(item: ProjectItem): number {

@@ -439,6 +439,7 @@ export interface ProjectState {
   rowArrangement: RowArrangement; // how items are arranged vertically in groups
   densityMode: DensityMode; // compactness styling without changing row membership
   swimlaneSpacing: number; // px gap between swimlane bands
+  timelineContainerWidth: number; // measured timeline viewport width for shared timescale solving
   selectedTierIndex: number | null; // which tier row is selected for Scale section editing
   pendingConflicts: SchedulingConflict[]; // conflicts awaiting user resolution (for 'ask' mode)
   preConflictSnapshot: { items: ProjectItem[]; dependencies: Dependency[] } | null; // state before conflict-triggering mutation

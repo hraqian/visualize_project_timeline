@@ -56,6 +56,7 @@ interface ProjectActions {
   setRowArrangement: (arrangement: RowArrangement) => void;
   setDensityMode: (mode: DensityMode) => void;
   setSwimlaneSpacing: (spacing: number) => void;
+  setTimelineContainerWidth: (width: number) => void;
   setSelectedTierIndex: (index: number | null) => void;
 
   // Project persistence
@@ -261,6 +262,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   rowArrangement: 'grouped',
   densityMode: 'comfortable',
   swimlaneSpacing: 5,
+  timelineContainerWidth: 0,
   selectedTierIndex: null,
   pendingConflicts: [],
   preConflictSnapshot: null,
@@ -318,6 +320,7 @@ export const useProjectStore = create<ProjectStore>((_set, get) => {
   setRowArrangement: (arrangement) => set({ rowArrangement: arrangement }),
   setDensityMode: (mode) => set({ densityMode: mode }),
   setSwimlaneSpacing: (spacing) => set({ swimlaneSpacing: Math.max(0, Math.min(40, spacing)) }),
+  setTimelineContainerWidth: (width) => set({ timelineContainerWidth: Math.max(0, Math.round(width)) }),
   setSelectedTierIndex: (index) => set({
     selectedTierIndex: index,
     stylePaneMainTab: index !== null ? 'timescale' : get().stylePaneMainTab,
