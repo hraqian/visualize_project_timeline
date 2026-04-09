@@ -535,7 +535,11 @@ const DependencyOverlay = memo(function DependencyOverlay({
               stroke="transparent"
               strokeWidth={12}
               style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-              onMouseDown={(e) => {
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onSelectDependency(dep.key);
+              }}
+              onClick={(e) => {
                 e.stopPropagation();
                 onSelectDependency(dep.key);
               }}
@@ -545,7 +549,7 @@ const DependencyOverlay = memo(function DependencyOverlay({
       </svg>
       <svg className="absolute top-0 left-0 pointer-events-none z-[45]" width={totalWidth} height={canvasHeight}>
         {entries.map(({ dep, isDepSelected, stroke, strokeOpacity, strokeWidth, head }) => (
-          <g key={`${dep.key}-head`} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1}>
+          <g key={`${dep.key}-head`} opacity={dep.isHidden && !isDepSelected ? 0.4 : 1} style={{ pointerEvents: 'none' }}>
             {head ? renderDependencyHead(head, stroke, strokeOpacity, strokeWidth, isDepSelected) : null}
           </g>
         ))}
@@ -2141,11 +2145,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
   const handleSelectDependency = useCallback((key: string) => {
     setSelectedDepKey(key);
-    setSelectedItem(null);
-    setSelectedSwimlane(null);
-    setSelectedTierIndex(null);
-    setStylePaneSection(null);
-  }, [setSelectedDepKey, setSelectedItem, setSelectedSwimlane, setSelectedTierIndex, setStylePaneSection]);
+  }, [setSelectedDepKey]);
 
   // Vertical connector lines (two dashed lines per task, start edge + end edge, going up to timescale)
   const verticalConnectors = useMemo(() => {
@@ -2569,7 +2569,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
       <div
         ref={containerRef}
         className="flex-1 overflow-auto scrollbar-thin relative"
-        onClick={() => {
+        onClick={(e) => {
+          const target = e.target as Element | null;
+          if (target?.closest('[data-testid^="dependency-hit-"]')) {
+            return;
+          }
           setSelectedItem(null);
           setSelectedSwimlane(null);
           setSelectedTierIndex(null);
@@ -3453,11 +3457,11 @@ function TaskBar({ item, x, y, width, barThickness, translateX, isSelected, isDr
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
             style={{
               position: 'absolute',
-              left: -18,
+              left: -24,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: 10,
-              height: 10,
+              width: 22,
+              height: 22,
               borderRadius: '50%',
               cursor: 'pointer',
               zIndex: 52,
@@ -3472,11 +3476,11 @@ function TaskBar({ item, x, y, width, barThickness, translateX, isSelected, isDr
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
             style={{
               position: 'absolute',
-              right: -18,
+              right: -24,
               top: '50%',
               transform: 'translateY(-50%)',
-              width: 10,
-              height: 10,
+              width: 22,
+              height: 22,
               borderRadius: '50%',
               cursor: 'pointer',
               zIndex: 52,
@@ -3891,11 +3895,11 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
               onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
               style={{
                 position: 'absolute',
-                left: -18,
-                top: isAbove ? undefined : effectiveIconSize / 2 - 5,
-                bottom: isAbove ? effectiveIconSize / 2 - 5 : undefined,
-                width: 10,
-                height: 10,
+                left: -24,
+                top: isAbove ? undefined : effectiveIconSize / 2 - 11,
+                bottom: isAbove ? effectiveIconSize / 2 - 11 : undefined,
+                width: 22,
+                height: 22,
                 borderRadius: '50%',
                 cursor: 'pointer',
                 zIndex: 52,
@@ -3910,11 +3914,11 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
               onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
               style={{
                 position: 'absolute',
-                right: -18,
-                top: isAbove ? undefined : effectiveIconSize / 2 - 5,
-                bottom: isAbove ? effectiveIconSize / 2 - 5 : undefined,
-                width: 10,
-                height: 10,
+                right: -24,
+                top: isAbove ? undefined : effectiveIconSize / 2 - 11,
+                bottom: isAbove ? effectiveIconSize / 2 - 11 : undefined,
+                width: 22,
+                height: 22,
                 borderRadius: '50%',
                 cursor: 'pointer',
                 zIndex: 52,
@@ -4004,10 +4008,10 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('start', e); }}
             style={{
               position: 'absolute',
-              left: -18,
-              top: effectiveIconSize / 2 - 5,
-              width: 10,
-              height: 10,
+              left: -24,
+              top: effectiveIconSize / 2 - 11,
+              width: 22,
+              height: 22,
               borderRadius: '50%',
               cursor: 'pointer',
               zIndex: 52,
@@ -4022,10 +4026,10 @@ function MilestoneItem({ item, x, y, iconSize, iconTopOverride, translateX, isSe
             onMouseDown={(e) => { e.stopPropagation(); onHandleMouseDown('end', e); }}
             style={{
               position: 'absolute',
-              right: -18,
-              top: effectiveIconSize / 2 - 5,
-              width: 10,
-              height: 10,
+              right: -24,
+              top: effectiveIconSize / 2 - 11,
+              width: 22,
+              height: 22,
               borderRadius: '50%',
               cursor: 'pointer',
               zIndex: 52,
