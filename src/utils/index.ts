@@ -86,7 +86,13 @@ type ResolvedTimescaleRange = {
 
 type LabelMeasurementConfig = Pick<TimescaleTierConfig, 'fontFamily' | 'fontWeight' | 'fontStyle' | 'fontSize'>;
 
-function alignStartForUnit(date: Date, unit: Exclude<TimescaleTier, 'auto'>): Date {
+function getFiscalYearStart(date: Date, fiscalYearStartMonth: number): Date {
+  const monthIndex = fiscalYearStartMonth - 1;
+  const fiscalYear = date.getMonth() >= monthIndex ? date.getFullYear() : date.getFullYear() - 1;
+  return new Date(fiscalYear, monthIndex, 1);
+}
+
+function alignStartForUnit(date: Date, unit: Exclude<TimescaleTier, 'auto'>, fiscalYearStartMonth: number): Date {
   switch (unit) {
     case 'week':
       return startOfWeek(date, { weekStartsOn: 1 });
@@ -95,13 +101,13 @@ function alignStartForUnit(date: Date, unit: Exclude<TimescaleTier, 'auto'>): Da
     case 'quarter':
       return startOfQuarter(date);
     case 'year':
-      return startOfYear(date);
+      return fiscalYearStartMonth === 1 ? startOfYear(date) : getFiscalYearStart(date, fiscalYearStartMonth);
     default:
       return date;
   }
 }
 
-function alignEndForUnitExclusive(date: Date, unit: Exclude<TimescaleTier, 'auto'>): Date {
+function alignEndForUnitExclusive(date: Date, unit: Exclude<TimescaleTier, 'auto'>, fiscalYearStartMonth: number): Date {
   switch (unit) {
     case 'week':
       return addDays(startOfWeek(date, { weekStartsOn: 1 }), 7);
@@ -110,13 +116,13 @@ function alignEndForUnitExclusive(date: Date, unit: Exclude<TimescaleTier, 'auto
     case 'quarter':
       return addMonths(startOfQuarter(date), 3);
     case 'year':
-      return addMonths(startOfYear(date), 12);
+      return addMonths(alignStartForUnit(date, 'year', fiscalYearStartMonth), 12);
     default:
       return addDays(date, 1);
   }
 }
 
-function shiftDateByUnit(date: Date, unit: Exclude<TimescaleTier, 'auto'>, amount: number): Date {
+function shiftDateByUnit(date: Date, unit: Exclude<TimescaleTier, 'auto'>, amount: number, fiscalYearStartMonth: number): Date {
   switch (unit) {
     case 'week':
       return addWeeks(date, amount);
@@ -125,7 +131,7 @@ function shiftDateByUnit(date: Date, unit: Exclude<TimescaleTier, 'auto'>, amoun
     case 'quarter':
       return addMonths(date, amount * 3);
     case 'year':
-      return addMonths(date, amount * 12);
+      return addMonths(alignStartForUnit(date, 'year', fiscalYearStartMonth), amount * 12);
     default:
       return addDays(date, amount);
   }
@@ -150,8 +156,8 @@ function getVisibleTierConfigsWithResolvedUnits(
     const startUnit = resolveAutoUnit(scheduleTotalDays);
     const startIdx = AUTO_UNIT_ORDER.indexOf(startUnit);
     for (const unit of AUTO_UNIT_ORDER.slice(startIdx)) {
-      const alignedStart = alignStartForUnit(scheduleStart, unit);
-      const alignedEnd = alignEndForUnitExclusive(scheduleEnd, unit);
+      const alignedStart = alignStartForUnit(scheduleStart, unit, timescale.fiscalYearStartMonth);
+      const alignedEnd = alignEndForUnitExclusive(scheduleEnd, unit, timescale.fiscalYearStartMonth);
       const diagnostics = getTimescaleFitDiagnostics(
         alignedStart,
         subDays(alignedEnd, 1),
@@ -190,8 +196,8 @@ function solveBottomTierRange(
   fiscalYearStartMonth: number,
   barWidthPx?: number,
 ) {
-  const alignedStart = alignStartForUnit(scheduleStart, unit);
-  const alignedEndExclusive = alignEndForUnitExclusive(scheduleEnd, unit);
+  const alignedStart = alignStartForUnit(scheduleStart, unit, fiscalYearStartMonth);
+  const alignedEndExclusive = alignEndForUnitExclusive(scheduleEnd, unit, fiscalYearStartMonth);
   const alignedEnd = subDays(alignedEndExclusive, 1);
   const labels = generateTierLabels(unit, alignedStart, alignedEnd, fiscalYearStartMonth);
   const rawUnitCount = labels.length;
@@ -214,8 +220,8 @@ function solveBottomTierRange(
   const padStartUnits = Math.floor(extraUnits / 2);
   const padEndUnits = Math.ceil(extraUnits / 2);
 
-  const origin = alignStartForUnit(shiftDateByUnit(alignedStart, unit, -padStartUnits), unit);
-  const rangeEndDate = subDays(alignEndForUnitExclusive(shiftDateByUnit(alignedEnd, unit, padEndUnits), unit), 1);
+  const origin = alignStartForUnit(shiftDateByUnit(alignedStart, unit, -padStartUnits, fiscalYearStartMonth), unit, fiscalYearStartMonth);
+  const rangeEndDate = subDays(alignEndForUnitExclusive(shiftDateByUnit(alignedEnd, unit, padEndUnits, fiscalYearStartMonth), unit, fiscalYearStartMonth), 1);
 
   return {
     origin,

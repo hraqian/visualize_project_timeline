@@ -463,6 +463,163 @@ const previewParityResults = await page.evaluate(async () => {
   };
 });
 
+const timescaleEdgeCaseResults = await page.evaluate(async () => {
+  const store = window.__PROJECT_STORE__;
+  if (!store) {
+    return { available: false };
+  }
+
+  const { buildResolvedTimescaleModel, resolveTimescaleRange } = await import('/src/utils/index.ts');
+
+  const configureVisibleTiers = (state, tiers) => ({
+    ...state.timescale,
+    tiers: [
+      ...tiers,
+      ...state.timescale.tiers.slice(tiers.length).map((tier) => ({ ...tier, visible: false })),
+    ],
+  });
+
+  store.getState().newProject();
+  store.getState().addItem({
+    name: 'Single tier task',
+    type: 'task',
+    startDate: '2026-03-29',
+    endDate: '2026-04-05',
+    row: 0,
+  });
+  store.setState((s) => ({
+    ...s,
+    timescale: configureVisibleTiers(s, [
+      { ...s.timescale.tiers[0], unit: 'month', format: 'MMM', visible: true },
+    ]),
+  }));
+  const singleTierState = store.getState();
+  const singleTierModel = buildResolvedTimescaleModel(singleTierState.items, singleTierState.timescale, 744);
+
+  store.getState().newProject();
+  store.getState().addItem({
+    name: 'Mixed auto start',
+    type: 'task',
+    startDate: '2024-01-15',
+    endDate: '2024-01-20',
+    row: 0,
+  });
+  store.getState().addItem({
+    name: 'Mixed auto end',
+    type: 'task',
+    startDate: '2024-06-10',
+    endDate: '2024-06-18',
+    row: 1,
+  });
+  store.setState((s) => ({
+    ...s,
+    timescale: configureVisibleTiers(s, [
+      { ...s.timescale.tiers[0], unit: 'auto', format: 'MMM', visible: true },
+      { ...(s.timescale.tiers[1] ?? s.timescale.tiers[0]), unit: 'month', format: 'MMM', visible: true, fontSize: 12, fontSizeAuto: true, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal' },
+    ]),
+  }));
+  const mixedAutoState = store.getState();
+  const mixedAutoRange = resolveTimescaleRange(mixedAutoState.items, mixedAutoState.timescale, 744);
+  const explicitMonthRange = resolveTimescaleRange(mixedAutoState.items, {
+    ...mixedAutoState.timescale,
+    tiers: [{ ...(mixedAutoState.timescale.tiers[1] ?? mixedAutoState.timescale.tiers[0]), unit: 'month', format: 'MMM', visible: true }],
+  }, 744);
+
+  store.getState().newProject();
+  store.getState().addItem({
+    name: 'Single day milestone',
+    type: 'milestone',
+    startDate: '2026-03-29',
+    endDate: '2026-03-29',
+    row: 0,
+  });
+  store.setState((s) => ({
+    ...s,
+    timescale: configureVisibleTiers(s, [
+      { ...s.timescale.tiers[0], unit: 'year', format: 'yyyy', visible: true },
+      { ...(s.timescale.tiers[1] ?? s.timescale.tiers[0]), unit: 'day', format: 'd_num', visible: true, fontSize: 11, fontSizeAuto: true, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal' },
+    ]),
+  }));
+  const shortRangeState = store.getState();
+  const shortRangeModel = buildResolvedTimescaleModel(shortRangeState.items, shortRangeState.timescale, 744);
+
+  store.getState().newProject();
+  store.getState().addItem({
+    name: 'Boundary start',
+    type: 'milestone',
+    startDate: '2023-07-03',
+    endDate: '2023-07-03',
+    row: 0,
+  });
+  store.getState().addItem({
+    name: 'Boundary end',
+    type: 'task',
+    startDate: '2026-03-21',
+    endDate: '2026-03-27',
+    row: 1,
+  });
+  store.setState((s) => ({
+    ...s,
+    timescale: configureVisibleTiers(s, [
+      { ...s.timescale.tiers[0], unit: 'year', format: 'yyyy', visible: true },
+      { ...(s.timescale.tiers[1] ?? s.timescale.tiers[0]), unit: 'month', format: 'MMM', visible: true, fontSize: 12, fontSizeAuto: true, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal' },
+    ]),
+  }));
+  const upperBoundaryState = store.getState();
+  const upperBoundaryModel = buildResolvedTimescaleModel(upperBoundaryState.items, upperBoundaryState.timescale, 744);
+
+  store.getState().newProject();
+  store.getState().addItem({
+    name: 'Fiscal task',
+    type: 'task',
+    startDate: '2025-03-15',
+    endDate: '2025-03-20',
+    row: 0,
+  });
+  store.setState((s) => ({
+    ...s,
+    timescale: {
+      ...configureVisibleTiers(s, [
+        { ...s.timescale.tiers[0], unit: 'year', format: 'yyyy', visible: true },
+      ]),
+      fiscalYearStartMonth: 7,
+    },
+  }));
+  const fiscalState = store.getState();
+  const fiscalRange = resolveTimescaleRange(fiscalState.items, fiscalState.timescale, 744);
+  const fiscalModel = buildResolvedTimescaleModel(fiscalState.items, fiscalState.timescale, 744);
+
+  return {
+    available: true,
+    singleTier: {
+      visibleUnits: singleTierModel.resolvedUnits,
+      tierRowCount: singleTierModel.tierRows.length,
+      firstRowLabels: singleTierModel.tierRows[0]?.cells.map((cell) => cell.label) ?? [],
+    },
+    mixedAutoExplicit: {
+      autoOrigin: mixedAutoRange.origin,
+      autoEnd: mixedAutoRange.rangeEndDate.toISOString().split('T')[0],
+      explicitOrigin: explicitMonthRange.origin,
+      explicitEnd: explicitMonthRange.rangeEndDate.toISOString().split('T')[0],
+      resolvedUnits: mixedAutoRange.resolvedUnits,
+    },
+    shortRange: {
+      totalDays: shortRangeModel.totalDays,
+      bottomLabels: shortRangeModel.tierRows.at(-1)?.cells.map((cell) => cell.label) ?? [],
+      topLabels: shortRangeModel.tierRows[0]?.cells.map((cell) => cell.label) ?? [],
+    },
+    upperBoundary: {
+      topLabels: upperBoundaryModel.tierRows[0]?.cells.map((cell) => cell.label) ?? [],
+      bottomLabels: upperBoundaryModel.tierRows.at(-1)?.cells.map((cell) => cell.label) ?? [],
+    },
+    fiscalYear: {
+      origin: fiscalRange.origin,
+      rangeEndDate: fiscalRange.rangeEndDate.toISOString().split('T')[0],
+      labels: fiscalModel.tierRows[0]?.cells.map((cell) => cell.label) ?? [],
+    },
+  };
+});
+
 const regressionResults = await page.evaluate(async () => {
   const storage = await import('/src/utils/fileStorage.ts');
   const store = window.__PROJECT_STORE__;
@@ -812,6 +969,7 @@ const titleAlignmentFailures = [];
 const wrappedTitleLayoutFailures = [];
 const compactRangeFailures = [];
 const previewParityFailures = [];
+const timescaleEdgeCaseFailures = [];
 const exportFailures = [];
 if (!regressionResults.timescale.tierClickSwitches) {
   timescaleFailures.push({ kind: 'tier-click-switch', ...regressionResults.timescale.tierClickState });
@@ -881,6 +1039,26 @@ if (!previewParityResults.available) {
   }
 }
 
+if (!timescaleEdgeCaseResults.available) {
+  timescaleEdgeCaseFailures.push(timescaleEdgeCaseResults);
+} else {
+  if (timescaleEdgeCaseResults.singleTier.visibleUnits.length !== 1 || timescaleEdgeCaseResults.singleTier.tierRowCount !== 1) {
+    timescaleEdgeCaseFailures.push({ reason: 'Single visible tier model shape changed', ...timescaleEdgeCaseResults.singleTier });
+  }
+  if (timescaleEdgeCaseResults.mixedAutoExplicit.autoOrigin !== timescaleEdgeCaseResults.mixedAutoExplicit.explicitOrigin || timescaleEdgeCaseResults.mixedAutoExplicit.autoEnd !== timescaleEdgeCaseResults.mixedAutoExplicit.explicitEnd) {
+    timescaleEdgeCaseFailures.push({ reason: 'Upper auto tier changed bottom-tier-owned range', ...timescaleEdgeCaseResults.mixedAutoExplicit });
+  }
+  if (timescaleEdgeCaseResults.shortRange.bottomLabels.length !== 1 || timescaleEdgeCaseResults.shortRange.bottomLabels[0] !== 'Day 29' || timescaleEdgeCaseResults.shortRange.topLabels.length < 1) {
+    timescaleEdgeCaseFailures.push({ reason: 'Very short range model did not preserve single-day coverage', ...timescaleEdgeCaseResults.shortRange });
+  }
+  if (!timescaleEdgeCaseResults.upperBoundary.topLabels.includes('2026')) {
+    timescaleEdgeCaseFailures.push({ reason: 'Upper tier dropped trailing partial boundary cell', ...timescaleEdgeCaseResults.upperBoundary });
+  }
+  if (timescaleEdgeCaseResults.fiscalYear.origin !== '2024-07-01' || timescaleEdgeCaseResults.fiscalYear.rangeEndDate !== '2025-06-30' || !timescaleEdgeCaseResults.fiscalYear.labels.includes('FY2024')) {
+    timescaleEdgeCaseFailures.push({ reason: 'Fiscal year offset did not align year range correctly', ...timescaleEdgeCaseResults.fiscalYear });
+  }
+}
+
 if (!exportResults.available) {
   exportFailures.push({ kind: 'unavailable' });
 } else {
@@ -895,7 +1073,7 @@ if (!exportResults.available) {
   }
 }
 
-const totalFailures = routingFailures.length + styleRoutingFailures.length + sameDayMilestoneTaskFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + wrappedTitleLayoutFailures.length + compactRangeFailures.length + previewParityFailures.length + exportFailures.length;
+const totalFailures = routingFailures.length + styleRoutingFailures.length + sameDayMilestoneTaskFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + wrappedTitleLayoutFailures.length + compactRangeFailures.length + previewParityFailures.length + timescaleEdgeCaseFailures.length + exportFailures.length;
 
 console.log(JSON.stringify({
   routing: {
@@ -951,6 +1129,10 @@ console.log(JSON.stringify({
   previewParity: {
     failures: previewParityFailures.length,
     details: previewParityFailures,
+  },
+  timescaleEdgeCases: {
+    failures: timescaleEdgeCaseFailures.length,
+    details: timescaleEdgeCaseFailures,
   },
   exports: {
     failures: exportFailures.length,
