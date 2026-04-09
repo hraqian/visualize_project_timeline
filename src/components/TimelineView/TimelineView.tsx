@@ -3,7 +3,7 @@ import { useProjectStore } from '@/store/useProjectStore';
 import { parseISO, differenceInDays, addDays, format } from 'date-fns';
 import { MilestoneIconComponent } from '@/components/common/MilestoneIconComponent';
 import { buildDependencyRenderGeometry, dependencyArrowEndInset, dependencyArrowVisualClearance } from '@/components/common/dependencyArrowGeometry';
-import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getTimescaleFitDiagnostics, resolveAutoUnit, resolveTimescaleRange } from '@/utils';
+import { buildResolvedTimescaleModel, computeAutoFontSize, getTimescaleFitDiagnostics, resolveAutoUnit } from '@/utils';
 import { DatePickerPopover } from './DatePickerPopover';
 import type { ProjectItem, Swimlane, DurationFormat, ConnectorThickness, OutlineThickness, TimescaleBarShape, DependencyType, TimescaleTier, TitleOverflowMode } from '@/types';
 
@@ -15,7 +15,7 @@ type EditingField = {
 } | null;
 
 // ─── InlineEditInput ─────────────────────────────────────────────────────────
-// A small inline text input that auto-focuses, selects all, and commits on Enter/blur.
+// A small inline text input that auto-focuses and commits on Enter/blur.
 
 function InlineEditInput({
   value,
@@ -37,7 +37,6 @@ function InlineEditInput({
     const el = inputRef.current;
     if (el) {
       el.focus();
-      el.select();
     }
   }, []);
 
@@ -64,6 +63,7 @@ function InlineEditInput({
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
+      draggable={false}
       className={className}
       style={{
         border: '1px solid #ef4444',
@@ -73,6 +73,9 @@ function InlineEditInput({
         padding: '0 2px',
         margin: '-1px -3px',
         boxSizing: 'content-box',
+        userSelect: 'text',
+        WebkitUserSelect: 'text',
+        cursor: 'text',
         ...inputStyle,
         color: '#334155',
       }}
@@ -1706,11 +1709,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
     return Math.max(timelineContainerWidth - reserved, 200);
   }, [timelineContainerWidth, timescale.leftEndCap?.fontSize, timescale.rightEndCap?.fontSize]);
 
-  const resolvedTimescaleRange = useMemo(
-    () => resolveTimescaleRange(items, timescale, timelineAutoBarWidth),
+  const resolvedTimescaleModel = useMemo(
+    () => buildResolvedTimescaleModel(items, timescale, timelineAutoBarWidth ?? 200),
     [items, timescale, timelineAutoBarWidth],
   );
-  const { origin, totalDays, rangeEndDate, resolvedUnits } = resolvedTimescaleRange;
+  const { origin, totalDays, rangeEndDate, resolvedUnits, tierRows, todayFraction, isTodayVisible } = resolvedTimescaleModel;
 
   // Migrate legacy single-tier {unit:'month', format:'MMM'} to unit:'auto' for already-loaded projects
   useEffect(() => {
@@ -1766,10 +1769,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   );
 
   // Today line position
-  const todayX = useMemo(() => {
-    const today = new Date();
-    return differenceInDays(today, parseISO(origin)) * dayWidth;
-  }, [origin, dayWidth]);
+  const todayX = todayFraction * totalWidth;
   const todayPos = timescale.todayPosition ?? 'below';
 
   // ─── Layout computation ────────────────────────────────────────────
@@ -1816,23 +1816,6 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
   const canvasHeight = (swimlaneLayout.length > 0
     ? swimlaneLayout[swimlaneLayout.length - 1].y + swimlaneLayout[swimlaneLayout.length - 1].height
     : independentHeight) || ROW_HEIGHT * 2;
-
-  // Compute timescale tiers
-  const tierLabels = useMemo(() => {
-    const rangeStart = parseISO(origin);
-    return timescale.tiers
-      .map((tier, idx) => ({ tier, storeIndex: idx }))
-      .filter(({ tier }) => tier.visible)
-      .map(({ tier, storeIndex }, visibleIdx) => {
-        const resolvedUnit = tier.unit === 'auto' ? resolvedUnits[visibleIdx] ?? 'year' : tier.unit;
-        const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
-        return {
-          tier: { ...tier, unit: resolvedUnit },
-          storeIndex,
-          labels: generateTierLabels(resolvedUnit, rangeStart, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat),
-        };
-      });
-  }, [origin, totalDays, rangeEndDate, timescale, resolvedUnits]);
 
   // Dependency lines SVG paths — orthogonal routing (right-angle segments only)
   const depPaths = useMemo(() => {
@@ -2593,7 +2576,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           width: totalWidth + leftCapWidth + rightCapWidth + (TIMESCALE_SIDE_MARGIN * 2),
           margin: '12px auto 0',
         }}>
-        <div ref={exportRef} style={{
+        <div ref={exportRef} data-timeline-solve-width="true" style={{
           width: totalWidth,
           position: 'relative',
           marginLeft: leftCapWidth + TIMESCALE_SIDE_MARGIN,
@@ -2672,9 +2655,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
 
               <div className="relative">
                 <div className="border-b border-[var(--color-border)] overflow-hidden relative" style={getTimescaleBarShapeStyle(timescale.barShape)}>
-                  {tierLabels.map(({ tier, storeIndex, labels }, tierIdx) => {
-                    const originDate = parseISO(origin);
-                    const cells = buildVisibleTierCells(labels, tier.unit, originDate, totalDays, totalWidth, timescale.tiers[storeIndex]?.unit !== 'auto');
+                  {tierRows.map(({ tier, storeIndex, cells }, tierIdx) => {
                     const isSelected = selectedTierIndex === storeIndex;
 
                     // Compute cell width in px using the narrowest rendered cell to avoid browser-zoom overlap.
@@ -2731,7 +2712,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                   })}
 
                   {/* Elapsed time bar — colored strip from left to today */}
-                  {(timescale.showElapsedTime ?? false) && todayX > 0 && (
+                  {(timescale.showElapsedTime ?? false) && isTodayVisible && todayX > 0 && (
                     <div
                       className="absolute left-0 pointer-events-none z-10"
                       style={{
@@ -2745,7 +2726,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 </div>
 
                 {/* Today label — positioned relative to timescale bar */}
-                {timescale.showToday && todayX >= 0 && todayX <= totalWidth && (
+                {timescale.showToday && isTodayVisible && todayX >= 0 && todayX <= totalWidth && (
                   <div
                     className="absolute pointer-events-none z-20"
                     style={{

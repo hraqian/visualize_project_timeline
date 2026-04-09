@@ -1282,7 +1282,7 @@ function SwimlaneGroup({
       <tr
         className={`group/swimlane cursor-pointer hover:bg-slate-50 transition-colors ${isDragging ? 'opacity-50' : ''} ${dragItemId && !isDragging ? 'ring-1 ring-inset ring-slate-200' : ''}`}
         onClick={onToggleCollapse}
-        draggable
+        draggable={!editingName}
         onDragStart={(e) => {
           e.dataTransfer.effectAllowed = 'move';
           onDragStart();
@@ -1323,7 +1323,6 @@ function SwimlaneGroup({
                 className="bg-white border border-slate-300 rounded px-2 py-0.5 text-[14px] font-semibold text-slate-800 outline-none focus:border-slate-700"
                 value={nameValue}
                 onChange={(e) => setNameValue(e.target.value)}
-                onFocus={(e) => e.target.select()}
                 onBlur={() => {
                   onUpdateSwimlane(swimlane.id, { name: nameValue });
                   setEditingName(false);
@@ -1334,7 +1333,9 @@ function SwimlaneGroup({
                     setEditingName(false);
                   }
                 }}
+                onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
+                draggable={false}
                 autoFocus
               />
             ) : (
@@ -1537,6 +1538,7 @@ function ItemRow({
   const [assignedValue, setAssignedValue] = useState(item.assignedTo);
   const [editingPredecessors, setEditingPredecessors] = useState(false);
   const [predecessorsValue, setPredecessorsValue] = useState('');
+  const isTextEditingActive = editingDuration || editingProgress || editingAssigned || editingPredecessors || focusedColumn === 'title';
 
   // Refs for focusable cells
   const cellRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
@@ -1606,7 +1608,6 @@ function ItemRow({
   useEffect(() => {
     if (shouldFocus && nameRef.current) {
       nameRef.current.focus();
-      nameRef.current.select();
       onClearFocus();
     }
   }, [shouldFocus, onClearFocus]);
@@ -1625,7 +1626,7 @@ function ItemRow({
           isChecked ? 'bg-slate-50/60' : isSelected ? 'bg-slate-50/40' : 'hover:bg-slate-50/80'
         } ${isItemDragging ? 'opacity-50' : ''}`}
         onClick={() => onSelectItem(item.id)}
-        draggable
+        draggable={!isTextEditingActive}
         onDragStart={(e) => {
           e.dataTransfer.effectAllowed = 'move';
           e.stopPropagation();
@@ -1671,7 +1672,9 @@ function ItemRow({
             handleCellKeyDown(e, 'title', true);
           }}
           onFocus={() => onCellFocus('title')}
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
+          draggable={false}
         />
       </td>
 
@@ -1752,7 +1755,9 @@ function ItemRow({
                 handleCellKeyDown(e, 'duration', true);
               }
             }}
+            onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
+            draggable={false}
           />
         ) : (
           <span
@@ -1916,7 +1921,9 @@ function ItemRow({
                   handleCellKeyDown(e, 'percentComplete', true);
                 }
               }}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
+              draggable={false}
             />
           ) : (
             <div
@@ -1996,7 +2003,9 @@ function ItemRow({
                   handleCellKeyDown(e, 'assignedTo', true);
                 }
               }}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
+              draggable={false}
             />
           ) : item.assignedTo ? (
             <span
@@ -2126,7 +2135,9 @@ function ItemRow({
                     }
                   }}
                   autoFocus
+                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
+                  draggable={false}
                 />
                 {predecessorsWarnings.length > 0 && (
                   <div className="absolute left-0 top-full mt-1 z-20 bg-amber-50 border border-amber-200 rounded px-2 py-1 shadow-md max-w-[220px]">

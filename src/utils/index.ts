@@ -70,6 +70,8 @@ type ResolvedTimescaleRange = {
   resolvedUnits: Exclude<TimescaleTier, 'auto'>[];
 };
 
+type LabelMeasurementConfig = Pick<TimescaleTierConfig, 'fontFamily' | 'fontWeight' | 'fontStyle' | 'fontSize'>;
+
 function alignStartForUnit(date: Date, unit: Exclude<TimescaleTier, 'auto'>): Date {
   switch (unit) {
     case 'week':
@@ -100,20 +102,36 @@ function alignEndForUnitExclusive(date: Date, unit: Exclude<TimescaleTier, 'auto
   }
 }
 
-export function resolveTimescaleRange(
-  items: ProjectItem[],
-  timescale: TimescaleConfig,
-  autoBarWidthPx?: number,
-): ResolvedTimescaleRange {
-  const range = getProjectRange(items);
-  const scheduleStart = parseISO(range.start);
-  const scheduleEnd = parseISO(range.end);
-  const scheduleTotalDays = differenceInDays(addDays(scheduleEnd, 1), scheduleStart);
+function shiftDateByUnit(date: Date, unit: Exclude<TimescaleTier, 'auto'>, amount: number): Date {
+  switch (unit) {
+    case 'week':
+      return addWeeks(date, amount);
+    case 'month':
+      return addMonths(date, amount);
+    case 'quarter':
+      return addMonths(date, amount * 3);
+    case 'year':
+      return addMonths(date, amount * 12);
+    default:
+      return addDays(date, amount);
+  }
+}
 
+function getFinestVisibleUnit(units: Exclude<TimescaleTier, 'auto'>[]): Exclude<TimescaleTier, 'auto'> {
+  return [...units].sort((left, right) => AUTO_UNIT_ORDER.indexOf(left) - AUTO_UNIT_ORDER.indexOf(right))[0] ?? 'month';
+}
+
+function getVisibleTierConfigsWithResolvedUnits(
+  timescale: TimescaleConfig,
+  scheduleStart: Date,
+  scheduleEnd: Date,
+  scheduleTotalDays: number,
+  autoBarWidthPx?: number,
+) {
   const visibleTiers = timescale.tiers.filter((t) => t.visible);
-  const resolvedUnits = visibleTiers.map((tier) => {
-    if (tier.unit !== 'auto') return tier.unit;
-    if (!autoBarWidthPx) return resolveAutoUnit(scheduleTotalDays);
+  return visibleTiers.map((tier) => {
+    if (tier.unit !== 'auto') return { tier, resolvedUnit: tier.unit };
+    if (!autoBarWidthPx) return { tier, resolvedUnit: resolveAutoUnit(scheduleTotalDays) };
 
     const startUnit = resolveAutoUnit(scheduleTotalDays);
     const startIdx = AUTO_UNIT_ORDER.indexOf(startUnit);
@@ -128,20 +146,104 @@ export function resolveTimescaleRange(
         tier,
       );
       const match = diagnostics.find((entry) => entry.unit === unit);
-      if (match?.fitsPrefixedFirstCell) return unit;
+      if (match?.fitsPrefixedFirstCell) return { tier, resolvedUnit: unit };
     }
-    return 'year';
+    return { tier, resolvedUnit: 'year' as const };
   });
+}
 
-  let padStart = scheduleStart;
-  let padEnd = addDays(scheduleEnd, 1);
-  for (const unit of resolvedUnits) {
-    const alignedStart = alignStartForUnit(scheduleStart, unit);
-    if (alignedStart < padStart) padStart = alignedStart;
-    const alignedEnd = alignEndForUnitExclusive(scheduleEnd, unit);
-    if (alignedEnd > padEnd) padEnd = alignedEnd;
+function getRepresentativeUnitLabelWidth(
+  unit: Exclude<TimescaleTier, 'auto'>,
+  labels: TimescaleLabel[],
+  config: LabelMeasurementConfig,
+) {
+  const measured = labels.map((label, idx) => {
+    const text = idx === 0 && unit === 'week'
+      ? `Week ${label.label}`
+      : idx === 0 && unit === 'day'
+        ? `Day ${label.label}`
+        : label.label;
+    return measureTextWidth(text, config.fontFamily, config.fontWeight, config.fontStyle, config.fontSize) + 12;
+  });
+  return Math.max(...measured, 1);
+}
+
+function solveBottomTierRange(
+  scheduleStart: Date,
+  scheduleEnd: Date,
+  unit: Exclude<TimescaleTier, 'auto'>,
+  config: LabelMeasurementConfig,
+  fiscalYearStartMonth: number,
+  barWidthPx?: number,
+) {
+  const alignedStart = alignStartForUnit(scheduleStart, unit);
+  const alignedEndExclusive = alignEndForUnitExclusive(scheduleEnd, unit);
+  const alignedEnd = subDays(alignedEndExclusive, 1);
+  const labels = generateTierLabels(unit, alignedStart, alignedEnd, fiscalYearStartMonth);
+  const rawUnitCount = labels.length;
+
+  if (!barWidthPx || rawUnitCount <= 1) {
+    return {
+      origin: alignedStart,
+      rangeEndDate: alignedEnd,
+      skipFactor: 1,
+      rawUnitCount,
+      paddedUnitCount: rawUnitCount,
+    };
   }
 
+  const requiredCellWidthPx = getRepresentativeUnitLabelWidth(unit, labels, config);
+  const fitCellCount = Math.max(1, Math.floor(barWidthPx / requiredCellWidthPx));
+  const skipFactor = Math.max(1, Math.ceil(rawUnitCount / fitCellCount));
+  const paddedUnitCount = Math.ceil(rawUnitCount / skipFactor) * skipFactor;
+  const extraUnits = paddedUnitCount - rawUnitCount;
+  const padStartUnits = Math.floor(extraUnits / 2);
+  const padEndUnits = Math.ceil(extraUnits / 2);
+
+  const origin = alignStartForUnit(shiftDateByUnit(alignedStart, unit, -padStartUnits), unit);
+  const rangeEndDate = subDays(alignEndForUnitExclusive(shiftDateByUnit(alignedEnd, unit, padEndUnits), unit), 1);
+
+  return {
+    origin,
+    rangeEndDate,
+    skipFactor,
+    rawUnitCount,
+    paddedUnitCount,
+  };
+}
+
+export function resolveTimescaleRange(
+  items: ProjectItem[],
+  timescale: TimescaleConfig,
+  autoBarWidthPx?: number,
+): ResolvedTimescaleRange {
+  const range = getProjectRange(items);
+  const scheduleStart = parseISO(range.start);
+  const scheduleEnd = parseISO(range.end);
+  const scheduleTotalDays = differenceInDays(addDays(scheduleEnd, 1), scheduleStart);
+
+  const resolvedVisibleTiers = getVisibleTierConfigsWithResolvedUnits(
+    timescale,
+    scheduleStart,
+    scheduleEnd,
+    scheduleTotalDays,
+    autoBarWidthPx,
+  );
+  const resolvedUnits = resolvedVisibleTiers.map(({ resolvedUnit }) => resolvedUnit);
+  const lowestVisibleTier = resolvedVisibleTiers[resolvedVisibleTiers.length - 1];
+  const bottomTierUnit = lowestVisibleTier?.resolvedUnit ?? getFinestVisibleUnit(resolvedUnits);
+  const bottomTierConfig = lowestVisibleTier?.tier ?? timescale.tiers.find((tier) => tier.visible) ?? timescale.tiers[0];
+  const bottomTierRange = solveBottomTierRange(
+    scheduleStart,
+    scheduleEnd,
+    bottomTierUnit,
+    bottomTierConfig,
+    timescale.fiscalYearStartMonth,
+    autoBarWidthPx,
+  );
+
+  const padStart = bottomTierRange.origin;
+  const padEnd = addDays(bottomTierRange.rangeEndDate, 1);
   const total = differenceInDays(padEnd, padStart);
   return {
     origin: padStart.toISOString().split('T')[0],
@@ -156,54 +258,7 @@ export function getProjectRangePadded(
   timescale: TimescaleConfig,
   autoBarWidthPx?: number,
 ): { origin: string; totalDays: number; rangeEndDate: Date } {
-  const range = getProjectRange(items);
   const resolved = resolveTimescaleRange(items, timescale, autoBarWidthPx);
-  const scheduleStart = parseISO(range.start);
-  const scheduleEnd = parseISO(range.end);
-  const scheduleTotalDays = differenceInDays(addDays(scheduleEnd, 1), scheduleStart);
-
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
-    (window as Window & {
-      __PADDED_RANGE_DEBUG__?: Array<{
-        inputStart: string;
-        inputEnd: string;
-        padStartInitial: string;
-        roughPadEnd: string;
-        roughTotalDays: number;
-        autoBarWidthPx?: number;
-        visibleUnits: string[];
-        origin: string;
-        rangeEndDate: string;
-        totalDays: number;
-      }>;
-    }).__PADDED_RANGE_DEBUG__ = [
-      ...((window as Window & { __PADDED_RANGE_DEBUG__?: Array<unknown> }).__PADDED_RANGE_DEBUG__ ?? []),
-      {
-        inputStart: range.start,
-        inputEnd: range.end,
-        padStartInitial: scheduleStart.toISOString().split('T')[0],
-        roughPadEnd: scheduleEnd.toISOString().split('T')[0],
-        roughTotalDays: scheduleTotalDays,
-        autoBarWidthPx,
-        visibleUnits: resolved.resolvedUnits,
-        origin: resolved.origin,
-        rangeEndDate: resolved.rangeEndDate.toISOString().split('T')[0],
-        totalDays: resolved.totalDays,
-      },
-    ] as Array<{
-      inputStart: string;
-      inputEnd: string;
-      padStartInitial: string;
-      roughPadEnd: string;
-      roughTotalDays: number;
-      autoBarWidthPx?: number;
-      visibleUnits: string[];
-      origin: string;
-      rangeEndDate: string;
-      totalDays: number;
-    }>;
-  }
-
   return { origin: resolved.origin, totalDays: resolved.totalDays, rangeEndDate: resolved.rangeEndDate };
 }
 
@@ -344,6 +399,24 @@ export interface TierCell {
   widthFrac: number;  // 0-1 width within bar
 }
 
+type VisibleTierCellOptions = {
+  allowSkip?: boolean;
+  tierConfig?: LabelMeasurementConfig;
+};
+
+export type ResolvedTimescaleTierRow = {
+  tier: TimescaleTierConfig & { unit: Exclude<TimescaleTier, 'auto'> };
+  storeIndex: number;
+  labels: TimescaleLabel[];
+  cells: TierCell[];
+};
+
+export type ResolvedTimescaleModel = ResolvedTimescaleRange & {
+  tierRows: ResolvedTimescaleTierRow[];
+  todayFraction: number;
+  isTodayVisible: boolean;
+};
+
 export type TimescaleFitDiagnostic = {
   unit: Exclude<TimescaleTier, 'auto'>;
   cellCount: number;
@@ -417,54 +490,96 @@ export function buildVisibleTierCells(
   originDate: Date,
   totalDays: number,
   barWidthPx: number,
-  allowSkip = true,
+  options: VisibleTierCellOptions = {},
 ): TierCell[] {
   if (labels.length === 0) return [];
+  const allowSkip = options.allowSkip ?? true;
+  const tierConfig = options.tierConfig;
 
-  const minLabelWidth: Record<string, number> = { day: 60, week: 70, month: 50, quarter: 50, year: 50 };
-  const minW = minLabelWidth[unit] ?? 40;
+  const buildCells = (skipFactor: number): TierCell[] => {
+    const rawCells: TierCell[] = [];
+    for (let i = 0; i < labels.length; i += skipFactor) {
+      const startFrac = Math.max(differenceInDays(labels[i].startDate, originDate) / totalDays, 0);
+      const endIdx = Math.min(i + skipFactor, labels.length) - 1;
+      const endFrac = Math.min((differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays, 1);
+      rawCells.push({
+        label: labels[i].label,
+        fraction: startFrac,
+        widthFrac: endFrac - startFrac,
+      });
+    }
 
-  // For explicit user-selected units, skip labels only as a readability fallback.
+    const fullCellWidth = rawCells.length > 1 ? Math.max(...rawCells.map(c => c.widthFrac)) : 1;
+    const cells = rawCells.filter(c => c.widthFrac >= fullCellWidth * 0.01);
+
+    if (cells.length > 0 && (unit === 'week' || unit === 'day')) {
+      const prefix = unit === 'week' ? 'Week ' : 'Day ';
+      cells[0].label = prefix + cells[0].label;
+    }
+
+    return cells;
+  };
+
+  const fitsCells = (cells: TierCell[]) => {
+    if (!tierConfig) return true;
+    return cells.every((cell) => {
+      const requiredWidth = measureTextWidth(cell.label, tierConfig.fontFamily, tierConfig.fontWeight, tierConfig.fontStyle, tierConfig.fontSize) + 12;
+      return cell.widthFrac * barWidthPx >= requiredWidth;
+    });
+  };
+
   let skipFactor = 1;
-  if (allowSkip && labels.length > 1) {
-    const refIdx = Math.min(1, labels.length - 1);
-    const refStartFrac = differenceInDays(labels[refIdx].startDate, originDate) / totalDays;
-    const refEndFrac = (differenceInDays(labels[refIdx].endDate, originDate) + 1) / totalDays;
-    const cellWidthPx = (refEndFrac - refStartFrac) * barWidthPx;
-    if (cellWidthPx < minW) {
-      skipFactor = Math.ceil(minW / cellWidthPx);
+  let cells = buildCells(skipFactor);
+  if (allowSkip) {
+    while (skipFactor < labels.length && !fitsCells(cells)) {
+      skipFactor += 1;
+      cells = buildCells(skipFactor);
     }
   }
 
-  // Build cells — origin and end are already aligned to full unit boundaries.
-  const rawCells: TierCell[] = [];
-  for (let i = 0; i < labels.length; i += skipFactor) {
-    const startFrac = Math.max(differenceInDays(labels[i].startDate, originDate) / totalDays, 0);
-    const endIdx = Math.min(i + skipFactor, labels.length) - 1;
-    const endFrac = Math.min((differenceInDays(labels[endIdx].endDate, originDate) + 1) / totalDays, 1);
-    rawCells.push({
-      label: labels[i].label,
-      fraction: startFrac,
-      widthFrac: endFrac - startFrac,
-    });
-  }
-
-  // Drop degenerate slivers (< 1% of a full cell) — these are alignment artifacts
-  const fullCellWidth = rawCells.length > 1 ? Math.max(...rawCells.map(c => c.widthFrac)) : 1;
-  const cells = rawCells.filter(c => c.widthFrac >= fullCellWidth * 0.01);
-
-  // Drop trailing partial cell (less than half a full cell) to avoid clipped labels
-  if (cells.length > 1 && cells[cells.length - 1].widthFrac < fullCellWidth * 0.5) {
-    cells.pop();
-  }
-
-  // Prefix first visible label for sequential units (e.g., "Week 9", "Day 1")
-  if (cells.length > 0 && (unit === 'week' || unit === 'day')) {
-    const prefix = unit === 'week' ? 'Week ' : 'Day ';
-    cells[0].label = prefix + cells[0].label;
-  }
-
   return cells;
+}
+
+export function buildResolvedTimescaleModel(
+  items: ProjectItem[],
+  timescale: TimescaleConfig,
+  barWidthPx: number,
+): ResolvedTimescaleModel {
+  const resolvedRange = resolveTimescaleRange(items, timescale, barWidthPx);
+  const { origin, totalDays, rangeEndDate, resolvedUnits } = resolvedRange;
+  const originDate = parseISO(origin);
+
+  const tierRows = timescale.tiers
+    .map((tier, idx) => ({ tier, storeIndex: idx }))
+    .filter(({ tier }) => tier.visible)
+    .map(({ tier, storeIndex }, visibleIdx) => {
+      const resolvedUnit = tier.unit === 'auto' ? resolvedUnits[visibleIdx] ?? 'year' : tier.unit;
+      const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
+      const labels = generateTierLabels(resolvedUnit, originDate, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat);
+      const cells = buildVisibleTierCells(labels, resolvedUnit, originDate, totalDays, barWidthPx, {
+        allowSkip: tier.unit !== 'auto',
+        tierConfig: tier,
+      });
+      return {
+        tier: { ...tier, unit: resolvedUnit },
+        storeIndex,
+        labels,
+        cells,
+      };
+    });
+
+  const today = new Date();
+  const rangeStart = parseISO(origin);
+  const isTodayVisible = today >= rangeStart && today <= rangeEndDate;
+  const rawTodayFraction = differenceInDays(today, rangeStart) / totalDays;
+  const todayFraction = Math.max(0, Math.min(1, rawTodayFraction));
+
+  return {
+    ...resolvedRange,
+    tierRows,
+    todayFraction,
+    isTodayVisible,
+  };
 }
 
 // ─── Auto Font Sizing ────────────────────────────────────────────────────────

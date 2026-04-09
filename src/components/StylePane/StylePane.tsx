@@ -41,8 +41,8 @@ import {
 } from '@/types';
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { parseISO, differenceInDays, format } from 'date-fns';
-import { generateTierLabels, buildVisibleTierCells, computeAutoFontSize, getFormatOptionsForUnit, getDefaultFormatForUnit, resolveTimescaleRange } from '@/utils';
+import { parseISO, format } from 'date-fns';
+import { buildResolvedTimescaleModel, computeAutoFontSize, getFormatOptionsForUnit, getDefaultFormatForUnit } from '@/utils';
 import { SchedulingSettingsModal } from '@/components/common/SchedulingSettingsModal';
 import { ConnectionPointButton } from '@/components/common/ConnectionPointButton';
 import { DialogButton, ModalCloseButton, ModalSurface } from '@/components/common/ModalPrimitives';
@@ -3387,6 +3387,11 @@ const DEFAULT_3_TIERS: TimescaleTierConfig[] = [
 ];
 
 const TIER_LABELS = ['Top tier', 'Middle tier', 'Bottom tier'];
+const TIMESCALE_SIDE_MARGIN = 24;
+
+function getReservedEndCapWidth(fontSize?: number) {
+  return (fontSize ?? 16) * 3 + 16;
+}
 
 function TierSettingsModal({ onClose }: { onClose: () => void }) {
   const items = useProjectStore((s) => s.items);
@@ -3404,6 +3409,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
   });
   const previewBarRef = useRef<HTMLDivElement>(null);
   const [previewBarWidth, setPreviewBarWidth] = useState(920);
+  const [liveTimelineSolveWidth, setLiveTimelineSolveWidth] = useState<number | null>(null);
 
   useEffect(() => {
     const el = previewBarRef.current;
@@ -3417,40 +3423,43 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const readLiveWidth = () => {
+      const el = document.querySelector('[data-timeline-solve-width]') as HTMLElement | null;
+      setLiveTimelineSolveWidth(el?.clientWidth ?? null);
+    };
+    readLiveWidth();
+    window.addEventListener('resize', readLiveWidth);
+    return () => window.removeEventListener('resize', readLiveWidth);
+  }, []);
+
   const updateTierDraft = (idx: number, updates: Partial<TimescaleTierConfig>) => {
     setTiers((prev) => prev.map((t, i) => (i === idx ? { ...t, ...updates } : t)));
   };
 
-  // Project range — same padded computation as main TimelineView
-  const resolvedTimescaleRange = useMemo(
-    () => resolveTimescaleRange(items, timescale, previewBarWidth),
-    [items, timescale, previewBarWidth],
-  );
-  const { origin, totalDays, rangeEndDate, resolvedUnits } = resolvedTimescaleRange;
+  const draftTimescale = useMemo(() => ({
+    ...timescale,
+    tiers,
+  }), [timescale, tiers]);
 
-  // Today position as fraction (0-1)
-  const todayFraction = useMemo(() => {
-    const today = new Date();
-    const frac = differenceInDays(today, parseISO(origin)) / totalDays;
-    return Math.max(0, Math.min(1, frac));
-  }, [origin, totalDays]);
+  const previewSolveWidth = useMemo(() => {
+    if (liveTimelineSolveWidth && liveTimelineSolveWidth > 0) return liveTimelineSolveWidth;
+    const reserved = (TIMESCALE_SIDE_MARGIN * 2)
+      + getReservedEndCapWidth(draftTimescale.leftEndCap?.fontSize)
+      + getReservedEndCapWidth(draftTimescale.rightEndCap?.fontSize);
+    return Math.max(previewBarWidth - reserved, 200);
+  }, [previewBarWidth, draftTimescale.leftEndCap?.fontSize, draftTimescale.rightEndCap?.fontSize]);
+
+  // Project range — same padded computation as main TimelineView
+  const resolvedTimescaleModel = useMemo(
+    () => buildResolvedTimescaleModel(items, draftTimescale, previewSolveWidth),
+    [items, draftTimescale, previewSolveWidth],
+  );
+  const { origin, rangeEndDate, tierRows: previewTierLabels, todayFraction, isTodayVisible } = resolvedTimescaleModel;
   const todayPos = timescale.todayPosition ?? 'below';
 
   const visibleTiers = useMemo(() => tiers.filter((t) => t.visible), [tiers]);
   const visibleCount = visibleTiers.length;
-  // Generate labels using shared buildVisibleTierCells utility
-  const previewTierLabels = useMemo(() => {
-    const originDate = parseISO(origin);
-    const BAR_WIDTH_PX = previewBarWidth;
-
-    return visibleTiers.map((tier, visibleIdx) => {
-      const resolvedUnit = tier.unit === 'auto' ? resolvedUnits[visibleIdx] ?? 'year' : tier.unit;
-      const resolvedFormat = tier.unit === 'auto' ? undefined : tier.format;
-      const labels = generateTierLabels(resolvedUnit, originDate, rangeEndDate, timescale.fiscalYearStartMonth, resolvedFormat);
-      const cells = buildVisibleTierCells(labels, resolvedUnit, originDate, totalDays, BAR_WIDTH_PX, tier.unit !== 'auto');
-      return { tier: { ...tier, unit: resolvedUnit }, cells };
-    });
-  }, [visibleTiers, origin, totalDays, rangeEndDate, timescale.fiscalYearStartMonth, resolvedUnits, previewBarWidth]);
 
   const handleSave = () => {
     updateTimescale({ tiers: tiers });
@@ -3536,7 +3545,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                   })}
 
                   {/* Elapsed time bar — colored strip from left to today */}
-                  {(timescale.showElapsedTime ?? false) && todayFraction > 0 && (
+                  {(timescale.showElapsedTime ?? false) && isTodayVisible && todayFraction > 0 && (
                     <div
                       className="absolute left-0 pointer-events-none z-10"
                       style={{
@@ -3550,7 +3559,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                 </div>
 
                 {/* Today label — gated on showToday, respects todayPosition */}
-                {timescale.showToday && todayFraction > 0 && todayFraction < 1 && (
+                {timescale.showToday && isTodayVisible && todayFraction > 0 && todayFraction < 1 && (
                   <div
                     className="absolute pointer-events-none z-20"
                     style={{

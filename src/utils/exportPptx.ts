@@ -512,7 +512,10 @@ function drawTimescale(
   tierLabels.forEach(({ tier, labels }, tierIdx) => {
     const tierY = ctx.timescaleY + tierIdx * tierHeight;
     const originDate = parseISO(origin);
-    const cells = buildVisibleTierCells(labels, tier.unit, originDate, ctx.totalDays, ctx.totalWidth, false);
+    const cells = buildVisibleTierCells(labels, tier.unit, originDate, ctx.totalDays, ctx.totalWidth, {
+      allowSkip: false,
+      tierConfig: tier,
+    });
 
     // Background bar
     slide.addShape('rect', {

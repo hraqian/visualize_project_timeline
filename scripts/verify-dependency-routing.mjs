@@ -328,6 +328,55 @@ const exportResults = await page.evaluate(async () => {
   }
 });
 
+const compactRangeResults = await page.evaluate(async () => {
+  const store = window.__PROJECT_STORE__;
+  if (!store) {
+    return { available: false };
+  }
+  const { resolveTimescaleRange } = await import('/src/utils/index.ts');
+
+  store.getState().newProject();
+  const startId = store.getState().addItem({
+    name: 'Start marker',
+    type: 'milestone',
+    startDate: '2023-07-03',
+    endDate: '2023-07-03',
+    row: 0,
+  });
+  const endId = store.getState().addItem({
+    name: 'End task',
+    type: 'task',
+    startDate: '2026-03-21',
+    endDate: '2026-03-27',
+    row: 1,
+  });
+
+  store.setState((s) => ({
+    ...s,
+    activeView: 'timeline',
+    timescale: {
+      ...s.timescale,
+      tiers: [
+        { ...s.timescale.tiers[0], unit: 'year', visible: true },
+        { ...s.timescale.tiers[1], unit: 'month', visible: true },
+        ...s.timescale.tiers.slice(2).map((tier) => ({ ...tier, visible: false })),
+      ],
+    },
+  }));
+
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const state = store.getState();
+  const items = state.items.filter((item) => item.id === startId || item.id === endId);
+  const resolved = resolveTimescaleRange(items, state.timescale, 744);
+  return {
+    available: true,
+    origin: resolved.origin,
+    rangeEndDate: resolved.rangeEndDate.toISOString().split('T')[0],
+    totalDays: resolved.totalDays,
+    visibleUnits: resolved.resolvedUnits,
+  };
+});
+
 const regressionResults = await page.evaluate(async () => {
   const storage = await import('/src/utils/fileStorage.ts');
   const store = window.__PROJECT_STORE__;
@@ -675,6 +724,7 @@ const timescaleFailures = [];
 const escapeFailures = [];
 const titleAlignmentFailures = [];
 const wrappedTitleLayoutFailures = [];
+const compactRangeFailures = [];
 const exportFailures = [];
 if (!regressionResults.timescale.tierClickSwitches) {
   timescaleFailures.push({ kind: 'tier-click-switch', ...regressionResults.timescale.tierClickState });
@@ -715,6 +765,17 @@ if (!wrappedTitleLayoutResults.available) {
   }
 }
 
+if (!compactRangeResults.available) {
+  compactRangeFailures.push(compactRangeResults);
+} else {
+  if (compactRangeResults.origin !== '2023-07-01') {
+    compactRangeFailures.push({ reason: 'Unexpected compact range start', ...compactRangeResults });
+  }
+  if (compactRangeResults.rangeEndDate !== '2026-04-30') {
+    compactRangeFailures.push({ reason: 'Unexpected compact range end', ...compactRangeResults });
+  }
+}
+
 if (!exportResults.available) {
   exportFailures.push({ kind: 'unavailable' });
 } else {
@@ -729,7 +790,7 @@ if (!exportResults.available) {
   }
 }
 
-const totalFailures = routingFailures.length + styleRoutingFailures.length + sameDayMilestoneTaskFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + wrappedTitleLayoutFailures.length + exportFailures.length;
+const totalFailures = routingFailures.length + styleRoutingFailures.length + sameDayMilestoneTaskFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + wrappedTitleLayoutFailures.length + compactRangeFailures.length + exportFailures.length;
 
 console.log(JSON.stringify({
   routing: {
@@ -777,6 +838,10 @@ console.log(JSON.stringify({
   wrappedTitleLayout: {
     failures: wrappedTitleLayoutFailures.length,
     details: wrappedTitleLayoutFailures,
+  },
+  compactRange: {
+    failures: compactRangeFailures.length,
+    details: compactRangeFailures,
   },
   exports: {
     failures: exportFailures.length,
