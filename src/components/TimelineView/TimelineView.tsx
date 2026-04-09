@@ -2631,7 +2631,11 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
           )}
 
            {/* Timescale Headers */}
-           <div className="sticky top-0 z-10 relative" style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}>
+            <div
+              className="sticky top-0 z-10 relative"
+              data-timescale-surface="timeline"
+              style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}
+            >
               {/* Left end cap — positioned outside the timescale bar */}
               {timescale.leftEndCap?.show && (
                 <div
@@ -2673,6 +2677,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                     return (
                       <div
                         key={tierIdx}
+                        data-timescale-tier-row={tierIdx}
                         className={`flex h-7 relative cursor-pointer transition-shadow hover:outline hover:outline-1 hover:outline-red-400 ${isSelected ? 'ring-2 ring-inset ring-white/40' : ''}`}
                         style={{ backgroundColor: tier.backgroundColor }}
                         onClick={(e) => {
@@ -2687,6 +2692,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                         {cells.map((cell, ci) => (
                           <div
                             key={ci}
+                            data-timescale-tier-cell={ci}
                             className={`flex items-center shrink-0 ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
                             style={{
                               position: 'absolute',
@@ -2704,7 +2710,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                               paddingRight: ci === cells.length - 1 ? 8 : 4,
                             }}
                           >
-                            <span style={{ whiteSpace: 'nowrap' }}>{cell.label}</span>
+                            <span data-timescale-tier-label style={{ whiteSpace: 'nowrap' }}>{cell.label}</span>
                           </div>
                         ))}
                       </div>
@@ -2728,6 +2734,7 @@ export const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(fu
                 {/* Today label — positioned relative to timescale bar */}
                 {timescale.showToday && isTodayVisible && todayX >= 0 && todayX <= totalWidth && (
                   <div
+                    data-timescale-today-marker="timeline"
                     className="absolute pointer-events-none z-20"
                     style={{
                       left: todayX,

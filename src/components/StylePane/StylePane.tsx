@@ -3479,7 +3479,11 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8">
           {/* Timescale preview — mirrors main TimelineView rendering */}
           {visibleCount > 0 && (
-            <div className="relative mx-16" style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}>
+            <div
+              className="relative mx-16"
+              data-timescale-surface="preview"
+              style={timescale.showToday ? (todayPos === 'below' ? { marginBottom: 22 } : { marginTop: 22 }) : undefined}
+            >
               {/* Left end cap — conditional on config, uses config styling */}
               {timescale.leftEndCap?.show && (
                 <div
@@ -3516,12 +3520,14 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                     return (
                     <div
                       key={tierIdx}
+                      data-timescale-tier-row={tierIdx}
                       className="relative"
                       style={{ backgroundColor: tier.backgroundColor, height: 28 }}
                     >
                       {cells.map((cell, ci) => (
                         <div
                           key={ci}
+                          data-timescale-tier-cell={ci}
                           className={`absolute top-0 h-full flex items-center ${tier.separators && ci > 0 ? 'border-l border-white/20' : ''}`}
                           style={{
                             left: `${cell.fraction * 100}%`,
@@ -3537,7 +3543,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                             paddingRight: ci === cells.length - 1 ? 8 : 4,
                           }}
                         >
-                          <span style={{ whiteSpace: 'nowrap' }}>{cell.label}</span>
+                          <span data-timescale-tier-label style={{ whiteSpace: 'nowrap' }}>{cell.label}</span>
                         </div>
                       ))}
                     </div>
@@ -3561,6 +3567,7 @@ function TierSettingsModal({ onClose }: { onClose: () => void }) {
                 {/* Today label — gated on showToday, respects todayPosition */}
                 {timescale.showToday && isTodayVisible && todayFraction > 0 && todayFraction < 1 && (
                   <div
+                    data-timescale-today-marker="preview"
                     className="absolute pointer-events-none z-20"
                     style={{
                       left: `${todayFraction * 100}%`,

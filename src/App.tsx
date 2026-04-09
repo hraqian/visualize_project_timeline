@@ -166,7 +166,9 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const exposeTestApi = import.meta.env.DEV || searchParams.has('__regression__');
+    if (!exposeTestApi) return;
     const testWindow = window as Window & {
       __PROJECT_STORE__?: typeof useProjectStore;
       __EXPORT_TEST_API__?: ExportTestApi;

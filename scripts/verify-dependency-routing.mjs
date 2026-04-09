@@ -3,7 +3,8 @@ import { chromium } from 'playwright';
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 
-await page.goto('http://127.0.0.1:4173', { waitUntil: 'networkidle' });
+await page.goto('http://127.0.0.1:4173/?__regression__=1', { waitUntil: 'networkidle' });
+await page.waitForFunction(() => Boolean(window.__PROJECT_STORE__), { timeout: 10000 });
 
 const uiEscapeResults = await page.evaluate(async () => {
   const store = window.__PROJECT_STORE__;
@@ -357,8 +358,8 @@ const compactRangeResults = await page.evaluate(async () => {
     timescale: {
       ...s.timescale,
       tiers: [
-        { ...s.timescale.tiers[0], unit: 'year', visible: true },
-        { ...s.timescale.tiers[1], unit: 'month', visible: true },
+        { ...s.timescale.tiers[0], unit: 'year', format: 'yyyy', visible: true },
+        { ...(s.timescale.tiers[1] ?? s.timescale.tiers[0]), unit: 'month', format: 'MMM', visible: true, fontSize: 12, fontSizeAuto: true, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal' },
         ...s.timescale.tiers.slice(2).map((tier) => ({ ...tier, visible: false })),
       ],
     },
@@ -374,6 +375,91 @@ const compactRangeResults = await page.evaluate(async () => {
     rangeEndDate: resolved.rangeEndDate.toISOString().split('T')[0],
     totalDays: resolved.totalDays,
     visibleUnits: resolved.resolvedUnits,
+  };
+});
+
+const previewParityResults = await page.evaluate(async () => {
+  const store = window.__PROJECT_STORE__;
+  if (!store) {
+    return { available: false };
+  }
+
+  const waitForPaint = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const getTierLabels = (surface) => {
+    const root = document.querySelector(`[data-timescale-surface="${surface}"]`);
+    if (!(root instanceof HTMLElement)) return null;
+    return Array.from(root.querySelectorAll('[data-timescale-tier-row]')).map((row) => (
+      Array.from(row.querySelectorAll('[data-timescale-tier-label]')).map((label) => label.textContent?.trim() ?? '')
+    ));
+  };
+  const hasTodayMarker = (surface) => Boolean(document.querySelector(`[data-timescale-today-marker="${surface}"]`));
+
+  store.getState().newProject();
+  store.getState().addItem({
+    name: 'Preview parity start',
+    type: 'milestone',
+    startDate: '2013-07-03',
+    endDate: '2013-07-03',
+    row: 0,
+  });
+  store.getState().addItem({
+    name: 'Preview parity end',
+    type: 'task',
+    startDate: '2016-03-21',
+    endDate: '2016-03-27',
+    row: 1,
+  });
+
+  store.setState((s) => ({
+    ...s,
+    activeView: 'timeline',
+    stylePaneSection: 'scale',
+    timescale: {
+      ...s.timescale,
+      showToday: true,
+      tiers: [
+        { ...s.timescale.tiers[0], unit: 'year', format: 'yyyy', visible: true },
+        { ...(s.timescale.tiers[1] ?? s.timescale.tiers[0]), unit: 'month', format: 'MMM', visible: true, fontSize: 12, fontSizeAuto: true, fontFamily: 'Arial', fontWeight: 400, fontStyle: 'normal' },
+        ...s.timescale.tiers.slice(2).map((tier) => ({ ...tier, visible: false })),
+      ],
+    },
+  }));
+
+  await waitForPaint();
+
+  const tierSettingsButton = Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Tier settings');
+  if (!(tierSettingsButton instanceof HTMLButtonElement)) {
+    return { available: false, reason: 'Missing Tier settings button' };
+  }
+
+  tierSettingsButton.click();
+  await waitForPaint();
+
+  const timelineLabels = getTierLabels('timeline');
+  const previewLabels = getTierLabels('preview');
+  if (!timelineLabels || !previewLabels) {
+    return {
+      available: false,
+      reason: 'Missing rendered timescale surfaces',
+      timelinePresent: Boolean(timelineLabels),
+      previewPresent: Boolean(previewLabels),
+    };
+  }
+
+  const timelineTodayVisible = hasTodayMarker('timeline');
+  const previewTodayVisible = hasTodayMarker('preview');
+  const closeButton = document.querySelector('[aria-label="Close modal"]');
+  if (closeButton instanceof HTMLElement) {
+    closeButton.click();
+    await waitForPaint();
+  }
+
+  return {
+    available: true,
+    timelineLabels,
+    previewLabels,
+    timelineTodayVisible,
+    previewTodayVisible,
   };
 });
 
@@ -725,6 +811,7 @@ const escapeFailures = [];
 const titleAlignmentFailures = [];
 const wrappedTitleLayoutFailures = [];
 const compactRangeFailures = [];
+const previewParityFailures = [];
 const exportFailures = [];
 if (!regressionResults.timescale.tierClickSwitches) {
   timescaleFailures.push({ kind: 'tier-click-switch', ...regressionResults.timescale.tierClickState });
@@ -776,6 +863,24 @@ if (!compactRangeResults.available) {
   }
 }
 
+if (!previewParityResults.available) {
+  previewParityFailures.push(previewParityResults);
+} else {
+  if (JSON.stringify(previewParityResults.timelineLabels) !== JSON.stringify(previewParityResults.previewLabels)) {
+    previewParityFailures.push({
+      reason: 'Preview labels diverged from timeline labels',
+      timelineLabels: previewParityResults.timelineLabels,
+      previewLabels: previewParityResults.previewLabels,
+    });
+  }
+  if (previewParityResults.timelineTodayVisible) {
+    previewParityFailures.push({ reason: 'Timeline today marker rendered outside range' });
+  }
+  if (previewParityResults.previewTodayVisible) {
+    previewParityFailures.push({ reason: 'Preview today marker rendered outside range' });
+  }
+}
+
 if (!exportResults.available) {
   exportFailures.push({ kind: 'unavailable' });
 } else {
@@ -790,7 +895,7 @@ if (!exportResults.available) {
   }
 }
 
-const totalFailures = routingFailures.length + styleRoutingFailures.length + sameDayMilestoneTaskFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + wrappedTitleLayoutFailures.length + compactRangeFailures.length + exportFailures.length;
+const totalFailures = routingFailures.length + styleRoutingFailures.length + sameDayMilestoneTaskFailures.length + viewFailures.length + schedulingFailures.length + dependencyFailures.length + persistenceFailures.length + timescaleFailures.length + escapeFailures.length + titleAlignmentFailures.length + wrappedTitleLayoutFailures.length + compactRangeFailures.length + previewParityFailures.length + exportFailures.length;
 
 console.log(JSON.stringify({
   routing: {
@@ -842,6 +947,10 @@ console.log(JSON.stringify({
   compactRange: {
     failures: compactRangeFailures.length,
     details: compactRangeFailures,
+  },
+  previewParity: {
+    failures: previewParityFailures.length,
+    details: previewParityFailures,
   },
   exports: {
     failures: exportFailures.length,
